@@ -6,8 +6,8 @@ function CustomButton({ children, sx, ...props }) {
       variant="contained"
       sx={{
         px: 3,
-        py: 1.25,
-        minHeight: 52,
+        py: 0.95,
+        minHeight: 44,
         lineHeight: 1.2,
         whiteSpace: "nowrap",
         borderRadius: 2,

@@ -32,6 +32,7 @@ function RegisterPage() {
     const nextErrors = validateRegister(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
+
     try {
       await register(values);
       navigate("/");
@@ -42,12 +43,22 @@ function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Tạo tài khoản mới"
-      subtitle="Gia nhập SmartFood để quản lý lịch sử đặt bàn, lưu quán yêu thích và khám phá nhiều gợi ý hợp gu hơn mỗi ngày."
+      title="Tạo tài khoản mới để bắt đầu khám phá WHAT2EAT."
+      subtitle="Gia nhập ứng dụng để quản lý lịch sử đặt bàn, lưu quán yêu thích và nhận thêm nhiều gợi ý ăn uống hợp gu mỗi ngày."
     >
-      <CustomCard>
+      <CustomCard
+        sx={{
+          width: "100%",
+          borderRadius: 0,
+          background: "transparent",
+          boxShadow: "none",
+          border: "none",
+          backdropFilter: "none",
+        }}
+        contentSx={{ p: { xs: 2, md: 2.2 }, "&:last-child": { pb: { xs: 2, md: 2.2 } } }}
+      >
         <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={2.5}>
+          <Stack spacing={1.35}>
             <Typography variant="h3">Đăng ký</Typography>
             {message ? <Alert severity="error">{message}</Alert> : null}
             <FormInput label="Họ và tên" name="fullName" value={values.fullName} onChange={handleChange} error={!!errors.fullName} helperText={errors.fullName} />
@@ -66,7 +77,7 @@ function RegisterPage() {
             <CustomButton type="submit" disabled={loading} startIcon={<PersonAddAltRoundedIcon />}>
               {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
             </CustomButton>
-            <Typography color="text.secondary">
+            <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
               Đã có tài khoản?{" "}
               <Link component={RouterLink} to="/dang-nhap" underline="hover">
                 Đăng nhập

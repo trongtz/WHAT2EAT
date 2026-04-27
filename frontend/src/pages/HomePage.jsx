@@ -1,13 +1,16 @@
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import FmdGoodRoundedIcon from "@mui/icons-material/FmdGoodRounded";
 import MyLocationRoundedIcon from "@mui/icons-material/MyLocationRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import {
+  alpha,
   Box,
+  Button,
   Chip,
   Grid,
-  IconButton,
   InputAdornment,
   Stack,
   TextField,
@@ -30,15 +33,21 @@ const restaurantLocations = {
 };
 
 const statusColors = {
-  "Còn chỗ": "#15C39A",
-  "Sắp đầy": "#F59E0B",
-  "Hết chỗ": "#EF4444",
+  "Còn chỗ": "#22B573",
+  "Sắp đầy": "#F5A623",
+  "Hết chỗ": "#E15B64",
 };
 
 const legendItems = [
-  { label: "Còn chỗ", color: "#15C39A" },
-  { label: "Sắp đầy", color: "#F59E0B" },
-  { label: "Đặt trước", color: "#EF4444" },
+  { label: "Còn chỗ", color: "#22B573" },
+  { label: "Sắp đầy", color: "#F5A623" },
+  { label: "Đặt trước", color: "#4A90E2" },
+];
+
+const insightItems = [
+  { label: "Gợi ý theo vị trí", value: "12+", icon: FmdGoodRoundedIcon },
+  { label: "Nhà hàng nổi bật", value: "Top rated", icon: StarRoundedIcon },
+  { label: "Đặt bàn siêu nhanh", value: "< 30s", icon: AccessTimeRoundedIcon },
 ];
 
 const createMarkerIcon = (color) =>
@@ -67,6 +76,8 @@ function HomePage() {
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [selectedId, setSelectedId] = useState(1);
+  const [focusCenter, setFocusCenter] = useState([10.7769, 106.7009]);
+  const [locationPending, setLocationPending] = useState(false);
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -74,6 +85,7 @@ function HomePage() {
       setRestaurants(data);
       setLoading(false);
     };
+
     fetchRestaurants();
   }, []);
 
@@ -85,6 +97,7 @@ function HomePage() {
   const filteredRestaurants = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
     if (!normalized) return featuredRestaurants;
+
     return featuredRestaurants.filter(
       (item) =>
         item.name.toLowerCase().includes(normalized) ||
@@ -102,30 +115,46 @@ function HomePage() {
   const selectedRestaurant =
     filteredRestaurants.find((item) => item.id === selectedId) || filteredRestaurants[0];
 
-  const selectedCenter = selectedRestaurant
-    ? restaurantLocations[selectedRestaurant.id] || [10.7769, 106.7009]
-    : [10.7769, 106.7009];
+  useEffect(() => {
+    if (selectedRestaurant) {
+      setFocusCenter(restaurantLocations[selectedRestaurant.id] || [10.7769, 106.7009]);
+    }
+  }, [selectedRestaurant]);
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) return;
+
+    setLocationPending(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setFocusCenter([coords.latitude, coords.longitude]);
+        setLocationPending(false);
+      },
+      () => {
+        setLocationPending(false);
+      },
+      { enableHighAccuracy: true, timeout: 6000 }
+    );
+  };
+
+  const heroViewportHeight = {
+    xs: "min(68svh, 560px)",
+    md: "calc(100svh - 190px)",
+    lg: "calc(100svh - 170px)",
+  };
 
   return (
-    <Stack spacing={4}>
-      <Box
-        className="glass-panel"
-        sx={{
-          borderRadius: 2,
-          p: { xs: 1.5, md: 2 },
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(247,250,255,0.93) 100%)",
-        }}
-      >
+    <Stack spacing={4.5}>
+      <Box className="glass-panel" sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2.5 }}>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, lg: 9 }}>
+          <Grid size={{ xs: 12, lg: 8.6 }}>
             <Box
               sx={{
                 position: "relative",
                 overflow: "hidden",
-                borderRadius: 2,
-                height: { xs: 520, md: 640 },
-                border: "1px solid rgba(47,107,255,0.08)",
+                borderRadius: 2.5,
+                height: heroViewportHeight,
+                border: "1px solid rgba(74,144,226,0.12)",
                 backgroundColor: "#EAF3FF",
               }}
             >
@@ -140,12 +169,12 @@ function HomePage() {
                   url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                 />
 
-                <MapFocusController center={selectedCenter} />
+                <MapFocusController center={focusCenter} />
 
                 {filteredRestaurants.map((restaurant) => {
                   const position = restaurantLocations[restaurant.id];
                   if (!position) return null;
-                  const markerColor = statusColors[restaurant.status] || "#15C39A";
+                  const markerColor = statusColors[restaurant.status] || "#22B573";
 
                   return (
                     <Marker
@@ -166,47 +195,82 @@ function HomePage() {
                 })}
               </MapContainer>
 
-              <Box sx={{ position: "absolute", top: 18, left: 18, zIndex: 500 }}>
+              <Stack spacing={1.5} sx={{ position: "absolute", top: 20, left: 20, right: 20, zIndex: 500 }}>
                 <TextField
-                  placeholder="Tìm món, nhà hàng..."
+                  placeholder="Tìm món, nhà hàng hoặc khu vực bạn muốn ăn..."
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   sx={{
-                    width: { xs: 280, md: 340 },
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 2,
+                    maxWidth: 460,
+                    "& .MuiOutlinedInput-root": {
                       bgcolor: "rgba(255,255,255,0.98)",
-                      boxShadow: "0 16px 30px rgba(28,36,64,0.12)",
+                      boxShadow: "0 18px 34px rgba(15,23,42,0.12)",
                     },
                   }}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <SearchRoundedIcon />
+                        <SearchRoundedIcon sx={{ color: "#4A90E2" }} />
                       </InputAdornment>
                     ),
                     endAdornment: (
                       <InputAdornment position="end">
-                        <TuneRoundedIcon />
+                        <TuneRoundedIcon sx={{ color: "#667085" }} />
                       </InputAdornment>
                     ),
                   }}
                 />
-              </Box>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                  <Button
+                    onClick={handleLocateMe}
+                    startIcon={<MyLocationRoundedIcon />}
+                    disabled={locationPending}
+                    sx={{
+                      alignSelf: "flex-start",
+                      px: 2,
+                      py: 1.1,
+                      bgcolor: "rgba(255,255,255,0.96)",
+                      color: "secondary.main",
+                      boxShadow: "0 16px 30px rgba(15,23,42,0.10)",
+                      "&:hover": {
+                        bgcolor: "white",
+                        transform: "translateY(-1px)",
+                      },
+                    }}
+                  >
+                    {locationPending ? "Đang lấy vị trí..." : "Vị trí của tôi"}
+                  </Button>
+                  <Box
+                    sx={{
+                      alignSelf: "flex-start",
+                      px: 2,
+                      py: 1.15,
+                      borderRadius: 2,
+                      bgcolor: "rgba(255,255,255,0.94)",
+                      boxShadow: "0 16px 30px rgba(15,23,42,0.10)",
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>
+                      {selectedRestaurant ? `Đang focus ${selectedRestaurant.name}` : "Khám phá quanh bạn"}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Stack>
 
               <Stack
-                direction="row"
+                direction={{ xs: "column", sm: "row" }}
                 spacing={1}
                 sx={{
                   position: "absolute",
-                  left: 18,
-                  bottom: 18,
+                  left: 20,
+                  bottom: 20,
                   zIndex: 500,
                   px: 2,
-                  py: 1.25,
+                  py: 1.35,
                   borderRadius: 2,
                   bgcolor: "rgba(255,255,255,0.96)",
-                  boxShadow: "0 16px 30px rgba(28,36,64,0.12)",
+                  boxShadow: "0 16px 30px rgba(15,23,42,0.12)",
                 }}
               >
                 {legendItems.map((item) => (
@@ -216,106 +280,83 @@ function HomePage() {
                   </Stack>
                 ))}
               </Stack>
-
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  position: "absolute",
-                  left: 18,
-                  top: 86,
-                  zIndex: 500,
-                  px: 1.75,
-                  py: 1,
-                  borderRadius: 2,
-                  bgcolor: "rgba(255,255,255,0.96)",
-                  boxShadow: "0 16px 30px rgba(28,36,64,0.12)",
-                }}
-              >
-                <MyLocationRoundedIcon color="primary" />
-                <Typography fontWeight={600}>Vị trí của tôi</Typography>
-              </Stack>
-
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: 118,
-                  right: 24,
-                  zIndex: 500,
-                  px: 2,
-                  py: 1.1,
-                  borderRadius: 2,
-                  bgcolor: "rgba(255,255,255,0.97)",
-                  boxShadow: "0 16px 30px rgba(28,36,64,0.12)",
-                }}
-              >
-                <Typography fontWeight={700} color="text.secondary">
-                  Đang tìm kiếm nhà hàng phù hợp...
-                </Typography>
-              </Box>
             </Box>
           </Grid>
 
-          <Grid size={{ xs: 12, lg: 3 }}>
+          <Grid size={{ xs: 12, lg: 3.4 }}>
             <Stack
               spacing={1.5}
               sx={{
-                height: { xs: "auto", lg: 640 },
+                height: { xs: "auto", lg: "calc(100svh - 170px)" },
+                maxHeight: { xs: "none", lg: "calc(100svh - 170px)" },
                 overflowY: "auto",
                 pr: 0.5,
               }}
             >
               {filteredRestaurants.map((restaurant) => {
                 const isActive = selectedId === restaurant.id;
+
                 return (
                   <Box
                     key={restaurant.id}
                     onClick={() => setSelectedId(restaurant.id)}
                     sx={{
-                      p: 1.5,
-                      borderRadius: 2,
+                      p: 1.25,
+                      borderRadius: 2.5,
                       cursor: "pointer",
-                      bgcolor: "rgba(255,255,255,0.96)",
+                      bgcolor: "rgba(255,255,255,0.94)",
                       border: isActive
-                        ? "1px solid rgba(47,107,255,0.3)"
-                        : "1px solid rgba(47,107,255,0.08)",
+                        ? "1px solid rgba(255,138,42,0.22)"
+                        : "1px solid rgba(15,23,42,0.06)",
                       boxShadow: isActive
-                        ? "0 18px 36px rgba(47,107,255,0.16)"
-                        : "0 12px 24px rgba(28,36,64,0.06)",
-                      transition: "all 0.2s ease",
+                        ? "0 24px 42px rgba(255, 140, 64, 0.14)"
+                        : "0 14px 26px rgba(15,23,42,0.06)",
+                      transition: "all 0.24s ease",
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 22px 36px rgba(15,23,42,0.10)",
+                      },
                     }}
                   >
-                    <Stack direction="row" spacing={1.25}>
+                    <Stack spacing={1.35}>
                       <Box
                         sx={{
-                          width: 104,
-                          height: 104,
+                          width: "100%",
+                          height: { xs: 160, xl: 176 },
                           borderRadius: 2,
-                          flexShrink: 0,
-                          backgroundImage: `url(${restaurant.image})`,
+                          overflow: "hidden",
+                          backgroundImage: `linear-gradient(180deg, rgba(8,15,28,0.02), rgba(8,15,28,0.22)), url(${restaurant.image})`,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }}
                       />
 
-                      <Stack spacing={0.6} minWidth={0}>
-                        <Typography variant="h4" sx={{ fontSize: "1.05rem" }}>
-                          {restaurant.name}
-                        </Typography>
-                        <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }} noWrap>
-                          {restaurant.address}
-                        </Typography>
-                        <Stack direction="row" spacing={0.6} alignItems="center">
-                          <StarRoundedIcon sx={{ fontSize: 18, color: "#F59E0B" }} />
-                          <Typography fontWeight={700}>{restaurant.rating}</Typography>
-                          <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-                            {restaurant.reviews}
+                      <Stack spacing={0.75}>
+                        <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="flex-start">
+                          <Typography variant="h4" sx={{ fontSize: "1.02rem" }}>
+                            {restaurant.name}
                           </Typography>
+                          <Chip
+                            size="small"
+                            icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
+                            label={restaurant.rating}
+                            sx={{ bgcolor: alpha("#22B573", 0.1), color: "#169A52" }}
+                          />
                         </Stack>
-                        <Stack direction="row" spacing={0.6} alignItems="center">
-                          <FmdGoodRoundedIcon sx={{ fontSize: 17, color: "#2F6BFF" }} />
-                          <Typography fontWeight={700} color="primary.main">
-                            {restaurant.distance}
+
+                        <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
+                          {restaurant.category} • {restaurant.address}
+                        </Typography>
+
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Stack direction="row" spacing={0.6} alignItems="center">
+                            <FmdGoodRoundedIcon sx={{ fontSize: 17, color: "#4A90E2" }} />
+                            <Typography fontWeight={700} sx={{ color: "#4A90E2", fontSize: "0.92rem" }}>
+                              {restaurant.distance}
+                            </Typography>
+                          </Stack>
+                          <Typography sx={{ color: "primary.main", fontWeight: 800 }}>
+                            {restaurant.averagePrice ? `${Math.round(restaurant.averagePrice / 1000)}k` : restaurant.priceRange}
                           </Typography>
                         </Stack>
                       </Stack>
@@ -329,9 +370,9 @@ function HomePage() {
       </Box>
 
       <SectionHeader
-        eyebrow="Gợi ý nổi bật"
-        title="Danh sách nổi bật"
-        description="Các nhà hàng đang được quan tâm nhiều hôm nay."
+        eyebrow="Curated picks"
+        title="Danh sách nổi bật hôm nay"
+        description="Ưu tiên hình ảnh hấp dẫn, đánh giá tốt và khoảng cách tiện lợi để bạn chọn quán nhanh hơn."
       />
 
       {loading ? (
@@ -348,8 +389,11 @@ function HomePage() {
                     to={`/nha-hang/${restaurant.id}`}
                     clickable
                     label="Xem chi tiết"
-                    color="primary"
-                    sx={{ fontWeight: 700, px: 1 }}
+                    sx={{
+                      px: 1.2,
+                      bgcolor: "rgba(255, 138, 42, 0.12)",
+                      color: "primary.main",
+                    }}
                   />
                 }
               />
@@ -357,6 +401,123 @@ function HomePage() {
           ))}
         </Grid>
       )}
+
+      <Box
+        sx={{
+          px: { xs: 2.2, md: 4.5 },
+          py: { xs: 3, md: 4.25 },
+          borderRadius: 2.5,
+          position: "relative",
+          overflow: "hidden",
+          background:
+            "linear-gradient(135deg, rgba(255,122,24,0.12) 0%, rgba(255,179,71,0.08) 34%, rgba(74,144,226,0.08) 100%)",
+          border: "1px solid rgba(255,255,255,0.75)",
+          boxShadow: "0 24px 64px rgba(15, 23, 42, 0.08)",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            width: 280,
+            height: 280,
+            top: -120,
+            right: -80,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(255,179,71,0.42), transparent 68%)",
+          }}
+        />
+
+        <Grid container spacing={3} alignItems="center">
+          <Grid size={{ xs: 12, lg: 7 }}>
+            <Stack spacing={2.1}>
+              <Chip
+                icon={<AutoAwesomeRoundedIcon />}
+                label="Bản đồ ẩm thực cá nhân hóa"
+                sx={{
+                  alignSelf: "flex-start",
+                  bgcolor: "rgba(255,255,255,0.8)",
+                  color: "primary.main",
+                }}
+              />
+              <Typography variant="h1" sx={{ maxWidth: 720 }}>
+                WHAT2EAT giúp bạn tìm quán ngon gần mình theo cách tinh tế hơn.
+              </Typography>
+              <Typography color="text.secondary" sx={{ maxWidth: 620, fontSize: "1.05rem" }}>
+                Khám phá nhà hàng bằng bản đồ trực quan, ảnh món ăn nổi bật và gợi ý thông minh để mỗi quyết định ăn gì đều nhanh, đẹp mắt và đáng tin.
+              </Typography>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.4} pt={0.5}>
+                <Button
+                  component={RouterLink}
+                  to="/tim-kiem"
+                  variant="contained"
+                  startIcon={<SearchRoundedIcon />}
+                  sx={{
+                    px: 2.8,
+                    background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
+                    boxShadow: "0 18px 36px rgba(255, 140, 64, 0.24)",
+                  }}
+                >
+                  Khám phá ngay
+                </Button>
+                <Button
+                  onClick={handleLocateMe}
+                  variant="outlined"
+                  startIcon={<MyLocationRoundedIcon />}
+                  sx={{
+                    px: 2.6,
+                    borderColor: "rgba(74,144,226,0.24)",
+                    color: "secondary.main",
+                    bgcolor: "rgba(255,255,255,0.72)",
+                  }}
+                >
+                  Vị trí của tôi
+                </Button>
+              </Stack>
+            </Stack>
+          </Grid>
+
+          <Grid size={{ xs: 12, lg: 5 }}>
+            <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1.5}>
+              {insightItems.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <Stack
+                    key={item.label}
+                    direction="row"
+                    spacing={1.5}
+                    alignItems="center"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      bgcolor: "rgba(255,255,255,0.78)",
+                      border: "1px solid rgba(255,255,255,0.68)",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 1.75,
+                        display: "grid",
+                        placeItems: "center",
+                        background: "linear-gradient(135deg, rgba(255,122,24,0.18), rgba(74,144,226,0.14))",
+                      }}
+                    >
+                      <Icon sx={{ color: item.icon === StarRoundedIcon ? "#22B573" : "#4A90E2" }} />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontWeight: 800 }}>{item.value}</Typography>
+                      <Typography sx={{ color: "text.secondary", fontSize: "0.92rem" }}>{item.label}</Typography>
+                    </Box>
+                  </Stack>
+                );
+              })}
+            </Stack>
+          </Grid>
+        </Grid>
+      </Box>
     </Stack>
   );
 }

@@ -4,11 +4,12 @@ function FormInput({ sx, ...props }) {
   return (
     <TextField
       fullWidth
-      size="medium"
+      size="small"
       sx={{
         "& .MuiOutlinedInput-root": {
           borderRadius: 2,
           backgroundColor: "rgba(255,255,255,0.92)",
+          minHeight: 44,
         },
         ...sx,
       }}

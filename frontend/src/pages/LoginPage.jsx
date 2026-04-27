@@ -1,5 +1,6 @@
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
-import { Alert, Box, Link, Stack, Typography } from "@mui/material";
+import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
+import { Alert, Box, Chip, Link, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
@@ -12,7 +13,7 @@ import { validateLogin } from "../utils/validators";
 function LoginPage() {
   const navigate = useNavigate();
   const { login, loading } = useAuth();
-  const [values, setValues] = useState({ email: "user@smartfood.vn", password: "123456" });
+  const [values, setValues] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
 
@@ -39,31 +40,48 @@ function LoginPage() {
 
   return (
     <AuthLayout
-      title="Chào mừng quay lại"
-      subtitle="Đăng nhập để đặt bàn nhanh, lưu nhà hàng yêu thích và nhận gợi ý AI theo đúng gu ăn uống của bạn."
+      title="Đăng nhập để tiếp tục hành trình khám phá món ngon."
+      subtitle="Lưu quán yêu thích, đặt bàn nhanh và nhận gợi ý phù hợp với khẩu vị của bạn trong một trải nghiệm gọn gàng, hiện đại."
     >
-      <CustomCard>
+      <CustomCard
+        sx={{
+          width: "100%",
+          borderRadius: 0,
+          background: "transparent",
+          boxShadow: "none",
+          border: "none",
+          backdropFilter: "none",
+        }}
+        contentSx={{ p: { xs: 2, md: 2.2 }, "&:last-child": { pb: { xs: 2, md: 2.2 } } }}
+      >
         <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={2.5}>
-            <Typography variant="h3">Đăng nhập</Typography>
-            <Typography color="text.secondary">
-              Tài khoản demo: `user@smartfood.vn`, `owner@smartfood.vn`, `admin@smartfood.vn` / mật khẩu `123456`
-            </Typography>
+          <Stack spacing={1.35}>
+            <Stack spacing={0.8}>
+              <Chip
+                icon={<TipsAndUpdatesRoundedIcon />}
+                label="Đăng nhập / Đăng ký để đồng bộ trải nghiệm"
+                sx={{
+                  alignSelf: "flex-start",
+                  height: 34,
+                  bgcolor: "rgba(255,138,42,0.10)",
+                  color: "primary.main",
+                  borderRadius: 2,
+                }}
+              />
+              <Typography variant="h3">Đăng nhập</Typography>
+              <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
+                Tài khoản demo: `user@smartfood.vn`, `owner@smartfood.vn`, `admin@smartfood.vn` với mật khẩu `123456`.
+              </Typography>
+            </Stack>
+
             {message ? <Alert severity="error">{message}</Alert> : null}
+
             <FormInput label="Email" name="email" value={values.email} onChange={handleChange} error={!!errors.email} helperText={errors.email} />
-            <FormInput
-              type="password"
-              label="Mật khẩu"
-              name="password"
-              value={values.password}
-              onChange={handleChange}
-              error={!!errors.password}
-              helperText={errors.password}
-            />
+            <FormInput type="password" label="Mật khẩu" name="password" value={values.password} onChange={handleChange} error={!!errors.password} helperText={errors.password} />
             <CustomButton type="submit" disabled={loading} startIcon={<LoginRoundedIcon />}>
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </CustomButton>
-            <Typography color="text.secondary">
+            <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
               Chưa có tài khoản?{" "}
               <Link component={RouterLink} to="/dang-ky" underline="hover">
                 Đăng ký ngay

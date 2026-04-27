@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = (nextUser) => {
     setUser(nextUser);
-    localStorage.setItem(storageKeys.user, JSON.stringify(nextUser));
+    sessionStorage.setItem(storageKeys.user, JSON.stringify(nextUser));
   };
 
   const value = useMemo(
