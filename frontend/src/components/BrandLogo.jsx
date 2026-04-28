@@ -4,54 +4,62 @@ import { Box, Stack, Typography } from "@mui/material";
 
 function BrandLogo({ compact = false }) {
   return (
-    <Stack direction="row" spacing={compact ? 1.25 : 1.4} alignItems="center">
+    <Stack direction="row" spacing={compact ? 1.1 : 1.25} alignItems="center">
       <Box
         sx={{
-          width: compact ? 48 : 54,
-          height: compact ? 48 : 54,
-          borderRadius: compact ? 2.5 : 4,
+          width: compact ? 46 : 52,
+          height: compact ? 46 : 52,
+          borderRadius: "50%",
           position: "relative",
           display: "grid",
           placeItems: "center",
           background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
-          boxShadow: "0 20px 42px rgba(255, 140, 64, 0.28)",
+          boxShadow: "0 14px 28px rgba(255, 140, 64, 0.24)",
           overflow: "hidden",
+          flexShrink: 0,
         }}
       >
         <Box
           sx={{
             position: "absolute",
-            inset: 1.5,
-            borderRadius: compact ? 2 : 2.5,
-            background:
-              "radial-gradient(circle at top, rgba(255,255,255,0.28), transparent 48%), rgba(255,255,255,0.08)",
+            inset: compact ? 10 : 11,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.96)",
           }}
         />
-        <FmdGoodRoundedIcon sx={{ position: "absolute", fontSize: compact ? 31 : 36, color: "white" }} />
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 2,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle at top, rgba(255,255,255,0.26), transparent 52%), rgba(255,255,255,0.04)",
+          }}
+        />
+        <FmdGoodRoundedIcon sx={{ position: "absolute", fontSize: compact ? 28 : 32, color: "white" }} />
         <RestaurantRoundedIcon
           sx={{
             position: "absolute",
-            fontSize: compact ? 16 : 18,
+            fontSize: compact ? 13 : 15,
             color: "#FF8B2C",
             transform: "translateY(1px)",
-            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))",
           }}
         />
       </Box>
 
-      <Box>
+      <Box sx={{ minWidth: 0 }}>
         <Typography
           sx={{
-            fontSize: compact ? "1.05rem" : "1.14rem",
+            fontSize: compact ? "1.02rem" : "1.12rem",
             fontWeight: 800,
-            letterSpacing: "0.06em",
-            lineHeight: 1,
+            letterSpacing: "0.05em",
+            lineHeight: 1.05,
           }}
         >
           WHAT2EAT
         </Typography>
         {!compact ? (
-          <Typography sx={{ mt: 0.35, fontSize: "0.74rem", color: "text.secondary", letterSpacing: "0.08em" }}>
+          <Typography sx={{ mt: 0.28, fontSize: "0.72rem", color: "text.secondary", letterSpacing: "0.07em" }}>
             DISCOVER TASTE NEAR YOU
           </Typography>
         ) : null}

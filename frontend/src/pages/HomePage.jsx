@@ -89,10 +89,7 @@ function HomePage() {
     fetchRestaurants();
   }, []);
 
-  const featuredRestaurants = useMemo(
-    () => restaurants.filter((item) => item.featured),
-    [restaurants]
-  );
+  const featuredRestaurants = useMemo(() => restaurants.filter((item) => item.featured), [restaurants]);
 
   const filteredRestaurants = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
@@ -158,15 +155,10 @@ function HomePage() {
                 backgroundColor: "#EAF3FF",
               }}
             >
-              <MapContainer
-                center={[10.7769, 106.7009]}
-                zoom={14}
-                scrollWheelZoom
-                style={{ height: "100%", width: "100%" }}
-              >
+              <MapContainer center={[10.7769, 106.7009]} zoom={14} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-                  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                  attribution="Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 />
 
                 <MapFocusController center={focusCenter} />
@@ -174,16 +166,13 @@ function HomePage() {
                 {filteredRestaurants.map((restaurant) => {
                   const position = restaurantLocations[restaurant.id];
                   if (!position) return null;
-                  const markerColor = statusColors[restaurant.status] || "#22B573";
 
                   return (
                     <Marker
                       key={restaurant.id}
                       position={position}
-                      icon={createMarkerIcon(markerColor)}
-                      eventHandlers={{
-                        click: () => setSelectedId(restaurant.id),
-                      }}
+                      icon={createMarkerIcon(statusColors[restaurant.status] || "#22B573")}
+                      eventHandlers={{ click: () => setSelectedId(restaurant.id) }}
                     >
                       <Popup>
                         <strong>{restaurant.name}</strong>
@@ -195,14 +184,16 @@ function HomePage() {
                 })}
               </MapContainer>
 
-              <Stack spacing={1.5} sx={{ position: "absolute", top: 20, left: 20, right: 20, zIndex: 500 }}>
+              <Stack spacing={1} sx={{ position: "absolute", top: 14, left: 14, right: 14, zIndex: 500 }}>
                 <TextField
                   placeholder="Tìm món, nhà hàng hoặc khu vực bạn muốn ăn..."
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   sx={{
-                    maxWidth: 460,
+                    maxWidth: 390,
                     "& .MuiOutlinedInput-root": {
+                      minHeight: 46,
+                      fontSize: "0.92rem",
                       bgcolor: "rgba(255,255,255,0.98)",
                       boxShadow: "0 18px 34px rgba(15,23,42,0.12)",
                     },
@@ -210,26 +201,28 @@ function HomePage() {
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <SearchRoundedIcon sx={{ color: "#4A90E2" }} />
+                        <SearchRoundedIcon sx={{ color: "#4A90E2", fontSize: 20 }} />
                       </InputAdornment>
                     ),
                     endAdornment: (
                       <InputAdornment position="end">
-                        <TuneRoundedIcon sx={{ color: "#667085" }} />
+                        <TuneRoundedIcon sx={{ color: "#667085", fontSize: 20 }} />
                       </InputAdornment>
                     ),
                   }}
                 />
 
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={0.8}>
                   <Button
                     onClick={handleLocateMe}
-                    startIcon={<MyLocationRoundedIcon />}
+                    startIcon={<MyLocationRoundedIcon sx={{ fontSize: 20 }} />}
                     disabled={locationPending}
                     sx={{
                       alignSelf: "flex-start",
-                      px: 2,
-                      py: 1.1,
+                      minHeight: 38,
+                      px: 1.35,
+                      py: 0.45,
+                      fontSize: "0.88rem",
                       bgcolor: "rgba(255,255,255,0.96)",
                       color: "secondary.main",
                       boxShadow: "0 16px 30px rgba(15,23,42,0.10)",
@@ -241,17 +234,18 @@ function HomePage() {
                   >
                     {locationPending ? "Đang lấy vị trí..." : "Vị trí của tôi"}
                   </Button>
+
                   <Box
                     sx={{
                       alignSelf: "flex-start",
-                      px: 2,
-                      py: 1.15,
+                      px: 1.35,
+                      py: 0.65,
                       borderRadius: 2,
                       bgcolor: "rgba(255,255,255,0.94)",
                       boxShadow: "0 16px 30px rgba(15,23,42,0.10)",
                     }}
                   >
-                    <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>
+                    <Typography sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.88rem", lineHeight: 1.2 }}>
                       {selectedRestaurant ? `Đang focus ${selectedRestaurant.name}` : "Khám phá quanh bạn"}
                     </Typography>
                   </Box>
@@ -260,23 +254,23 @@ function HomePage() {
 
               <Stack
                 direction={{ xs: "column", sm: "row" }}
-                spacing={1}
+                spacing={0.8}
                 sx={{
                   position: "absolute",
-                  left: 20,
-                  bottom: 20,
+                  left: 14,
+                  bottom: 14,
                   zIndex: 500,
-                  px: 2,
-                  py: 1.35,
+                  px: 1.3,
+                  py: 0.75,
                   borderRadius: 2,
                   bgcolor: "rgba(255,255,255,0.96)",
                   boxShadow: "0 16px 30px rgba(15,23,42,0.12)",
                 }}
               >
                 {legendItems.map((item) => (
-                  <Stack key={item.label} direction="row" spacing={1} alignItems="center">
-                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: item.color }} />
-                    <Typography fontSize="0.9rem">{item.label}</Typography>
+                  <Stack key={item.label} direction="row" spacing={0.75} alignItems="center">
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: item.color }} />
+                    <Typography fontSize="0.8rem">{item.label}</Typography>
                   </Stack>
                 ))}
               </Stack>
@@ -305,12 +299,8 @@ function HomePage() {
                       borderRadius: 2.5,
                       cursor: "pointer",
                       bgcolor: "rgba(255,255,255,0.94)",
-                      border: isActive
-                        ? "1px solid rgba(255,138,42,0.22)"
-                        : "1px solid rgba(15,23,42,0.06)",
-                      boxShadow: isActive
-                        ? "0 24px 42px rgba(255, 140, 64, 0.14)"
-                        : "0 14px 26px rgba(15,23,42,0.06)",
+                      border: isActive ? "1px solid rgba(255,138,42,0.22)" : "1px solid rgba(15,23,42,0.06)",
+                      boxShadow: isActive ? "0 24px 42px rgba(255, 140, 64, 0.14)" : "0 14px 26px rgba(15,23,42,0.06)",
                       transition: "all 0.24s ease",
                       "&:hover": {
                         transform: "translateY(-2px)",
@@ -318,7 +308,7 @@ function HomePage() {
                       },
                     }}
                   >
-                    <Stack spacing={1.35}>
+                    <Stack spacing={1.15}>
                       <Box
                         sx={{
                           width: "100%",
@@ -331,7 +321,7 @@ function HomePage() {
                         }}
                       />
 
-                      <Stack spacing={0.75}>
+                      <Stack spacing={0.65}>
                         <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="flex-start">
                           <Typography variant="h4" sx={{ fontSize: "1.02rem" }}>
                             {restaurant.name}
