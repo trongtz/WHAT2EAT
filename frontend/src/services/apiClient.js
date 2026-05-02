@@ -1,10 +1,11 @@
 import axios from "axios";
-import { mockAdapter } from "./mockServer";
+// import { mockAdapter } from "./mockServer";
 import { getStoredToken } from "../utils/storage";
 
 const apiClient = axios.create({
-  baseURL: "/api",
-  adapter: mockAdapter,
+  baseURL: "http://localhost:8000/api"
+  // baseURL: "/api",
+  // adapter: mockAdapter,
 });
 
 apiClient.interceptors.request.use((config) => {

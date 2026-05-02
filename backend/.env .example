@@ -1,0 +1,4 @@
+DATABASE_URL=
+SECRET_KEY=chuoi_bi_mat_nay_phai_that_dai_va_bao_mat_cho_what2eat
+ALGORITHM=
+ACCESS_TOKEN_EXPIRE_MINUTES=
