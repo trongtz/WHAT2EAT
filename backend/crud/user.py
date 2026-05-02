@@ -11,12 +11,14 @@ def create_user(db: Session, user_in: UserRegisterRequest):
     """Tạo user mới vào database"""
     hashed_password = get_password_hash(user_in.password)
     
+    assigned_role = user_in.role if user_in.role in ["customer", "owner"] else "customer"
+    
     db_user = User(
         fullName=user_in.fullName,
         email=user_in.email,
         phone=user_in.phone,
         password=hashed_password,
-        role="customer",
+        role=assigned_role,
         status="active"
     )
     db.add(db_user)
