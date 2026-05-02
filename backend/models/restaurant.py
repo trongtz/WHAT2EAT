@@ -10,6 +10,7 @@ class Restaurant(Base):
     # ForeignKey trỏ về bảng 'users', cột 'id'
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False) 
     
+    
     name = Column(String, nullable=False, index=True)
     address = Column(String, nullable=False)
     phone = Column(String, nullable=False)
@@ -23,3 +24,4 @@ class Restaurant(Base):
 
     # Khai báo mối quan hệ để SQLAlchemy tự động lấy dữ liệu chủ quán khi cần
     owner = relationship("User", back_populates="restaurants")
+    dishes = relationship("Dish", back_populates="restaurant") # 1 Nhà hàng -> Nhiều Món ăn

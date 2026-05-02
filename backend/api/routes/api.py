@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 # Import các router con
-from api.routes import auth, restaurants, bookings, ai, owner
+from api.routes import auth, restaurants, bookings, ai, owner, dishes
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ api_router.include_router(restaurants.router, prefix="/restaurants", tags=["Rest
 api_router.include_router(bookings.router, prefix="/bookings", tags=["Bookings"])
 api_router.include_router(ai.router, prefix="/ai", tags=["AI Recommendations"])
 api_router.include_router(owner.router, prefix="/owner", tags=["Owner Dashboard"])
+api_router.include_router(dishes.router, prefix="/dishes", tags=["Dishes (Thực đơn)"])
