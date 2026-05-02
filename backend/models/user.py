@@ -1,5 +1,6 @@
 # File: models/user.py
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 from core.database import Base
 
 class User(Base):
@@ -12,3 +13,5 @@ class User(Base):
     password = Column(String, nullable=False) # Cột này sẽ lưu mật khẩu đã băm (hashed)
     role = Column(String, default="customer")
     status = Column(String, default="active")
+
+    restaurants = relationship("Restaurant", back_populates="owner") # 1 User (Owner) -> Nhiều Restaurant

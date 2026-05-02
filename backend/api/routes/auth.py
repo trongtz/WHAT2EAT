@@ -4,6 +4,7 @@ from schemas.auth import UserRegisterRequest, UserLoginRequest, AuthResponse
 from core.security import verify_password, create_access_token
 from core.database import get_db
 import crud.user as crud_user 
+from fastapi.security import OAuth2PasswordRequestForm
 
 router = APIRouter()
 
@@ -38,3 +39,14 @@ async def login(payload: UserLoginRequest, db: Session = Depends(get_db)):
     # 3. Tạo Token và trả về
     token = create_access_token(data={"sub": str(user.id)})
     return {"token": token, "user": user}
+
+# login dành riêng để test trên swagger
+@router.post("/login/swagger", include_in_schema=False)
+async def swagger_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = crud_user.get_user_by_email(db, email=form_data.username)
+    if not user or not verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=400, detail="Sai email hoặc mật khẩu")
+        
+    token = create_access_token(data={"sub": str(user.id)})
+    # Swagger bắt buộc key trả về phải tên là "access_token" và "token_type"
+    return {"access_token": token, "token_type": "bearer"}

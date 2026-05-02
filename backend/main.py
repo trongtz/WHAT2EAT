@@ -5,18 +5,18 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.database import engine, Base
-from core.init_db import seed_admin
+from core.init_db import seed_data
 
 # Phải import tất cả các models ở đây để create_all nhận diện được
 import models.user
-# import models.restaurant
+import models.restaurant
 # import models.booking
 
 # import api
 from api.routes.api import api_router
 
 Base.metadata.create_all(bind=engine)
-seed_admin() # default admin
+seed_data()
 app = FastAPI(title="WHAT2EAT API")
 
 # 1. CẤU HÌNH CORS
