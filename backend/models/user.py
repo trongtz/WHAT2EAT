@@ -15,3 +15,4 @@ class User(Base):
     status = Column(String, default="active")
 
     restaurants = relationship("Restaurant", back_populates="owner") # 1 User (Owner) -> Nhiều Restaurant
+    bookings = relationship("Booking", back_populates="customer") # 1 Khách hàng có thể có nhiều lịch đặt bàn

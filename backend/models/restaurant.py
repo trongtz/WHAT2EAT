@@ -25,3 +25,4 @@ class Restaurant(Base):
     # Khai báo mối quan hệ để SQLAlchemy tự động lấy dữ liệu chủ quán khi cần
     owner = relationship("User", back_populates="restaurants")
     dishes = relationship("Dish", back_populates="restaurant") # 1 Nhà hàng -> Nhiều Món ăn
+    bookings = relationship("Booking", back_populates="restaurant") # 1 Nhà hàng có thể nhận nhiều lịch đặt bàn

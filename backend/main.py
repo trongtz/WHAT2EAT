@@ -11,7 +11,7 @@ from core.init_db import seed_data
 import models.user
 import models.restaurant
 import models.dish
-# import models.booking
+import models.booking
 
 # import api
 from api.routes.api import api_router
