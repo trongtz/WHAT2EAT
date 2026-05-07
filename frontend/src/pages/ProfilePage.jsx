@@ -1,14 +1,7 @@
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
-import {
-  Alert,
-  Chip,
-  Grid,
-  Link,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Chip, Grid, Link, Stack, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
@@ -30,10 +23,10 @@ function ProfilePage() {
     phone: user?.phone || "",
   });
 
-  const accountStatus = useMemo(
-    () => (user?.status === "active" ? "Tài khoản đang hoạt động" : "Tài khoản đang bị khóa"),
-    [user?.status]
-  );
+  const accountStatus = useMemo(() => {
+    if (user?.isGuest) return "Phiên khách tạm thời";
+    return user?.status === "active" ? "Tài khoản đang hoạt động" : "Tài khoản đang bị khóa";
+  }, [user?.isGuest, user?.status]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -43,10 +36,18 @@ function ProfilePage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
+
     try {
-      const updatedUser = await authService.updateProfile({ userId: user.id, ...form });
+      const updatedUser = user?.isGuest
+        ? { ...user, ...form }
+        : await authService.updateProfile({ userId: user.id, ...form });
+
       updateUser(updatedUser);
-      setMessage("Cập nhật hồ sơ thành công.");
+      setMessage(
+        user?.isGuest
+          ? "Hồ sơ khách đã được cập nhật trong phiên này."
+          : "Cập nhật hồ sơ thành công."
+      );
       setOpen(false);
     } finally {
       setSaving(false);
@@ -65,23 +66,24 @@ function ProfilePage() {
             <Stack spacing={2}>
               {message ? <Alert severity="success">{message}</Alert> : null}
               <Typography variant="h4">{user?.fullName}</Typography>
-              <Typography color="text.secondary">Email: {user?.email}</Typography>
-              <Typography color="text.secondary">Số điện thoại: {user?.phone}</Typography>
+              <Typography color="text.secondary">Email: {user?.email || "Chưa cung cấp"}</Typography>
+              <Typography color="text.secondary">Số điện thoại: {user?.phone || "Chưa cung cấp"}</Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <Chip label={`Vai trò: ${user?.role}`} color="primary" />
-                <Chip
-                  label={accountStatus}
-                  color={user?.status === "active" ? "success" : "error"}
-                />
+                <Chip label={`Vai trò: ${user?.isGuest ? "khách" : user?.role}`} color="primary" />
+                <Chip label={accountStatus} color={user?.status === "active" ? "success" : "error"} />
               </Stack>
-              <Alert severity="info">
-                Bạn có thể chỉnh trực tiếp họ tên, email và số điện thoại ngay trong hồ sơ này.
-              </Alert>
-              <CustomButton
-                startIcon={<EditRoundedIcon />}
-                sx={{ alignSelf: "flex-start" }}
-                onClick={() => setOpen(true)}
-              >
+              {user?.isGuest ? (
+                <Alert severity="info">
+                  Bạn đang dùng chế độ Khách. Các thay đổi trong hồ sơ và thao tác khác chỉ
+                  được lưu trong phiên hiện tại.
+                </Alert>
+              ) : (
+                <Alert severity="info">
+                  Bạn có thể chỉnh trực tiếp họ tên, email và số điện thoại ngay trong hồ sơ
+                  này.
+                </Alert>
+              )}
+              <CustomButton startIcon={<EditRoundedIcon />} sx={{ alignSelf: "flex-start" }} onClick={() => setOpen(true)}>
                 Chỉnh sửa hồ sơ
               </CustomButton>
             </Stack>
@@ -95,20 +97,12 @@ function ProfilePage() {
                 Quay lại trang khách hàng
               </Link>
               {user?.role === "owner" ? (
-                <CustomButton
-                  component={RouterLink}
-                  to="/chu-nha-hang/dashboard"
-                  startIcon={<StorefrontRoundedIcon />}
-                >
+                <CustomButton component={RouterLink} to="/chu-nha-hang/dashboard" startIcon={<StorefrontRoundedIcon />}>
                   Đi tới khu chủ nhà hàng
                 </CustomButton>
               ) : null}
               {user?.role === "admin" ? (
-                <CustomButton
-                  component={RouterLink}
-                  to="/admin/dashboard"
-                  startIcon={<ShieldRoundedIcon />}
-                >
+                <CustomButton component={RouterLink} to="/admin/dashboard" startIcon={<ShieldRoundedIcon />}>
                   Đi tới khu quản trị
                 </CustomButton>
               ) : null}

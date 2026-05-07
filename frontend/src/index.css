@@ -2,11 +2,11 @@
 
 :root {
   font-family: "Inter", "SF Pro Display", "Segoe UI", sans-serif;
-  color: #18212f;
+  color: var(--app-text-primary, #18212f);
   background:
-    radial-gradient(circle at top left, rgba(255, 167, 81, 0.18), transparent 26%),
-    radial-gradient(circle at top right, rgba(74, 144, 226, 0.16), transparent 24%),
-    linear-gradient(180deg, #fbfbfc 0%, #f7f8fa 54%, #f9fafb 100%);
+    radial-gradient(circle at top left, var(--app-surface-glow-a, rgba(255, 167, 81, 0.18)), transparent 26%),
+    radial-gradient(circle at top right, var(--app-surface-glow-b, rgba(74, 144, 226, 0.16)), transparent 24%),
+    linear-gradient(180deg, color-mix(in srgb, var(--app-background, #f7f8fa) 96%, white) 0%, var(--app-background, #f7f8fa) 54%, color-mix(in srgb, var(--app-background, #f7f8fa) 96%, white) 100%);
   line-height: 1.5;
   font-weight: 400;
 }
@@ -24,11 +24,11 @@ body,
 
 body {
   min-width: 320px;
-  color: #18212f;
+  color: var(--app-text-primary, #18212f);
   background:
-    radial-gradient(circle at top left, rgba(255, 167, 81, 0.12), transparent 22%),
-    radial-gradient(circle at 85% 10%, rgba(74, 144, 226, 0.1), transparent 18%),
-    #f7f8fa;
+    radial-gradient(circle at top left, var(--app-body-glow-a, rgba(255, 167, 81, 0.12)), transparent 22%),
+    radial-gradient(circle at 85% 10%, var(--app-body-glow-b, rgba(74, 144, 226, 0.1)), transparent 18%),
+    var(--app-background, #f7f8fa);
 }
 
 a {
@@ -47,9 +47,9 @@ img {
 
 .glass-panel {
   backdrop-filter: blur(18px);
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.08);
+  background: var(--app-glass-bg, rgba(255, 255, 255, 0.84));
+  border: 1px solid var(--app-glass-border, rgba(255, 255, 255, 0.72));
+  box-shadow: 0 26px 60px var(--app-glass-shadow, rgba(15, 23, 42, 0.08));
 }
 
 .leaflet-container {

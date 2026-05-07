@@ -5,9 +5,9 @@ import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, Container, Grid, Stack, Typography } from "@mui/material";
 
 const authHighlights = [
-  { label: "Gợi ý hợp gu", value: "AI picks", icon: AutoAwesomeRoundedIcon, color: "#FF8A2A" },
-  { label: "Quán gần bạn", value: "Live map", icon: LocationOnRoundedIcon, color: "#4A90E2" },
-  { label: "Đánh giá tốt", value: "4.8+", icon: StarRoundedIcon, color: "#22B573" },
+  { label: "Gợi ý hợp gu", value: "AI picks", icon: AutoAwesomeRoundedIcon, color: "var(--app-primary)" },
+  { label: "Quán gần bạn", value: "Live map", icon: LocationOnRoundedIcon, color: "var(--app-secondary)" },
+  { label: "Đánh giá tốt", value: "4.8+", icon: StarRoundedIcon, color: "var(--app-success)" },
 ];
 
 function AuthLayout({ title, subtitle, children }) {
@@ -19,7 +19,7 @@ function AuthLayout({ title, subtitle, children }) {
         alignItems: "center",
         py: { xs: 2, md: 1.5 },
         background:
-          "radial-gradient(circle at top left, rgba(255,179,71,0.26), transparent 24%), radial-gradient(circle at top right, rgba(74,144,226,0.14), transparent 22%), #F7F8FA",
+          "radial-gradient(circle at top left, var(--app-surface-glow-a), transparent 24%), radial-gradient(circle at top right, var(--app-surface-glow-b), transparent 22%), var(--app-background)",
       }}
     >
       <Container maxWidth="xl">
@@ -31,8 +31,8 @@ function AuthLayout({ title, subtitle, children }) {
             width: "100%",
             p: { xs: 1.5, md: 2 },
             borderRadius: 4,
-            background: "rgba(255,255,255,0.72)",
-            boxShadow: "0 28px 64px rgba(15, 23, 42, 0.10)",
+            background: "var(--app-surface-soft)",
+            boxShadow: "0 28px 64px var(--app-glass-shadow)",
           }}
         >
           <Grid container spacing={{ xs: 2, md: 2 }} alignItems="stretch">
@@ -48,7 +48,7 @@ function AuthLayout({ title, subtitle, children }) {
                   alignItems: "flex-end",
                   p: { xs: 1.8, md: 2 },
                   backgroundImage:
-                    "linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.64) 100%), url(https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80)",
+                    "linear-gradient(180deg, rgba(15,23,42,0.10) 0%, rgba(15,23,42,0.68) 100%), url(https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80)",
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }}
@@ -68,7 +68,9 @@ function AuthLayout({ title, subtitle, children }) {
                 >
                   <Stack direction="row" spacing={1} alignItems="center">
                     <RestaurantRoundedIcon sx={{ color: "white", fontSize: 20 }} />
-                    <Typography sx={{ color: "white", fontWeight: 800, letterSpacing: "0.05em", fontSize: "0.92rem" }}>
+                    <Typography
+                      sx={{ color: "white", fontWeight: 800, letterSpacing: "0.05em", fontSize: "0.92rem" }}
+                    >
                       WHAT2EAT
                     </Typography>
                   </Stack>
@@ -118,7 +120,9 @@ function AuthLayout({ title, subtitle, children }) {
                             }}
                           >
                             <Icon sx={{ color: item.color, mb: 0.65, fontSize: 18 }} />
-                            <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.86rem" }}>{item.value}</Typography>
+                            <Typography sx={{ color: "white", fontWeight: 800, fontSize: "0.86rem" }}>
+                              {item.value}
+                            </Typography>
                             <Typography sx={{ color: "rgba(255,255,255,0.76)", fontSize: "0.76rem" }}>
                               {item.label}
                             </Typography>

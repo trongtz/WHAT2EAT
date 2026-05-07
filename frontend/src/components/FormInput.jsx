@@ -8,7 +8,7 @@ function FormInput({ sx, ...props }) {
       sx={{
         "& .MuiOutlinedInput-root": {
           borderRadius: 2,
-          backgroundColor: "rgba(255,255,255,0.92)",
+          backgroundColor: "var(--app-surface-strong)",
           minHeight: 44,
         },
         ...sx,

@@ -12,6 +12,7 @@ import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
+import { getGuestReviewsByRestaurant, toggleGuestFavorite } from "../utils/guestSession";
 import { formatCurrency, formatDate } from "../utils/helpers";
 
 function RestaurantDetailPage() {
@@ -25,19 +26,33 @@ function RestaurantDetailPage() {
     const fetchRestaurant = async () => {
       try {
         const data = await restaurantService.getRestaurantDetail(id);
-        setRestaurant(data);
+        const guestReviews = user?.isGuest ? getGuestReviewsByRestaurant(id) : [];
+
+        setRestaurant({
+          ...data,
+          reviews: Number(data.reviews || 0) + guestReviews.length,
+          reviewsList: [...guestReviews, ...(data.reviewsList || [])],
+        });
       } finally {
         setLoading(false);
       }
     };
+
     fetchRestaurant();
-  }, [id]);
+  }, [id, user?.isGuest]);
 
   const handleFavorite = async () => {
     if (!user) {
       setMessage("Vui lòng đăng nhập để lưu yêu thích.");
       return;
     }
+
+    if (user.isGuest) {
+      toggleGuestFavorite(id);
+      setMessage("Đã cập nhật danh sách yêu thích trong phiên khách.");
+      return;
+    }
+
     await favoriteService.toggle({ userId: user.id, restaurantId: Number(id) });
     setMessage("Đã cập nhật danh sách yêu thích.");
   };

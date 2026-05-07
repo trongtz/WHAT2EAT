@@ -7,6 +7,7 @@ function CustomCard({ children, sx, contentSx, ...props }) {
       sx={{
         overflow: "visible",
         borderRadius: 2,
+        background: "var(--app-surface-strong)",
         ...sx,
       }}
       {...props}

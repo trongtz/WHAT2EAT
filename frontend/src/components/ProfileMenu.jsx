@@ -1,7 +1,7 @@
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
   Avatar,
   Box,
@@ -16,15 +16,18 @@ import {
 } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ThemeStudioModal from "./ThemeStudioModal";
 
 const roleLabel = {
   customer: "Food Explorer",
+  guest: "Guest Explorer",
   owner: "Restaurant Curator",
   admin: "Taste Director",
 };
 
 function ProfileMenu({ user, onLogout }) {
   const [anchorEl, setAnchorEl] = useState(null);
+  const [themeStudioOpen, setThemeStudioOpen] = useState(false);
   const navigate = useNavigate();
 
   const initials = useMemo(() => {
@@ -68,7 +71,8 @@ function ProfileMenu({ user, onLogout }) {
             height: 42,
             color: "white",
             fontWeight: 800,
-            background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
+            background:
+              "linear-gradient(135deg, var(--app-avatar-a, #FF7A18) 0%, var(--app-avatar-b, #FFB347) 100%)",
             boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.32)",
           }}
         >
@@ -88,7 +92,9 @@ function ProfileMenu({ user, onLogout }) {
           >
             {user?.fullName}
           </Typography>
-          <Typography sx={{ mt: 0.25, fontSize: "0.82rem", color: "text.secondary", lineHeight: 1.1 }}>
+          <Typography
+            sx={{ mt: 0.25, fontSize: "0.82rem", color: "text.secondary", lineHeight: 1.1 }}
+          >
             {roleLabel[user?.role] || "Food Explorer"}
           </Typography>
         </Box>
@@ -107,7 +113,7 @@ function ProfileMenu({ user, onLogout }) {
           paper: {
             sx: {
               mt: 1.25,
-              minWidth: 240,
+              minWidth: 260,
               borderRadius: 3,
               p: 1,
               background: "rgba(255,255,255,0.92)",
@@ -148,14 +154,14 @@ function ProfileMenu({ user, onLogout }) {
         <MenuItem
           onClick={() => {
             setAnchorEl(null);
-            navigate("/ho-so");
+            setThemeStudioOpen(true);
           }}
           sx={{ borderRadius: 2 }}
         >
           <ListItemIcon>
-            <SettingsRoundedIcon fontSize="small" />
+            <AutoAwesomeRoundedIcon fontSize="small" />
           </ListItemIcon>
-          Cài đặt
+          Giao diện
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -170,6 +176,8 @@ function ProfileMenu({ user, onLogout }) {
           Đăng xuất
         </MenuItem>
       </Menu>
+
+      <ThemeStudioModal open={themeStudioOpen} onClose={() => setThemeStudioOpen(false)} />
     </>
   );
 }

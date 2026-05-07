@@ -1,45 +1,93 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 import AppLayout from "../layouts/AppLayout";
 import BackofficeLayout from "../layouts/BackofficeLayout";
-import { useAuth } from "../hooks/useAuth";
-import LoginPage from "../pages/LoginPage";
-import RegisterPage from "../pages/RegisterPage";
-import ProfilePage from "../pages/ProfilePage";
-import HomePage from "../pages/HomePage";
-import SearchPage from "../pages/SearchPage";
-import RestaurantDetailPage from "../pages/RestaurantDetailPage";
-import BookingPage from "../pages/BookingPage";
-import BookingHistoryPage from "../pages/BookingHistoryPage";
-import ReviewPage from "../pages/ReviewPage";
-import FavoritesPage from "../pages/FavoritesPage";
 import AiRecommendationPage from "../pages/AiRecommendationPage";
-import OwnerDashboardPage from "../pages/owner/OwnerDashboardPage";
-import OwnerRestaurantsPage from "../pages/owner/OwnerRestaurantsPage";
-import OwnerMenuPage from "../pages/owner/OwnerMenuPage";
-import OwnerBookingsPage from "../pages/owner/OwnerBookingsPage";
-import OwnerReviewsPage from "../pages/owner/OwnerReviewsPage";
-import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
-import AdminUsersPage from "../pages/admin/AdminUsersPage";
-import AdminRestaurantsPage from "../pages/admin/AdminRestaurantsPage";
-import AdminAnalyticsPage from "../pages/admin/AdminAnalyticsPage";
+import BookingHistoryPage from "../pages/BookingHistoryPage";
+import BookingPage from "../pages/BookingPage";
+import FavoritesPage from "../pages/FavoritesPage";
+import HomePage from "../pages/HomePage";
+import LoginPage from "../pages/LoginPage";
 import NotFoundPage from "../pages/NotFoundPage";
+import ProfilePage from "../pages/ProfilePage";
+import RegisterPage from "../pages/RegisterPage";
+import RestaurantDetailPage from "../pages/RestaurantDetailPage";
+import ReviewPage from "../pages/ReviewPage";
+import SearchPage from "../pages/SearchPage";
+import AdminAnalyticsPage from "../pages/admin/AdminAnalyticsPage";
+import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
+import AdminRestaurantsPage from "../pages/admin/AdminRestaurantsPage";
+import AdminUsersPage from "../pages/admin/AdminUsersPage";
+import OwnerBookingsPage from "../pages/owner/OwnerBookingsPage";
+import OwnerDashboardPage from "../pages/owner/OwnerDashboardPage";
+import OwnerMenuPage from "../pages/owner/OwnerMenuPage";
+import OwnerRestaurantsPage from "../pages/owner/OwnerRestaurantsPage";
+import OwnerReviewsPage from "../pages/owner/OwnerReviewsPage";
+
+const getDefaultRouteByRole = (role) => {
+  if (role === "owner") return "/chu-nha-hang/dashboard";
+  if (role === "admin") return "/admin/dashboard";
+  return "/";
+};
 
 function ProtectedRoute({ children, roles }) {
   const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated) return <Navigate to="/dang-nhap" replace />;
-  if (roles?.length && !roles.includes(user?.role)) return <Navigate to="/" replace />;
+  if (roles?.length && !roles.includes(user?.role)) {
+    return <Navigate to={getDefaultRouteByRole(user?.role)} replace />;
+  }
+
   return children;
 }
 
-const withLayout = (element) => <AppLayout>{element}</AppLayout>;
+function CustomerFacingRoute({ children }) {
+  const { user } = useAuth();
+
+  if (user?.role === "owner" || user?.role === "admin") {
+    return <Navigate to={getDefaultRouteByRole(user.role)} replace />;
+  }
+
+  return children;
+}
+
+function AuthRoute({ children }) {
+  const { isAuthenticated, user } = useAuth();
+
+  if (isAuthenticated) {
+    return <Navigate to={getDefaultRouteByRole(user?.role)} replace />;
+  }
+
+  return children;
+}
+
+const withLayout = (element) => (
+  <CustomerFacingRoute>
+    <AppLayout>{element}</AppLayout>
+  </CustomerFacingRoute>
+);
+
 const withBackofficeLayout = (role, element) => <BackofficeLayout role={role}>{element}</BackofficeLayout>;
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/dang-nhap" element={<LoginPage />} />
-      <Route path="/dang-ky" element={<RegisterPage />} />
+      <Route
+        path="/dang-nhap"
+        element={
+          <AuthRoute>
+            <LoginPage />
+          </AuthRoute>
+        }
+      />
+      <Route
+        path="/dang-ky"
+        element={
+          <AuthRoute>
+            <RegisterPage />
+          </AuthRoute>
+        }
+      />
       <Route path="/" element={withLayout(<HomePage />)} />
       <Route path="/tim-kiem" element={withLayout(<SearchPage />)} />
       <Route path="/nha-hang/:id" element={withLayout(<RestaurantDetailPage />)} />

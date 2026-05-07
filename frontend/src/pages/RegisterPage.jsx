@@ -1,5 +1,5 @@
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
-import { Alert, Box, Link, Stack, Typography } from "@mui/material";
+import { Alert, Box, Link, MenuItem, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
@@ -16,6 +16,7 @@ function RegisterPage() {
     fullName: "",
     email: "",
     phone: "",
+    role: "customer",
     password: "",
     confirmPassword: "",
   });
@@ -35,7 +36,12 @@ function RegisterPage() {
 
     try {
       await register(values);
-      navigate("/");
+      navigate("/dang-nhap", {
+        replace: true,
+        state: {
+          message: "Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.",
+        },
+      });
     } catch (error) {
       setMessage(error.message);
     }
@@ -64,6 +70,10 @@ function RegisterPage() {
             <FormInput label="Họ và tên" name="fullName" value={values.fullName} onChange={handleChange} error={!!errors.fullName} helperText={errors.fullName} />
             <FormInput label="Email" name="email" value={values.email} onChange={handleChange} error={!!errors.email} helperText={errors.email} />
             <FormInput label="Số điện thoại" name="phone" value={values.phone} onChange={handleChange} error={!!errors.phone} helperText={errors.phone} />
+            <FormInput select label="Vai trò" name="role" value={values.role} onChange={handleChange} error={!!errors.role} helperText={errors.role}>
+              <MenuItem value="customer">Khách hàng</MenuItem>
+              <MenuItem value="owner">Chủ nhà hàng</MenuItem>
+            </FormInput>
             <FormInput type="password" label="Mật khẩu" name="password" value={values.password} onChange={handleChange} error={!!errors.password} helperText={errors.password} />
             <FormInput
               type="password"

@@ -9,6 +9,8 @@ import RestaurantCard from "../components/RestaurantCard";
 import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { favoriteService } from "../services/favoriteService";
+import { restaurantService } from "../services/restaurantService";
+import { getGuestFavoriteIds } from "../utils/guestSession";
 
 function FavoritesPage() {
   const { user } = useAuth();
@@ -21,10 +23,21 @@ function FavoritesPage() {
         setLoading(false);
         return;
       }
-      const data = await favoriteService.getFavorites(user.id);
-      setItems(data);
+
+      if (user.isGuest) {
+        const [favoriteIds, restaurants] = await Promise.all([
+          Promise.resolve(getGuestFavoriteIds()),
+          restaurantService.getRestaurants(),
+        ]);
+        setItems(restaurants.filter((restaurant) => favoriteIds.includes(restaurant.id)));
+      } else {
+        const data = await favoriteService.getFavorites(user.id);
+        setItems(data);
+      }
+
       setLoading(false);
     };
+
     loadFavorites();
   }, [user]);
 

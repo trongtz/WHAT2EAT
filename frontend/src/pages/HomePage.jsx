@@ -38,12 +38,6 @@ const statusColors = {
   "Hết chỗ": "#E15B64",
 };
 
-const legendItems = [
-  { label: "Còn chỗ", color: "#22B573" },
-  { label: "Sắp đầy", color: "#F5A623" },
-  { label: "Đặt trước", color: "#4A90E2" },
-];
-
 const insightItems = [
   { label: "Gợi ý theo vị trí", value: "12+", icon: FmdGoodRoundedIcon },
   { label: "Nhà hàng nổi bật", value: "Top rated", icon: StarRoundedIcon },
@@ -155,7 +149,13 @@ function HomePage() {
                 backgroundColor: "#EAF3FF",
               }}
             >
-              <MapContainer center={[10.7769, 106.7009]} zoom={14} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
+              <MapContainer
+                center={[10.7769, 106.7009]}
+                zoom={14}
+                scrollWheelZoom
+                attributionControl={false}
+                style={{ height: "100%", width: "100%" }}
+              >
                 <TileLayer
                   attribution="Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
                   url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -190,10 +190,10 @@ function HomePage() {
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   sx={{
-                    maxWidth: 390,
+                    maxWidth: 340,
                     "& .MuiOutlinedInput-root": {
-                      minHeight: 46,
-                      fontSize: "0.92rem",
+                      minHeight: 42,
+                      fontSize: "0.88rem",
                       bgcolor: "rgba(255,255,255,0.98)",
                       boxShadow: "0 18px 34px rgba(15,23,42,0.12)",
                     },
@@ -234,45 +234,7 @@ function HomePage() {
                   >
                     {locationPending ? "Đang lấy vị trí..." : "Vị trí của tôi"}
                   </Button>
-
-                  <Box
-                    sx={{
-                      alignSelf: "flex-start",
-                      px: 1.35,
-                      py: 0.65,
-                      borderRadius: 2,
-                      bgcolor: "rgba(255,255,255,0.94)",
-                      boxShadow: "0 16px 30px rgba(15,23,42,0.10)",
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.88rem", lineHeight: 1.2 }}>
-                      {selectedRestaurant ? `Đang focus ${selectedRestaurant.name}` : "Khám phá quanh bạn"}
-                    </Typography>
-                  </Box>
                 </Stack>
-              </Stack>
-
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={0.8}
-                sx={{
-                  position: "absolute",
-                  left: 14,
-                  bottom: 14,
-                  zIndex: 500,
-                  px: 1.3,
-                  py: 0.75,
-                  borderRadius: 2,
-                  bgcolor: "rgba(255,255,255,0.96)",
-                  boxShadow: "0 16px 30px rgba(15,23,42,0.12)",
-                }}
-              >
-                {legendItems.map((item) => (
-                  <Stack key={item.label} direction="row" spacing={0.75} alignItems="center">
-                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: item.color }} />
-                    <Typography fontSize="0.8rem">{item.label}</Typography>
-                  </Stack>
-                ))}
               </Stack>
             </Box>
           </Grid>
@@ -346,7 +308,9 @@ function HomePage() {
                             </Typography>
                           </Stack>
                           <Typography sx={{ color: "primary.main", fontWeight: 800 }}>
-                            {restaurant.averagePrice ? `${Math.round(restaurant.averagePrice / 1000)}k` : restaurant.priceRange}
+                            {restaurant.averagePrice
+                              ? `${Math.round(restaurant.averagePrice / 1000)}k`
+                              : restaurant.priceRange}
                           </Typography>
                         </Stack>
                       </Stack>
@@ -433,7 +397,8 @@ function HomePage() {
                 WHAT2EAT giúp bạn tìm quán ngon gần mình theo cách tinh tế hơn.
               </Typography>
               <Typography color="text.secondary" sx={{ maxWidth: 620, fontSize: "1.05rem" }}>
-                Khám phá nhà hàng bằng bản đồ trực quan, ảnh món ăn nổi bật và gợi ý thông minh để mỗi quyết định ăn gì đều nhanh, đẹp mắt và đáng tin.
+                Khám phá nhà hàng bằng bản đồ trực quan, ảnh món ăn nổi bật và gợi ý thông minh để
+                mỗi quyết định ăn gì đều nhanh, đẹp mắt và đáng tin.
               </Typography>
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.4} pt={0.5}>
@@ -444,8 +409,11 @@ function HomePage() {
                   startIcon={<SearchRoundedIcon />}
                   sx={{
                     px: 2.8,
-                    background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
-                    boxShadow: "0 18px 36px rgba(255, 140, 64, 0.24)",
+                    backgroundColor: "var(--app-primary)",
+                    backgroundImage:
+                      "linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-light) 100%)",
+                    boxShadow:
+                      "0 18px 36px color-mix(in srgb, var(--app-primary) 24%, transparent)",
                   }}
                 >
                   Khám phá ngay
@@ -499,7 +467,9 @@ function HomePage() {
                     </Box>
                     <Box>
                       <Typography sx={{ fontWeight: 800 }}>{item.value}</Typography>
-                      <Typography sx={{ color: "text.secondary", fontSize: "0.92rem" }}>{item.label}</Typography>
+                      <Typography sx={{ color: "text.secondary", fontSize: "0.92rem" }}>
+                        {item.label}
+                      </Typography>
                     </Box>
                   </Stack>
                 );

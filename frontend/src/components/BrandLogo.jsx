@@ -13,8 +13,8 @@ function BrandLogo({ compact = false }) {
           position: "relative",
           display: "grid",
           placeItems: "center",
-          background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
-          boxShadow: "0 14px 28px rgba(255, 140, 64, 0.24)",
+          background: "var(--app-primary-gradient)",
+          boxShadow: "0 14px 28px color-mix(in srgb, var(--app-primary) 24%, transparent)",
           overflow: "hidden",
           flexShrink: 0,
         }}
@@ -24,7 +24,7 @@ function BrandLogo({ compact = false }) {
             position: "absolute",
             inset: compact ? 10 : 11,
             borderRadius: "50%",
-            background: "rgba(255,255,255,0.96)",
+            background: "var(--app-surface-strong)",
           }}
         />
         <Box
@@ -41,7 +41,7 @@ function BrandLogo({ compact = false }) {
           sx={{
             position: "absolute",
             fontSize: compact ? 13 : 15,
-            color: "#FF8B2C",
+            color: "var(--app-primary)",
             transform: "translateY(1px)",
           }}
         />
@@ -59,7 +59,9 @@ function BrandLogo({ compact = false }) {
           WHAT2EAT
         </Typography>
         {!compact ? (
-          <Typography sx={{ mt: 0.28, fontSize: "0.72rem", color: "text.secondary", letterSpacing: "0.07em" }}>
+          <Typography
+            sx={{ mt: 0.28, fontSize: "0.72rem", color: "text.secondary", letterSpacing: "0.07em" }}
+          >
             DISCOVER TASTE NEAR YOU
           </Typography>
         ) : null}

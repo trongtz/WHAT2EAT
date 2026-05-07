@@ -37,7 +37,7 @@ function AppLayout({ children }) {
           pt: { xs: 1.5, md: 2 },
           pb: 1.25,
           background:
-            "linear-gradient(180deg, rgba(247,248,250,0.96) 0%, rgba(247,248,250,0.88) 78%, rgba(247,248,250,0) 100%)",
+            "linear-gradient(180deg, color-mix(in srgb, var(--app-background) 96%, white) 0%, color-mix(in srgb, var(--app-background) 88%, transparent) 78%, rgba(255,255,255,0) 100%)",
           backdropFilter: "blur(16px)",
         }}
       >
@@ -48,9 +48,9 @@ function AppLayout({ children }) {
               px: { xs: 1.25, md: 1.5 },
               borderRadius: 4,
               backdropFilter: "blur(20px)",
-              background: "rgba(255,255,255,0.72)",
-              border: "1px solid rgba(255,255,255,0.72)",
-              boxShadow: "0 24px 50px rgba(15, 23, 42, 0.10)",
+              background: "var(--app-surface-soft)",
+              border: "1px solid var(--app-glass-border)",
+              boxShadow: "0 24px 50px var(--app-glass-shadow)",
               gap: 1.5,
             }}
           >
@@ -80,8 +80,8 @@ function AppLayout({ children }) {
                 px: 0.5,
                 py: 0.5,
                 borderRadius: 4,
-                bgcolor: "rgba(248,250,252,0.9)",
-                border: "1px solid rgba(15,23,42,0.05)",
+                bgcolor: "var(--app-surface-muted)",
+                border: "1px solid color-mix(in srgb, var(--app-text-primary) 6%, transparent)",
               }}
             >
               {navItems.map((item) => {
@@ -104,8 +104,11 @@ function AppLayout({ children }) {
                       },
                       "&.active": {
                         color: "white",
-                        background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
-                        boxShadow: "0 16px 34px rgba(255, 140, 64, 0.26)",
+                        backgroundColor: "var(--app-primary)",
+                        backgroundImage:
+                          "linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-light) 100%)",
+                        boxShadow:
+                          "0 16px 34px color-mix(in srgb, var(--app-primary) 26%, transparent)",
                       },
                     }}
                   >
@@ -136,8 +139,12 @@ function AppLayout({ children }) {
                   variant="contained"
                   sx={{
                     px: 2.6,
-                    background: "linear-gradient(135deg, #FF7A18 0%, #FFB347 100%)",
-                    boxShadow: "0 16px 34px rgba(255, 140, 64, 0.25)",
+                    color: "white",
+                    backgroundColor: "var(--app-primary)",
+                    backgroundImage:
+                      "linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-light) 100%)",
+                    boxShadow:
+                      "0 16px 34px color-mix(in srgb, var(--app-primary) 25%, transparent)",
                   }}
                 >
                   Đăng nhập / Đăng ký
@@ -170,7 +177,7 @@ function AppLayout({ children }) {
             <Typography variant="body2" color="text.secondary">
               WHAT2EAT © 2026 • Khám phá món ngon gần bạn với bản đồ, AI và trải nghiệm đặt bàn tinh gọn.
             </Typography>
-            <Typography variant="body2" sx={{ color: "#169A52", fontWeight: 700 }}>
+            <Typography variant="body2" sx={{ color: "var(--app-success)", fontWeight: 700 }}>
               Curated for modern food discovery
             </Typography>
           </Box>

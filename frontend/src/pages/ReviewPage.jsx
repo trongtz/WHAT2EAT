@@ -8,6 +8,7 @@ import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { restaurantService } from "../services/restaurantService";
 import { reviewService } from "../services/reviewService";
+import { createGuestReview } from "../utils/guestSession";
 
 function ReviewPage() {
   const { user } = useAuth();
@@ -25,17 +26,30 @@ function ReviewPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
     if (!user) {
       setMessage("Vui lòng đăng nhập để gửi đánh giá.");
       return;
     }
-    await reviewService.create({
-      restaurantId: Number(values.restaurantId),
-      rating: values.rating,
-      comment: values.comment,
-      userName: user.fullName,
-    });
-    setMessage("Đánh giá của bạn đã được ghi nhận.");
+
+    if (user.isGuest) {
+      createGuestReview({
+        restaurantId: Number(values.restaurantId),
+        rating: values.rating,
+        comment: values.comment,
+        userName: user.fullName,
+      });
+      setMessage("Đánh giá của bạn đã được lưu trong phiên khách.");
+    } else {
+      await reviewService.create({
+        restaurantId: Number(values.restaurantId),
+        rating: values.rating,
+        comment: values.comment,
+        userName: user.fullName,
+      });
+      setMessage("Đánh giá của bạn đã được ghi nhận.");
+    }
+
     setValues({ restaurantId: "", rating: 5, comment: "" });
   };
 
@@ -62,10 +76,7 @@ function ReviewPage() {
               </FormInput>
               <Stack spacing={1}>
                 <Typography>Điểm đánh giá</Typography>
-                <Rating
-                  value={values.rating}
-                  onChange={(_, nextValue) => setValues((prev) => ({ ...prev, rating: nextValue || 5 }))}
-                />
+                <Rating value={values.rating} onChange={(_, nextValue) => setValues((prev) => ({ ...prev, rating: nextValue || 5 }))} />
               </Stack>
               <FormInput
                 multiline

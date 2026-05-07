@@ -60,9 +60,10 @@ export const mockAdapter = async (config) => {
   if (method === "post" && url === "/auth/register") {
     const existedUser = users.some((item) => item.email === payload.email);
     if (existedUser) return fail("Email này đã tồn tại");
+    const assignedRole = ["customer", "owner"].includes(payload.role) ? payload.role : "customer";
     const nextUser = {
       id: users.length + 1,
-      role: "customer",
+      role: assignedRole,
       status: "active",
       favoriteIds: [],
       ...payload,

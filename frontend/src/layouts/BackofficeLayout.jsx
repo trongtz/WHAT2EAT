@@ -3,51 +3,44 @@ import ApprovalRoundedIcon from "@mui/icons-material/ApprovalRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
+import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
 import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
-import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
-import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import {
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  Container,
-  Stack,
-  Typography,
-} from "@mui/material";
+import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
+import { Avatar, Box, Button, Chip, Container, Stack, Typography } from "@mui/material";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 const navByRole = {
   owner: [
-    { label: "Tong quan", to: "/chu-nha-hang/dashboard", icon: <DashboardRoundedIcon /> },
-    { label: "Nha hang", to: "/chu-nha-hang/nha-hang", icon: <StorefrontRoundedIcon /> },
+    { label: "Tổng quan", to: "/chu-nha-hang/dashboard", icon: <DashboardRoundedIcon /> },
+    { label: "Nhà hàng", to: "/chu-nha-hang/nha-hang", icon: <StorefrontRoundedIcon /> },
     { label: "Menu", to: "/chu-nha-hang/menu", icon: <MenuBookRoundedIcon /> },
-    { label: "Dat ban", to: "/chu-nha-hang/dat-ban", icon: <TableRestaurantRoundedIcon /> },
-    { label: "Danh gia", to: "/chu-nha-hang/danh-gia", icon: <RateReviewRoundedIcon /> },
+    { label: "Đặt bàn", to: "/chu-nha-hang/dat-ban", icon: <TableRestaurantRoundedIcon /> },
+    { label: "Đánh giá", to: "/chu-nha-hang/danh-gia", icon: <RateReviewRoundedIcon /> },
   ],
   admin: [
-    { label: "Tong quan", to: "/admin/dashboard", icon: <DashboardRoundedIcon /> },
-    { label: "Phan tich", to: "/admin/phan-tich", icon: <AnalyticsRoundedIcon /> },
-    { label: "Nguoi dung", to: "/admin/nguoi-dung", icon: <PeopleRoundedIcon /> },
-    { label: "Duyet nha hang", to: "/admin/nha-hang", icon: <ApprovalRoundedIcon /> },
+    { label: "Tổng quan", to: "/admin/dashboard", icon: <DashboardRoundedIcon /> },
+    { label: "Phân tích", to: "/admin/phan-tich", icon: <AnalyticsRoundedIcon /> },
+    { label: "Người dùng", to: "/admin/nguoi-dung", icon: <PeopleRoundedIcon /> },
+    { label: "Duyệt nhà hàng", to: "/admin/nha-hang", icon: <ApprovalRoundedIcon /> },
   ],
 };
 
 const roleMeta = {
   owner: {
-    title: "Trung tam van hanh nha hang",
-    subtitle: "Quan ly ban, menu, danh gia va hieu suat theo thoi gian thuc.",
-    accent: "linear-gradient(135deg, #FF9F1C 0%, #FFB347 100%)",
-    chip: "Chu nha hang",
+    title: "Trung tâm vận hành nhà hàng",
+    subtitle: "Quản lý bàn, menu, đánh giá và hiệu suất theo thời gian thực.",
+    accent: "var(--app-primary-gradient)",
+    avatarColor: "var(--app-primary)",
+    chip: "Chủ nhà hàng",
   },
   admin: {
-    title: "Bang dieu khien quan tri",
-    subtitle: "Kiem soat duyet nha hang, tai khoan va suc khoe he thong.",
-    accent: "linear-gradient(135deg, #111827 0%, #334155 100%)",
+    title: "Bảng điều khiển quản trị",
+    subtitle: "Kiểm soát duyệt nhà hàng, tài khoản và sức khỏe hệ thống.",
+    accent: "var(--app-secondary-gradient)",
+    avatarColor: "var(--app-secondary-dark)",
     chip: "Admin",
   },
 };
@@ -67,10 +60,7 @@ function BackofficeLayout({ role, children }) {
     <Box
       sx={{
         minHeight: "100vh",
-        background:
-          role === "admin"
-            ? "linear-gradient(180deg, #F4F7FB 0%, #EEF3F9 100%)"
-            : "linear-gradient(180deg, #FFF8F0 0%, #F7FAFF 100%)",
+        background: "var(--app-shell-gradient)",
       }}
     >
       <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -88,9 +78,9 @@ function BackofficeLayout({ role, children }) {
               top: { lg: 24 },
               borderRadius: 2,
               p: 2.5,
-              bgcolor: "rgba(255,255,255,0.9)",
-              border: "1px solid rgba(15,23,42,0.06)",
-              boxShadow: "0 24px 50px rgba(15,23,42,0.08)",
+              bgcolor: "var(--app-surface-soft)",
+              border: "1px solid color-mix(in srgb, var(--app-text-primary) 6%, transparent)",
+              boxShadow: "0 24px 50px var(--app-glass-shadow)",
             }}
           >
             <Stack spacing={2.5}>
@@ -104,14 +94,14 @@ function BackofficeLayout({ role, children }) {
                     placeItems: "center",
                     color: "white",
                     background: meta.accent,
-                    boxShadow: "0 18px 36px rgba(15,23,42,0.16)",
+                    boxShadow: "0 18px 36px color-mix(in srgb, var(--app-text-primary) 16%, transparent)",
                   }}
                 >
                   {role === "admin" ? <RestaurantRoundedIcon /> : <StorefrontRoundedIcon />}
                 </Box>
                 <Box>
                   <Typography variant="h4" sx={{ fontSize: "1.2rem" }}>
-                    SmartFood
+                    WHAT2EAT
                   </Typography>
                   <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
                     {meta.chip}
@@ -154,7 +144,7 @@ function BackofficeLayout({ role, children }) {
                       "&.active": {
                         color: "white",
                         background: meta.accent,
-                        boxShadow: "0 14px 28px rgba(15,23,42,0.14)",
+                        boxShadow: "0 14px 28px color-mix(in srgb, var(--app-text-primary) 14%, transparent)",
                       },
                     }}
                   >
@@ -167,14 +157,12 @@ function BackofficeLayout({ role, children }) {
                 sx={{
                   borderRadius: 2,
                   p: 1.75,
-                  bgcolor: "rgba(244,247,251,0.9)",
-                  border: "1px solid rgba(15,23,42,0.06)",
+                  bgcolor: "var(--app-surface-muted)",
+                  border: "1px solid color-mix(in srgb, var(--app-text-primary) 6%, transparent)",
                 }}
               >
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar sx={{ bgcolor: role === "admin" ? "#111827" : "#FF9F1C" }}>
-                    {user?.fullName?.charAt(0)}
-                  </Avatar>
+                  <Avatar sx={{ bgcolor: meta.avatarColor }}>{user?.fullName?.charAt(0)}</Avatar>
                   <Box minWidth={0}>
                     <Typography fontWeight={700} noWrap>
                       {user?.fullName}
@@ -186,24 +174,13 @@ function BackofficeLayout({ role, children }) {
                 </Stack>
               </Box>
 
-              <Stack spacing={1.25}>
-                <Button
-                  component={NavLink}
-                  to="/"
-                  startIcon={<ArrowBackRoundedIcon />}
-                  variant="outlined"
-                  sx={{ justifyContent: "flex-start", borderRadius: 2 }}
-                >
-                  Ve giao dien khach hang
-                </Button>
-                <Button
-                  onClick={handleLogout}
-                  startIcon={<LogoutRoundedIcon />}
-                  sx={{ justifyContent: "flex-start", borderRadius: 2 }}
-                >
-                  Dang xuat
-                </Button>
-              </Stack>
+              <Button
+                onClick={handleLogout}
+                startIcon={<LogoutRoundedIcon />}
+                sx={{ justifyContent: "flex-start", borderRadius: 2 }}
+              >
+                Đăng xuất
+              </Button>
             </Stack>
           </Box>
 
@@ -212,9 +189,9 @@ function BackofficeLayout({ role, children }) {
               sx={{
                 borderRadius: 2,
                 p: { xs: 2, md: 3 },
-                bgcolor: "rgba(255,255,255,0.88)",
-                border: "1px solid rgba(15,23,42,0.06)",
-                boxShadow: "0 24px 50px rgba(15,23,42,0.08)",
+                bgcolor: "var(--app-surface-strong)",
+                border: "1px solid color-mix(in srgb, var(--app-text-primary) 6%, transparent)",
+                boxShadow: "0 24px 50px var(--app-glass-shadow)",
               }}
             >
               {children}

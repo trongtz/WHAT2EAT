@@ -9,6 +9,7 @@ import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { bookingService } from "../services/bookingService";
 import { restaurantService } from "../services/restaurantService";
+import { createGuestBooking } from "../utils/guestSession";
 import { validateBooking } from "../utils/validators";
 
 function BookingPage() {
@@ -43,12 +44,20 @@ function BookingPage() {
     const nextErrors = validateBooking(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
+
     if (!user) {
       setMessage("Vui lòng đăng nhập trước khi đặt bàn.");
       return;
     }
-    await bookingService.create({ ...values, userId: user.id, guests: Number(values.guests) });
-    setMessage("Đặt bàn thành công. Bạn có thể xem trạng thái ở lịch sử đặt bàn.");
+
+    if (user.isGuest) {
+      createGuestBooking(values);
+      setMessage("Đặt bàn tạm thời đã được lưu trong phiên khách này.");
+    } else {
+      await bookingService.create({ ...values, userId: user.id, guests: Number(values.guests) });
+      setMessage("Đặt bàn thành công. Bạn có thể xem trạng thái ở lịch sử đặt bàn.");
+    }
+
     setValues({ ...values, date: "", time: "", guests: 2, note: "" });
   };
 
@@ -92,7 +101,7 @@ function BookingPage() {
               <Typography variant="h4">Lưu ý khi đặt bàn</Typography>
               <Typography color="text.secondary">Bạn nên đặt trước ít nhất 30 phút để hệ thống dễ gợi ý bàn phù hợp.</Typography>
               <Typography color="text.secondary">Với nhóm đông, hãy ghi chú yêu cầu vị trí ngồi hoặc khu vực riêng nếu cần.</Typography>
-              <Typography color="text.secondary">Dữ liệu hiện tại dùng mock API, rất thuận tiện để nối backend thật sau này.</Typography>
+              <Typography color="text.secondary">Chế độ Khách sẽ chỉ lưu đặt bàn trong phiên hiện tại và không ghi vào database.</Typography>
             </Stack>
           </CustomCard>
         </Grid>

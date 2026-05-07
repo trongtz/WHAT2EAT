@@ -1,6 +1,8 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { authService } from "../services/authService";
+import { clearGuestSessionData, createGuestUser } from "../utils/guestSession";
 import {
+  GUEST_AUTH_TOKEN,
   clearStoredAuth,
   getStoredToken,
   getStoredUser,
@@ -23,6 +25,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const response = await authService.login(payload);
+      clearGuestSessionData();
       setStoredAuth(response);
       setUser(response.user);
       setToken(response.token);
@@ -36,10 +39,22 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const response = await authService.register(payload);
-      setStoredAuth(response);
-      setUser(response.user);
-      setToken(response.token);
       return response;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginAsGuest = async () => {
+    setLoading(true);
+    try {
+      const guestUser = createGuestUser();
+      clearStoredAuth();
+      clearGuestSessionData();
+      setStoredAuth({ token: GUEST_AUTH_TOKEN, user: guestUser });
+      setUser(guestUser);
+      setToken(GUEST_AUTH_TOKEN);
+      return { token: GUEST_AUTH_TOKEN, user: guestUser };
     } finally {
       setLoading(false);
     }
@@ -47,6 +62,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     clearStoredAuth();
+    clearGuestSessionData();
     setUser(null);
     setToken(null);
   };
@@ -63,6 +79,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: Boolean(token),
       loading,
       login,
+      loginAsGuest,
       register,
       updateUser,
       logout,

@@ -11,8 +11,17 @@ function CustomButton({ children, sx, ...props }) {
         lineHeight: 1.2,
         whiteSpace: "nowrap",
         borderRadius: 2,
-        boxShadow: "0 14px 28px rgba(47, 107, 255, 0.22)",
-        background: "linear-gradient(135deg, #2F6BFF 0%, #5B8CFF 100%)",
+        color: "white",
+        boxShadow: "0 14px 28px color-mix(in srgb, var(--app-primary) 28%, transparent)",
+        backgroundColor: "var(--app-primary)",
+        backgroundImage:
+          "linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-light) 100%)",
+        "&:hover": {
+          backgroundColor: "var(--app-primary)",
+          backgroundImage:
+            "linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-light) 100%)",
+          filter: "brightness(1.02)",
+        },
         ...sx,
       }}
       {...props}

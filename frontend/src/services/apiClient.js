@@ -1,6 +1,6 @@
 import axios from "axios";
 // import { mockAdapter } from "./mockServer";
-import { getStoredToken } from "../utils/storage";
+import { getStoredToken, isGuestToken } from "../utils/storage";
 
 const apiClient = axios.create({
   baseURL: "http://localhost:8000/api"
@@ -10,7 +10,7 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const token = getStoredToken();
-  if (token) {
+  if (token && !isGuestToken(token)) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;

@@ -1,8 +1,9 @@
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
+import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
 import { Alert, Box, Chip, Link, Stack, Typography } from "@mui/material";
 import { useState } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
 import CustomCard from "../components/CustomCard";
 import FormInput from "../components/FormInput";
@@ -12,10 +13,12 @@ import { validateLogin } from "../utils/validators";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login, loading } = useAuth();
+  const location = useLocation();
+  const { login, loginAsGuest, loading } = useAuth();
   const [values, setValues] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const successMessage = location.state?.message || "";
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -29,10 +32,21 @@ function LoginPage() {
     if (Object.keys(nextErrors).length) return;
 
     try {
+      setMessage("");
       const response = await login(values);
       if (response.user.role === "owner") navigate("/chu-nha-hang/dashboard");
       else if (response.user.role === "admin") navigate("/admin/dashboard");
       else navigate("/");
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      setMessage("");
+      await loginAsGuest();
+      navigate("/", { replace: true });
     } catch (error) {
       setMessage(error.message);
     }
@@ -69,17 +83,27 @@ function LoginPage() {
                 }}
               />
               <Typography variant="h3">Đăng nhập</Typography>
-              <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
-                Tài khoản demo: `user@smartfood.vn`, `owner@smartfood.vn`, `admin@smartfood.vn` với mật khẩu `123456`.
-              </Typography>
             </Stack>
 
+            {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
             {message ? <Alert severity="error">{message}</Alert> : null}
 
             <FormInput label="Email" name="email" value={values.email} onChange={handleChange} error={!!errors.email} helperText={errors.email} />
             <FormInput type="password" label="Mật khẩu" name="password" value={values.password} onChange={handleChange} error={!!errors.password} helperText={errors.password} />
             <CustomButton type="submit" disabled={loading} startIcon={<LoginRoundedIcon />}>
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+            </CustomButton>
+            <CustomButton
+              type="button"
+              disabled={loading}
+              onClick={handleGuestLogin}
+              startIcon={<PersonOutlineRoundedIcon />}
+              sx={{
+                background: "linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)",
+                boxShadow: "0 14px 28px rgba(20, 184, 166, 0.24)",
+              }}
+            >
+              {loading ? "Đang vào với tư cách khách..." : "Vào với tư cách Khách"}
             </CustomButton>
             <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
               Chưa có tài khoản?{" "}

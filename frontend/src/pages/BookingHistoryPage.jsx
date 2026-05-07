@@ -8,6 +8,7 @@ import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { bookingService } from "../services/bookingService";
 import { restaurantService } from "../services/restaurantService";
+import { getGuestBookings } from "../utils/guestSession";
 import { formatDate, getStatusColor } from "../utils/helpers";
 
 function BookingHistoryPage() {
@@ -19,15 +20,17 @@ function BookingHistoryPage() {
   useEffect(() => {
     const loadData = async () => {
       const [bookingData, restaurantData] = await Promise.all([
-        bookingService.getHistory(user.id),
+        user.isGuest ? Promise.resolve(getGuestBookings()) : bookingService.getHistory(user.id),
         restaurantService.getRestaurants(),
       ]);
+
       setHistory(bookingData);
       setRestaurantMap(Object.fromEntries(restaurantData.map((item) => [item.id, item])));
       setLoading(false);
     };
+
     loadData();
-  }, [user.id]);
+  }, [user.id, user.isGuest]);
 
   if (loading) return <LoadingScreen message="Đang tải lịch sử đặt bàn..." />;
 

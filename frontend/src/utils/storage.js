@@ -3,6 +3,8 @@ export const storageKeys = {
   user: "smartfood_user",
 };
 
+export const GUEST_AUTH_TOKEN = "guest-session";
+
 const clearLegacyLocalStorage = () => {
   localStorage.removeItem(storageKeys.token);
   localStorage.removeItem(storageKeys.user);
@@ -29,3 +31,5 @@ export const getStoredUser = () => {
   const rawUser = sessionStorage.getItem(storageKeys.user);
   return rawUser ? JSON.parse(rawUser) : null;
 };
+
+export const isGuestToken = (token) => token === GUEST_AUTH_TOKEN;
