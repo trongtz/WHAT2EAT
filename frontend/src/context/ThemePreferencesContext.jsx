@@ -11,7 +11,19 @@ const readStoredPreferences = () => {
   if (!rawValue) return defaultThemePreferences;
 
   try {
-    return { ...defaultThemePreferences, ...JSON.parse(rawValue) };
+    const parsedPreferences = JSON.parse(rawValue);
+
+    // One-time migration so older stored themes adopt the new default preset.
+    if (!parsedPreferences?.themeVersion) {
+      return {
+        ...defaultThemePreferences,
+        radius: parsedPreferences?.radius ?? defaultThemePreferences.radius,
+        density: parsedPreferences?.density ?? defaultThemePreferences.density,
+        themeVersion: defaultThemePreferences.themeVersion,
+      };
+    }
+
+    return { ...defaultThemePreferences, ...parsedPreferences };
   } catch {
     return defaultThemePreferences;
   }

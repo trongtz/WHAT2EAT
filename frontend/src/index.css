@@ -58,21 +58,55 @@ img {
   font-family: "Inter", "SF Pro Display", "Segoe UI", sans-serif;
 }
 
-.smartfood-marker {
-  width: 18px;
-  height: 18px;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  border: 3px solid #fff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+.smartfood-map-pin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-10px);
 }
 
-.smartfood-marker::after {
+.smartfood-map-pin__label {
+  max-width: 140px;
+  margin-bottom: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1b2838;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16);
+}
+
+.smartfood-map-pin {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--pin-color, #5ea2f7);
+  border: 3px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
+}
+
+.smartfood-map-pin::after {
   content: "";
   position: absolute;
   inset: 4px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.9);
+}
+
+.smartfood-map-pin--user {
+  width: 24px;
+  height: 24px;
+  border-width: 4px;
+  box-shadow:
+    0 14px 30px rgba(15, 23, 42, 0.26),
+    0 0 0 12px rgba(229, 72, 77, 0.18);
 }
 
 .leaflet-popup-content-wrapper,

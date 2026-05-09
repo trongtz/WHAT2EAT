@@ -94,9 +94,10 @@ export const themePresets = [
 ];
 
 export const defaultThemePreferences = {
-  presetId: "citrus",
+  presetId: "matcha",
   radius: 12,
   density: "cozy",
+  themeVersion: 2,
 };
 
 export const getThemePreset = (presetId) =>
