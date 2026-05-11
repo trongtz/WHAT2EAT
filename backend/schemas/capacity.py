@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 from datetime import time, date
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CapacityBase(BaseModel):
@@ -27,8 +27,7 @@ class CapacityResponse(CapacityBase):
     capacity_id: UUID
     restaurant_id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CapacityOverrideBase(BaseModel):
@@ -50,5 +49,4 @@ class CapacityOverrideResponse(CapacityOverrideBase):
     override_id: UUID
     restaurant_id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,6 +1,6 @@
 from typing import Literal
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class UserRegisterRequest(BaseModel):
@@ -23,19 +23,16 @@ class UserData(BaseModel):
     status: str
     avatar_url: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuthResponse(BaseModel):
     token: str
     user: UserData
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TokenPayload(BaseModel):
     sub: str  # user_id
     exp: int  # expiration time
-

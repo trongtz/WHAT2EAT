@@ -1,5 +1,7 @@
 from uuid import UUID
+from datetime import datetime
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from models.booking import Reservation
 from schemas.booking import ReservationCreate, ReservationUpdate
 
@@ -93,3 +95,46 @@ def reject_reservation(db: Session, reservation_id: UUID, rejection_reason: str)
     db.commit()
     db.refresh(db_reservation)
     return db_reservation
+
+
+def count_available_seats(
+    db: Session,
+    restaurant_id: UUID,
+    reservation_time: datetime,
+    max_capacity: int
+) -> int:
+    """
+    Tính số ghế còn trống cho một khung giờ cụ thể
+    
+    Logic:
+    1. Lấy max_capacity từ Capacity/CapacityOverride
+    2. Tính tổng guest_count từ các CONFIRMED/PENDING reservations
+    3. Return max_capacity - tổng_booked
+    """
+    # Count confirmed + pending reservations for this time slot
+    # Simplified: count all non-rejected reservations
+    booked_seats = db.query(Reservation).filter(
+        Reservation.restaurant_id == restaurant_id,
+        Reservation.reservation_time == reservation_time,
+        Reservation.status.in_(["CONFIRMED", "PENDING"])
+    ).with_entities(db.func.sum(Reservation.guest_count)).scalar() or 0
+    
+    available = max_capacity - int(booked_seats)
+    return max(0, available)
+
+
+def check_overbooking(
+    db: Session,
+    restaurant_id: UUID,
+    reservation_time: datetime,
+    guest_count: int,
+    max_capacity: int
+) -> bool:
+    """
+    Kiểm tra xem reservation này có gây overbooking không
+    
+    Return: True nếu OK (không overbooking), False nếu vượt quá
+    """
+    available = count_available_seats(db, restaurant_id, reservation_time, max_capacity)
+    return guest_count <= available
+

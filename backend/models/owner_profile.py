@@ -1,7 +1,8 @@
 # File: models/owner_profile.py
 from sqlalchemy import Column, DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy import ForeignKey
 from core.database import Base
 
 
