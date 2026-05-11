@@ -1,27 +1,51 @@
-from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+from uuid import UUID
+from datetime import datetime
+from decimal import Decimal
+from pydantic import BaseModel, Field
 
-# 1. Base Schema: Chứa các trường chung nhất
+
 class RestaurantBase(BaseModel):
-    name: str
+    """Base schema cho Restaurant"""
+    name: str = Field(..., min_length=1, max_length=255)
     address: str
-    phone: str
+    phone: str = Field(..., max_length=20)
     description: Optional[str] = None
-    opening_time: Optional[str] = None
-    capacity: int = 50
-    image_url: Optional[str] = None
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
+    open_hours: Optional[dict] = None  # {"mon": {"open": "08:00", "close": "22:00"}}
+    images: Optional[List[str]] = None
+    cuisine_type: Optional[str] = None
+    price_range: Optional[str] = None  # "cheap", "mid", "expensive"
 
-# 2. Schema dùng để TẠO nhà hàng (Frontend gửi lên)
+
 class RestaurantCreate(RestaurantBase):
-    # owner_id: int # Tạm thời bắt truyền owner_id, sau này ta sẽ lấy tự động từ Token
+    """Schema để tạo restaurant"""
     pass
 
-# 3. Schema dùng để TRẢ VỀ (Backend gửi cho Frontend)
+
+class RestaurantUpdate(BaseModel):
+    """Schema để update restaurant"""
+    name: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    description: Optional[str] = None
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
+    open_hours: Optional[dict] = None
+    images: Optional[List[str]] = None
+    cuisine_type: Optional[str] = None
+    price_range: Optional[str] = None
+
+
 class RestaurantResponse(RestaurantBase):
-    id: int
-    owner_id: int
-    status: str
+    """Schema để trả về restaurant"""
+    restaurant_id: UUID
+    owner_id: UUID
+    average_rating: Decimal
+    status: str  # PENDING, APPROVED, REJECTED
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
-        # Cấu hình này giúp Pydantic hiểu được dữ liệu từ SQLAlchemy (ORM)
         from_attributes = True

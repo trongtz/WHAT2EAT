@@ -7,11 +7,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from core.database import engine, Base
 from core.init_db import seed_data
 
-# Phải import tất cả các models ở đây để create_all nhận diện được
+# Import tất cả các models ở đây để create_all nhận diện được
 import models.user
+import models.customer_profile
+import models.owner_profile
 import models.restaurant
 import models.dish
 import models.booking
+import models.capacity
+import models.review
+import models.favorite
+import models.search_history
+import models.notification
 
 # import api
 from api.routes.api import api_router
