@@ -31,15 +31,7 @@ function CustomModal({ open, onClose, title, children, width = 520 }) {
         <Typography variant="h4" mb={2} sx={{ flexShrink: 0 }}>
           {title}
         </Typography>
-        <Box
-          sx={{
-            overflowY: "auto",
-            pr: 0.4,
-            pt: 0.8,
-          }}
-        >
-          {children}
-        </Box>
+        <Box sx={{ overflowY: "auto", pr: 0.4 }}>{children}</Box>
       </Box>
     </Modal>
   );

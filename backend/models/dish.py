@@ -1,23 +1,27 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
+# File: models/dish.py (MenuItem)
+from sqlalchemy import Column, String, Text, ForeignKey, Boolean, Numeric
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from core.database import Base
+import uuid
 
-class Dish(Base):
-    __tablename__ = "dishes"
 
-    id = Column(Integer, primary_key=True, index=True)
+class MenuItem(Base):
+    __tablename__ = "menu_items"
+
+    item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.restaurant_id"), nullable=False)
     
-    # Khóa ngoại trỏ về nhà hàng
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
-    
-    name = Column(String, nullable=False, index=True)
-    description = Column(String, nullable=True)
-    price = Column(Float, nullable=False) # Giá tiền
-    category = Column(String, nullable=True) # Danh mục: Khai vị, Món chính, Đồ uống...
-    
-    # Quan trọng: Trạng thái Còn hàng / Hết hàng theo đúng Proposal
-    is_available = Column(Boolean, default=True) 
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    price = Column(Numeric(10, 2), nullable=False)
+    category = Column(String(100), nullable=True)  # "Đồ ăn", "Nước uống", "Combo"
     image_url = Column(String, nullable=True)
+    is_available = Column(Boolean, default=True)
 
-    # Khai báo mối quan hệ ngược lại với Restaurant
-    restaurant = relationship("Restaurant", back_populates="dishes")
+    # Relationships
+    restaurant = relationship("Restaurant", back_populates="menu_items")
+
+
+# Keep old name as alias for backward compatibility
+Dish = MenuItem

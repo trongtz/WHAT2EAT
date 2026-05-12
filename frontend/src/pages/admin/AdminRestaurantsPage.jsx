@@ -8,26 +8,27 @@ import EmptyState from "../../components/EmptyState";
 import LoadingScreen from "../../components/LoadingScreen";
 import SectionHeader from "../../components/SectionHeader";
 import { restaurantService } from "../../services/restaurantService";
-import {
-  formatDateTime,
-  getPriceRangeLabel,
-  getRestaurantStatusLabel,
-  getStatusColor,
-} from "../../utils/helpers";
+import { getPriceRangeLabel } from "../../utils/helpers";
 
 function AdminRestaurantsPage() {
   const [items, setItems] = useState(null);
   const [message, setMessage] = useState("");
-  const [filter, setFilter] = useState("ALL");
+  const [error, setError] = useState("");
 
   const loadData = async () => {
-    const data = await restaurantService.getAdminRestaurants();
-    setItems(data);
+    try {
+      const data = await restaurantService.getAdminRestaurants();
+      setItems(data);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  const pendingItems = useMemo(() => (items || []).filter((item) => item.status === "PENDING"), [items]);
 
   const handleStatus = async (restaurantId, status) => {
     await restaurantService.updateAdminRestaurantStatus(restaurantId, status);
@@ -35,67 +36,43 @@ function AdminRestaurantsPage() {
     await loadData();
   };
 
-  const filteredItems = useMemo(() => {
-    if (!items) return [];
-    if (filter === "ALL") return items;
-    return items.filter((item) => item.status === filter);
-  }, [filter, items]);
-
   if (!items) return <LoadingScreen message="Đang tải danh sách chi nhánh..." />;
-
-  const pendingCount = items.filter((item) => item.status === "PENDING").length;
-  const approvedCount = items.filter((item) => item.status === "APPROVED").length;
-  const rejectedCount = items.filter((item) => item.status === "REJECTED").length;
 
   return (
     <Stack spacing={3}>
-      <SectionHeader
-        title="Duyệt chi nhánh nhà hàng"
-        description="Tất cả chi nhánh owner đăng ký sẽ hiển thị tại đây để admin xác minh và phê duyệt."
-      />
-
+      <SectionHeader title="Duyệt nhà hàng" />
       {message ? <Alert severity="success">{message}</Alert> : null}
+      {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip label={`Tất cả (${items.length})`} color={filter === "ALL" ? "primary" : "default"} onClick={() => setFilter("ALL")} />
-        <Chip label={`Chờ duyệt (${pendingCount})`} color={filter === "PENDING" ? "warning" : "default"} onClick={() => setFilter("PENDING")} />
-        <Chip label={`Đã duyệt (${approvedCount})`} color={filter === "APPROVED" ? "success" : "default"} onClick={() => setFilter("APPROVED")} />
-        <Chip label={`Từ chối (${rejectedCount})`} color={filter === "REJECTED" ? "error" : "default"} onClick={() => setFilter("REJECTED")} />
-      </Stack>
-
-      {filteredItems.length ? (
+      {pendingItems.length ? (
         <Grid container spacing={3}>
-          {filteredItems.map((item) => (
+          {pendingItems.map((item) => (
             <Grid key={item.id} size={{ xs: 12 }}>
               <CustomCard>
                 <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5} justifyContent="space-between">
                   <Stack spacing={1.25}>
                     <Typography variant="h4">{item.name}</Typography>
                     <Typography color="text.secondary">{item.address}</Typography>
-                    <Typography color="text.secondary">
-                      Owner: {item.ownerName || "Chưa rõ"} {item.ownerEmail ? `• ${item.ownerEmail}` : ""}
-                    </Typography>
+                    <Typography color="text.secondary">Owner: {item.ownerName || item.ownerEmail || "Chưa rõ"}</Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                      <Chip label={item.cuisineType || "Chưa có loại ẩm thực"} />
+                      {item.cuisineType
+                        ?.split(",")
+                        .map((part) => part.trim())
+                        .filter(Boolean)
+                        .slice(0, 3)
+                        .map((part) => <Chip key={part} label={part} />)}
                       <Chip label={getPriceRangeLabel(item.priceRange)} variant="outlined" />
-                      <Chip label={getRestaurantStatusLabel(item.status)} color={getStatusColor(item.status)} />
+                      <Chip label="Chờ duyệt" color="warning" />
                     </Stack>
-                    <Typography color="text.secondary">{item.description || "Chi nhánh chưa có mô tả."}</Typography>
-                    <Typography color="text.secondary">Số điện thoại: {item.phone || "Chưa cập nhật"}</Typography>
-                    <Typography color="text.secondary">Ngày gửi hồ sơ: {formatDateTime(item.createdAt)}</Typography>
+                    <Typography color="text.secondary">{item.description || "Không có mô tả."}</Typography>
                   </Stack>
                   <Stack spacing={1.25} alignItems={{ xs: "stretch", lg: "flex-end" }}>
-                    <CustomButton
-                      startIcon={<CheckCircleRoundedIcon />}
-                      onClick={() => handleStatus(item.id, "APPROVED")}
-                      disabled={item.status === "APPROVED"}
-                    >
+                    <CustomButton startIcon={<CheckCircleRoundedIcon />} onClick={() => handleStatus(item.id, "APPROVED")}>
                       Duyệt chi nhánh
                     </CustomButton>
                     <CustomButton
                       startIcon={<BlockRoundedIcon />}
                       onClick={() => handleStatus(item.id, "REJECTED")}
-                      disabled={item.status === "REJECTED"}
                       sx={{ background: "linear-gradient(135deg, #E85D75 0%, #FB7185 100%)" }}
                     >
                       Từ chối
@@ -107,10 +84,7 @@ function AdminRestaurantsPage() {
           ))}
         </Grid>
       ) : (
-        <EmptyState
-          title="Không có chi nhánh nào trong bộ lọc này"
-          description="Thử chuyển bộ lọc hoặc đợi owner gửi thêm hồ sơ chi nhánh mới."
-        />
+        <EmptyState title="Không có hồ sơ chờ duyệt" description="" />
       )}
     </Stack>
   );

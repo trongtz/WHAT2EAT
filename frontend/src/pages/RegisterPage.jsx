@@ -1,5 +1,6 @@
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
-import { Alert, Box, Link, MenuItem, Stack, Typography } from "@mui/material";
+import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
+import { Alert, Box, Chip, Link, MenuItem, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
@@ -49,8 +50,8 @@ function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Tạo tài khoản mới để bắt đầu khám phá WHAT2EAT."
-      subtitle="Gia nhập ứng dụng để quản lý lịch sử đặt bàn, lưu quán yêu thích và nhận thêm nhiều gợi ý ăn uống hợp gu mỗi ngày."
+      title="Tạo tài khoản mới để bắt đầu khám phá."
+      subtitle="Tham gia ứng dụng để trải nghiệm và nhận thêm nhiều gợi ý ăn uống hợp gu mỗi ngày."
     >
       <CustomCard
         sx={{
@@ -65,7 +66,21 @@ function RegisterPage() {
       >
         <Box component="form" onSubmit={handleSubmit}>
           <Stack spacing={1.35}>
-            <Typography variant="h3">Đăng ký</Typography>
+            <Stack spacing={0.8}>
+              <Chip
+                icon={<TipsAndUpdatesRoundedIcon />}
+                label="Tạo tài khoản để cá nhân hóa hành trình khám phá"
+                sx={{
+                  alignSelf: "flex-start",
+                  height: 34,
+                  bgcolor: "color-mix(in srgb, var(--app-primary) 12%, var(--app-paper))",
+                  color: "var(--app-primary)",
+                  border: "1px solid color-mix(in srgb, var(--app-primary) 18%, white)",
+                  borderRadius: 2,
+                }}
+              />
+              <Typography variant="h3">Đăng ký</Typography>
+            </Stack>
             {message ? <Alert severity="error">{message}</Alert> : null}
             <FormInput label="Họ và tên" name="fullName" value={values.fullName} onChange={handleChange} error={!!errors.fullName} helperText={errors.fullName} />
             <FormInput label="Email" name="email" value={values.email} onChange={handleChange} error={!!errors.email} helperText={errors.email} />
@@ -89,7 +104,12 @@ function RegisterPage() {
             </CustomButton>
             <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
               Đã có tài khoản?{" "}
-              <Link component={RouterLink} to="/dang-nhap" underline="hover">
+              <Link
+                component={RouterLink}
+                to="/dang-nhap"
+                underline="hover"
+                sx={{ color: "var(--app-primary)", fontWeight: 700 }}
+              >
                 Đăng nhập
               </Link>
             </Typography>

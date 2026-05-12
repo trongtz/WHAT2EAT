@@ -81,9 +81,9 @@ function SearchPage() {
         <Grid size={{ xs: 12, md: 2 }}>
           <FormInput select label="Ngân sách" name="price" value={filters.price} onChange={handleChange}>
             <MenuItem value="">Không giới hạn</MenuItem>
-            <MenuItem value="100000">Dưới 100.000đ</MenuItem>
-            <MenuItem value="250000">Dưới 250.000đ</MenuItem>
-            <MenuItem value="400000">Dưới 400.000đ</MenuItem>
+            <MenuItem value="cheap">Dưới 100.000đ</MenuItem>
+            <MenuItem value="mid">100.000đ - 300.000đ</MenuItem>
+            <MenuItem value="expensive">Trên 300.000đ</MenuItem>
           </FormInput>
         </Grid>
         <Grid size={{ xs: 12, md: 2 }}>

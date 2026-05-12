@@ -19,8 +19,8 @@ function SectionHeader({ eyebrow, title, description, action }) {
               py: 0.75,
               mb: 1.25,
               borderRadius: 999,
-              bgcolor: "color-mix(in srgb, var(--app-primary) 12%, white)",
-              color: "var(--app-primary)",
+              bgcolor: "rgba(255, 138, 42, 0.10)",
+              color: "primary.main",
               fontWeight: 800,
               letterSpacing: "0.04em",
             }}

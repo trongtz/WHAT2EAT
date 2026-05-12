@@ -1,1 +1,1 @@
-"""API routes package."""
+# Package marker for api routes.

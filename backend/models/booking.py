@@ -1,27 +1,32 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text
+# File: models/booking.py (Reservation)
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Integer, func
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from core.database import Base
+import uuid
 
-class Booking(Base):
-    __tablename__ = "bookings"
 
-    id = Column(Integer, primary_key=True, index=True)
-    
-    # Ai đặt? (Trỏ về User)
-    customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
-    # Đặt ở đâu? (Trỏ về Restaurant)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
-    
-    # Thông tin chi tiết
-    booking_date = Column(String, nullable=False) # Định dạng: YYYY-MM-DD
-    booking_time = Column(String, nullable=False) # Định dạng: HH:MM
-    number_of_people = Column(Integer, nullable=False)
-    note = Column(Text, nullable=True) # Lời nhắn thêm (VD: "Sắp xếp chỗ gần cửa sổ")
-    
-    # Trạng thái: pending (chờ xác nhận), confirmed (chủ quán đã chốt), cancelled (đã hủy)
-    status = Column(String, default="pending") 
+class Reservation(Base):
+    __tablename__ = "reservations"
 
-    # Thiết lập mối quan hệ
-    customer = relationship("User", back_populates="bookings")
-    restaurant = relationship("Restaurant", back_populates="bookings")
+    reservation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.restaurant_id"), nullable=False)
+    
+    reservation_time = Column(DateTime, nullable=False)
+    guest_count = Column(Integer, nullable=False)
+    notes = Column(Text, nullable=True)
+    
+    status = Column(String(50), default="PENDING")  # PENDING, CONFIRMED, REJECTED, CANCELLED
+    rejection_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    customer = relationship("User", back_populates="reservations")
+    restaurant = relationship("Restaurant", back_populates="reservations")
+    review = relationship("Review", back_populates="reservation", uselist=False)
+
+
+# Keep old name as alias for backward compatibility
+Booking = Reservation

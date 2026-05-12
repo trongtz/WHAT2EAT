@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -24,7 +24,7 @@ from services.restaurant_service import attach_restaurant_review_summary
 router = APIRouter()
 
 
-@router.get("/search", response_model=List[RestaurantResponse])
+@router.get("/search", response_model=list[RestaurantResponse])
 def search_restaurants(
     query: Optional[str] = Query(None),
     cuisine_type: Optional[str] = Query(None),
@@ -43,7 +43,7 @@ def search_restaurants(
     return restaurants
 
 
-@router.get("/nearby", response_model=List[RestaurantResponse])
+@router.get("/nearby", response_model=list[RestaurantResponse])
 def get_nearby_restaurants(
     latitude: Decimal = Query(...),
     longitude: Decimal = Query(...),
@@ -59,7 +59,7 @@ def get_nearby_restaurants(
     return restaurants
 
 
-@router.get("/popular", response_model=List[RestaurantResponse])
+@router.get("/popular", response_model=list[RestaurantResponse])
 def get_popular_restaurants(limit: int = 10, db: Session = Depends(get_db)):
     restaurants = crud_restaurant.get_popular_restaurants(db, limit)
     for restaurant in restaurants:
@@ -68,7 +68,7 @@ def get_popular_restaurants(limit: int = 10, db: Session = Depends(get_db)):
     return restaurants
 
 
-@router.get("/new", response_model=List[RestaurantResponse])
+@router.get("/new", response_model=list[RestaurantResponse])
 def get_new_restaurants(limit: int = 10, db: Session = Depends(get_db)):
     restaurants = crud_restaurant.get_newly_added_restaurants(db, limit)
     for restaurant in restaurants:
@@ -77,7 +77,7 @@ def get_new_restaurants(limit: int = 10, db: Session = Depends(get_db)):
     return restaurants
 
 
-@router.get("/", response_model=List[RestaurantResponse])
+@router.get("/", response_model=list[RestaurantResponse])
 def get_all_restaurants(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     restaurants = crud_restaurant.get_restaurants(db=db, skip=skip, limit=limit, status="APPROVED")
     for restaurant in restaurants:
@@ -86,7 +86,7 @@ def get_all_restaurants(skip: int = 0, limit: int = 100, db: Session = Depends(g
     return restaurants
 
 
-@router.get("/owner/{owner_id}", response_model=List[RestaurantResponse])
+@router.get("/owner/{owner_id}", response_model=list[RestaurantResponse])
 def get_owner_restaurants(
     owner_id: UUID,
     skip: int = 0,
@@ -140,7 +140,7 @@ def get_restaurant_detail(restaurant_id: UUID, db: Session = Depends(get_db)):
     return restaurant
 
 
-@router.get("/{restaurant_id}/menu", response_model=List[MenuItemResponse])
+@router.get("/{restaurant_id}/menu", response_model=list[MenuItemResponse])
 def get_restaurant_menu(
     restaurant_id: UUID,
     skip: int = 0,
@@ -150,7 +150,7 @@ def get_restaurant_menu(
     return crud_menu_item.get_menu_items_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
 
 
-@router.get("/{restaurant_id}/reviews", response_model=List[ReviewResponse])
+@router.get("/{restaurant_id}/reviews", response_model=list[ReviewResponse])
 def get_restaurant_reviews(
     restaurant_id: UUID,
     skip: int = 0,
@@ -171,7 +171,12 @@ def create_restaurant(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ chủ nhà hàng mới được quyền tạo nhà hàng",
         )
-    created_restaurant = crud_restaurant.create_restaurant(db=db, restaurant=restaurant, owner_id=current_user.user_id)
+
+    created_restaurant = crud_restaurant.create_restaurant(
+        db=db,
+        restaurant=restaurant,
+        owner_id=current_user.user_id,
+    )
     replace_restaurant_capacities(
         db,
         created_restaurant.restaurant_id,
@@ -210,7 +215,7 @@ def update_restaurant(
     max_capacity = restaurant_in.max_capacity
     updated_restaurant = crud_restaurant.update_restaurant(db, restaurant_id, restaurant_in)
     if not updated_restaurant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NhÃ  hÃ ng khÃ´ng tá»“n táº¡i")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nhà hàng không tồn tại")
 
     if max_capacity is not None or restaurant_in.open_hours is not None:
         replace_restaurant_capacities(

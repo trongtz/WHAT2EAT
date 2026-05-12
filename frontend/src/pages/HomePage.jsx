@@ -235,8 +235,8 @@ function HomePage() {
         setRestaurants(data);
         const firstLocatedRestaurant = data.find((restaurant) => hasCoordinates(restaurant));
         setSelectedRestaurantId(firstLocatedRestaurant?.id || data[0]?.id || null);
-      } catch {
-        setError("Không tải được dữ liệu nhà hàng.");
+      } catch (err) {
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -487,7 +487,7 @@ function HomePage() {
                   style={{ height: "100%", width: "100%" }}
                 >
                   <TileLayer
-                    attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+                    attribution="Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
                     url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                   />
 
@@ -643,7 +643,7 @@ function HomePage() {
       </Box>
 
       <SectionHeader
-        eyebrow="Curated picks"
+        eyebrow="Nổi bật hôm nay"
         title="Danh sách nổi bật hôm nay"
         description="Ưu tiên các nhà hàng có ảnh đẹp, đánh giá tốt và dữ liệu chi tiết đầy đủ để bạn chọn nhanh hơn."
       />
@@ -743,7 +743,7 @@ function HomePage() {
                     bgcolor: "rgba(255,255,255,0.72)",
                   }}
                 >
-                  Vị trí của tôi
+                  {locationPending ? "Đang lấy vị trí..." : "Vị trí của tôi"}
                 </Button>
               </Stack>
             </Stack>

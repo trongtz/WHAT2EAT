@@ -1,214 +1,191 @@
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LocalPhoneRoundedIcon from "@mui/icons-material/LocalPhoneRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
 import { Alert, Box, Chip, Grid, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
 import LoadingScreen from "../../components/LoadingScreen";
-import SectionHeader from "../../components/SectionHeader";
 import { restaurantService } from "../../services/restaurantService";
-import {
-  formatDateTime,
-  formatOpenHours,
-  getPriceRangeLabel,
-  getRestaurantStatusLabel,
-  getStatusColor,
-} from "../../utils/helpers";
-
-const getCuisineLabels = (value) =>
-  String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-const getRestaurantRatingLabel = (restaurant) =>
-  Number(restaurant.reviewCount || 0) > 0
-    ? `${Number(restaurant.averageRating || 0).toFixed(1)} sao`
-    : "Không có đánh giá";
-
-function MenuImage({ imageUrl, size = 76 }) {
-  return (
-    <Box
-      sx={{
-        width: size,
-        height: size,
-        borderRadius: 2,
-        flexShrink: 0,
-        border: "1px solid rgba(15,23,42,0.08)",
-        background: imageUrl
-          ? `linear-gradient(180deg, rgba(18,22,44,0.05), rgba(18,22,44,0.16)), url(${imageUrl})`
-          : "linear-gradient(135deg, rgba(255,159,28,0.18), rgba(47,107,255,0.14))",
-        backgroundPosition: "center",
-        backgroundSize: "cover",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
-      }}
-    />
-  );
-}
-
-function DetailMetric({ label, value, icon }) {
-  return (
-    <Box
-      sx={{
-        p: 1.6,
-        borderRadius: 2,
-        bgcolor: "rgba(248,250,255,0.92)",
-        border: "1px solid rgba(15,23,42,0.06)",
-      }}
-    >
-      <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-        {label}
-      </Typography>
-      <Stack direction="row" spacing={0.7} alignItems="center" sx={{ mt: 0.5 }}>
-        {icon}
-        <Typography fontWeight={800}>{value}</Typography>
-      </Stack>
-    </Box>
-  );
-}
+import { formatCurrency, formatOpenHours, getPriceRangeLabel, getRestaurantStatusLabel } from "../../utils/helpers";
 
 function OwnerRestaurantDetailPage() {
-  const { id } = useParams();
+  const { restaurantId } = useParams();
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
-      const data = await restaurantService.getManageRestaurant(id);
-      setRestaurant(data);
-      setLoading(false);
+      try {
+        const data = await restaurantService.getManageRestaurant(restaurantId);
+        setRestaurant(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
-
     loadData();
-  }, [id]);
+  }, [restaurantId]);
 
   if (loading) return <LoadingScreen message="Đang tải chi tiết chi nhánh..." />;
+  if (error) return <Alert severity="error">{error}</Alert>;
   if (!restaurant) return <Alert severity="error">Không tìm thấy chi nhánh.</Alert>;
-
-  const cuisineLabels = getCuisineLabels(restaurant.cuisineType);
 
   return (
     <Stack spacing={3}>
-      <SectionHeader
-        title={restaurant.name}
-        action={
-          <CustomButton
-            component={RouterLink}
-            to="/chu-nha-hang/nha-hang"
-            startIcon={<ArrowBackRoundedIcon />}
-            sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
-          >
-            Quay lại
-          </CustomButton>
-        }
-      />
+      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap>
+        <Typography variant="h2">{restaurant.name}</Typography>
+        <CustomButton
+          component={RouterLink}
+          to="/chu-nha-hang/nha-hang"
+          startIcon={<ArrowBackRoundedIcon />}
+          sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
+        >
+          Quay lại
+        </CustomButton>
+      </Stack>
 
-      <Alert severity={restaurant.status === "APPROVED" ? "success" : restaurant.status === "REJECTED" ? "error" : "info"}>
+      <Alert severity={restaurant.status === "APPROVED" ? "success" : restaurant.status === "REJECTED" ? "error" : "warning"}>
         {restaurant.status === "APPROVED"
-          ? "Chi nhánh đã được admin duyệt. Bạn có thể sửa thông tin, quản lý menu và theo dõi sức chứa đặt bàn."
-          : restaurant.status === "PENDING"
-            ? "Chi nhánh đang chờ admin duyệt. Bạn có thể xem chi tiết hồ sơ đã gửi."
-            : "Chi nhánh đang ở trạng thái bị từ chối."}
+          ? "Chi nhánh đã được admin duyệt. Bạn có thể sửa thông tin và quản lý menu."
+          : restaurant.status === "REJECTED"
+            ? "Chi nhánh đã bị từ chối. Bạn cần tạo hồ sơ mới hoặc liên hệ admin."
+            : "Chi nhánh đang chờ admin duyệt trước khi mở quyền cập nhật."}
       </Alert>
 
       <CustomCard>
-        <Stack spacing={2.5}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, lg: 4 }}>
             <Box
               sx={{
-                width: { xs: "100%", md: 220 },
-                height: 170,
-                borderRadius: 2,
-                flexShrink: 0,
+                height: 240,
+                borderRadius: 2.5,
+                overflow: "hidden",
                 background: restaurant.image
-                  ? `linear-gradient(180deg, rgba(18,22,44,0.08), rgba(18,22,44,0.24)), url(${restaurant.image})`
-                  : "linear-gradient(135deg, rgba(255,159,28,0.22), rgba(47,107,255,0.18))",
-                backgroundPosition: "center",
+                  ? `linear-gradient(180deg, rgba(18,22,44,0.05), rgba(18,22,44,0.18)), url(${restaurant.image})`
+                  : "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 18%, white), color-mix(in srgb, var(--app-secondary) 16%, white))",
                 backgroundSize: "cover",
+                backgroundPosition: "center",
               }}
             />
+          </Grid>
 
-            <Stack spacing={1.1} flex={1}>
-              <Typography variant="h4">{restaurant.name}</Typography>
+          <Grid size={{ xs: 12, lg: 8 }}>
+            <Stack spacing={1.25}>
+              <Typography variant="h3">{restaurant.name}</Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {cuisineLabels.length ? (
-                  cuisineLabels.map((label) => <Chip key={label} label={label} />)
-                ) : (
-                  <Chip label="Chưa có loại ẩm thực" />
-                )}
+                {restaurant.cuisineType
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+                  .map((item) => (
+                    <Chip key={item} label={item} />
+                  ))}
                 <Chip label={getPriceRangeLabel(restaurant.priceRange)} variant="outlined" />
                 <Chip
                   label={getRestaurantStatusLabel(restaurant.status)}
-                  color={getStatusColor(restaurant.status)}
+                  color={restaurant.status === "APPROVED" ? "success" : restaurant.status === "REJECTED" ? "error" : "warning"}
                 />
                 <Chip
-                  icon={<StarRoundedIcon sx={{ fontSize: 18 }} />}
-                  label={getRestaurantRatingLabel(restaurant)}
-                  variant="outlined"
-                  color="warning"
+                  icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
+                  label={
+                    restaurant.averageRating > 0 ? `${restaurant.averageRating.toFixed(1)} sao` : "Không có đánh giá"
+                  }
+                  sx={{
+                    bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
+                    color: "var(--app-primary)",
+                  }}
                 />
               </Stack>
+
               <Typography color="text.secondary">{restaurant.address}</Typography>
-              <Stack direction="row" spacing={0.9} alignItems="center">
-                <LocalPhoneRoundedIcon sx={{ color: "text.secondary", fontSize: 18 }} />
-                <Typography color="text.secondary">{restaurant.phone || "Chưa cập nhật"}</Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <LocalPhoneRoundedIcon sx={{ color: "var(--app-secondary)" }} />
+                <Typography color="text.secondary">{restaurant.phone}</Typography>
               </Stack>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography color="text.secondary">Giờ mở cửa</Typography>
+                  <Typography fontWeight={800}>{formatOpenHours(restaurant.openHours)}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography color="text.secondary">Chỗ ngồi</Typography>
+                  <Typography fontWeight={800}>
+                    {restaurant.availableCapacity}/{restaurant.maxCapacity}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography color="text.secondary">Số món ăn</Typography>
+                  <Typography fontWeight={800}>{restaurant.menu.length}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography color="text.secondary">Đánh giá</Typography>
+                  <Typography fontWeight={800}>
+                    {restaurant.averageRating > 0 ? restaurant.averageRating.toFixed(1) : "Không có"}
+                  </Typography>
+                </Grid>
+              </Grid>
+
               <Typography color="text.secondary">
-                {restaurant.description || "Chi nhánh chưa có mô tả."}
+                {restaurant.description || "Nhà hàng này chưa có mô tả chi tiết."}
               </Typography>
             </Stack>
-          </Stack>
-
-          <Grid container spacing={1.5}>
-            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <DetailMetric label="Cập nhật gần nhất" value={formatDateTime(restaurant.updatedAt)} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <DetailMetric label="Giờ mở cửa" value={formatOpenHours(restaurant.openHours)} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <DetailMetric
-                label="Chỗ ngồi"
-                value={`${restaurant.availableCapacity || 0}/${restaurant.maxCapacity || 0}`}
-                icon={<TableRestaurantRoundedIcon sx={{ fontSize: 18 }} />}
-              />
-            </Grid>
           </Grid>
-        </Stack>
+        </Grid>
       </CustomCard>
 
       <CustomCard>
         <Stack spacing={2}>
-          <Typography variant="h4">Menu hiện tại</Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap>
+            <Typography variant="h4">Menu của chi nhánh</Typography>
+            {restaurant.status === "APPROVED" ? (
+              <CustomButton component={RouterLink} to={`/chu-nha-hang/menu?restaurantId=${restaurant.id}&focus=create`}>
+                Thêm món
+              </CustomButton>
+            ) : null}
+          </Stack>
+
           {restaurant.menu.length ? (
-            <Grid container spacing={2}>
+            <Grid container spacing={1.5}>
               {restaurant.menu.map((item) => (
                 <Grid key={item.id} size={{ xs: 12, md: 6 }}>
                   <Box
                     sx={{
-                      p: 2,
+                      p: 1.2,
                       borderRadius: 2,
-                      bgcolor: "rgba(248,250,255,0.92)",
-                      border: "1px solid rgba(15,23,42,0.06)",
+                      border: "1px solid rgba(15,23,42,0.08)",
+                      bgcolor: "rgba(255,255,255,0.78)",
                     }}
                   >
-                    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-                      <MenuImage imageUrl={item.imageUrl} />
-                      <Stack spacing={0.75}>
+                    <Stack direction="row" spacing={1.2}>
+                      <Box
+                        sx={{
+                          width: 84,
+                          minWidth: 84,
+                          height: 84,
+                          borderRadius: 1.5,
+                          overflow: "hidden",
+                          background: item.imageUrl
+                            ? `linear-gradient(180deg, rgba(18,22,44,0.04), rgba(18,22,44,0.16)), url(${item.imageUrl})`
+                            : "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 16%, white), color-mix(in srgb, var(--app-secondary) 12%, white))",
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }}
+                      />
+                      <Stack spacing={0.45} sx={{ minWidth: 0, flex: 1 }}>
                         <Typography fontWeight={800}>{item.name}</Typography>
-                        <Typography color="text.secondary">
+                        <Typography color="text.secondary" sx={{ fontSize: "0.9rem" }}>
                           {item.description || "Chưa có mô tả món ăn."}
                         </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          <Chip label={item.category || "Chưa phân loại"} />
-                          <Chip
-                            label={item.isAvailable ? "Đang phục vụ" : "Tạm ẩn"}
-                            color={item.isAvailable ? "success" : "default"}
-                          />
+                        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                          {item.category ? <Chip size="small" label={item.category} /> : null}
+                          <Chip size="small" label={item.isAvailable ? "Đang phục vụ" : "Tạm hết"} />
                         </Stack>
+                        <Typography fontWeight={800}>{formatCurrency(item.price)}</Typography>
                       </Stack>
                     </Stack>
                   </Box>
@@ -216,7 +193,7 @@ function OwnerRestaurantDetailPage() {
               ))}
             </Grid>
           ) : (
-            <Alert severity="info">Chi nhánh này chưa có món ăn nào được khai báo.</Alert>
+            <Typography color="text.secondary">Chi nhánh này chưa có món ăn nào.</Typography>
           )}
         </Stack>
       </CustomCard>

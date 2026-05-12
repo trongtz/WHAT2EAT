@@ -1,22 +1,18 @@
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LocalPhoneRoundedIcon from "@mui/icons-material/LocalPhoneRounded";
-import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
-import RestaurantMenuRoundedIcon from "@mui/icons-material/RestaurantMenuRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import {
   Alert,
   Box,
-  Checkbox,
   Chip,
   Grid,
   MenuItem,
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
@@ -27,17 +23,9 @@ import LoadingScreen from "../../components/LoadingScreen";
 import SectionHeader from "../../components/SectionHeader";
 import { useAuth } from "../../hooks/useAuth";
 import { restaurantService } from "../../services/restaurantService";
-import {
-  formatDate,
-  formatOpenHours,
-  getPriceRangeLabel,
-  getRestaurantStatusLabel,
-  getStatusColor,
-} from "../../utils/helpers";
+import { formatOpenHours, getPriceRangeLabel, getRestaurantStatusLabel } from "../../utils/helpers";
 
-const defaultOpenHoursTemplate = "08:00 - 22:00";
-const OTHER_CUISINE_OPTION = "Khác";
-const cuisineOptions = [
+const CUISINE_OPTIONS = [
   "Món ăn Thái Lan",
   "Món ăn miền Tây",
   "Món lẩu",
@@ -50,7 +38,7 @@ const cuisineOptions = [
   "Món ăn Việt Nam",
   "Quán bia",
   "Bít tết",
-  OTHER_CUISINE_OPTION,
+  "Khác",
 ];
 
 const defaultForm = {
@@ -59,126 +47,29 @@ const defaultForm = {
   address: "",
   phone: "",
   description: "",
-  latitude: "",
-  longitude: "",
-  cuisineSelections: [],
-  cuisineOther: "",
-  price_range: "mid",
-  max_capacity: 10,
+  price_range: "",
+  open_hours: "",
+  max_capacity: "",
   imagesText: "",
-  openHoursText: defaultOpenHoursTemplate,
+  selectedCuisines: [],
+  customCuisine: "",
 };
 
-const parseCuisineType = (value) => {
-  const tokens = String(value || "")
+const normalizeCuisineSelection = (value) =>
+  String(value || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  const selections = [];
-  let otherText = "";
-
-  tokens.forEach((token) => {
-    if (cuisineOptions.includes(token) && token !== OTHER_CUISINE_OPTION) {
-      selections.push(token);
-      return;
-    }
-
-    if (token === OTHER_CUISINE_OPTION) {
-      if (!selections.includes(OTHER_CUISINE_OPTION)) {
-        selections.push(OTHER_CUISINE_OPTION);
+const toCuisineText = (selectedCuisines, customCuisine) =>
+  selectedCuisines
+    .flatMap((item) => {
+      if (item === "Khác") {
+        return customCuisine.trim() ? [customCuisine.trim()] : [];
       }
-      return;
-    }
-
-    if (token.toLowerCase().startsWith("khác:")) {
-      if (!selections.includes(OTHER_CUISINE_OPTION)) {
-        selections.push(OTHER_CUISINE_OPTION);
-      }
-      otherText = token.slice(5).trim();
-      return;
-    }
-
-    if (!selections.includes(OTHER_CUISINE_OPTION)) {
-      selections.push(OTHER_CUISINE_OPTION);
-    }
-    otherText = token;
-  });
-
-  return {
-    selections,
-    otherText,
-  };
-};
-
-const serializeCuisineType = (selections, otherText) => {
-  const baseValues = selections.filter((item) => item !== OTHER_CUISINE_OPTION);
-
-  if (!selections.includes(OTHER_CUISINE_OPTION)) {
-    return baseValues.join(", ");
-  }
-
-  if (otherText.trim()) {
-    return [...baseValues, `Khác: ${otherText.trim()}`].join(", ");
-  }
-
-  return [...baseValues, OTHER_CUISINE_OPTION].join(", ");
-};
-
-const getCuisineLabels = (value) => {
-  const { selections, otherText } = parseCuisineType(value);
-
-  if (!selections.length) {
-    return [];
-  }
-
-  return selections.map((item) =>
-    item === OTHER_CUISINE_OPTION && otherText ? `Khác: ${otherText}` : item
-  );
-};
-
-const buildFormFromRestaurant = (restaurant) => {
-  const cuisine = parseCuisineType(restaurant.cuisineType);
-
-  return {
-    restaurantId: restaurant.id,
-    name: restaurant.name ?? "",
-    address: restaurant.address ?? "",
-    phone: restaurant.phone ?? "",
-    description: restaurant.description ?? "",
-    latitude: restaurant.latitude ?? "",
-    longitude: restaurant.longitude ?? "",
-    cuisineSelections: cuisine.selections,
-    cuisineOther: cuisine.otherText,
-    price_range: restaurant.priceRange ?? "mid",
-    max_capacity: restaurant.maxCapacity || 10,
-    imagesText: restaurant.images?.join("\n") ?? "",
-    openHoursText: restaurant.openHours ?? defaultOpenHoursTemplate,
-  };
-};
-
-const getRestaurantRatingLabel = (restaurant) =>
-  Number(restaurant.reviewCount || 0) > 0
-    ? `${Number(restaurant.averageRating || 0).toFixed(1)} sao`
-    : "Không có đánh giá";
-
-function RestaurantMetric({ label, value }) {
-  return (
-    <Box
-      sx={{
-        p: 1.4,
-        borderRadius: 2,
-        bgcolor: "rgba(248,250,255,0.92)",
-        border: "1px solid rgba(15,23,42,0.06)",
-      }}
-    >
-      <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-        {label}
-      </Typography>
-      <Box sx={{ mt: 0.35, fontWeight: 800, fontSize: "1.15rem", color: "text.primary" }}>{value}</Box>
-    </Box>
-  );
-}
+      return [item];
+    })
+    .join(", ");
 
 function OwnerRestaurantsPage() {
   const { user } = useAuth();
@@ -192,26 +83,55 @@ function OwnerRestaurantsPage() {
   const [form, setForm] = useState(defaultForm);
 
   const loadData = async () => {
-    const data = await restaurantService.getOwnerRestaurants(user.id);
-    setRestaurants(data);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const data = await restaurantService.getOwnerRestaurants(user.id);
+      setRestaurants(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, [user.id]);
 
+  const approvedRestaurants = useMemo(
+    () => restaurants.filter((restaurant) => restaurant.status === "APPROVED"),
+    [restaurants]
+  );
+
+  const handleClose = () => {
+    setOpen(false);
+    setForm(defaultForm);
+  };
+
   const handleOpenCreate = () => {
     setMode("create");
     setForm(defaultForm);
-    setError("");
     setOpen(true);
   };
 
   const handleOpenEdit = (restaurant) => {
+    const cuisineValues = normalizeCuisineSelection(restaurant.cuisineType);
+    const selectedKnown = cuisineValues.filter((item) => CUISINE_OPTIONS.includes(item));
+    const customValues = cuisineValues.filter((item) => !CUISINE_OPTIONS.includes(item));
     setMode("edit");
-    setForm(buildFormFromRestaurant(restaurant));
-    setError("");
+    setForm({
+      restaurantId: restaurant.id,
+      name: restaurant.name,
+      address: restaurant.address,
+      phone: restaurant.phone,
+      description: restaurant.description || "",
+      price_range: restaurant.priceRange || "",
+      open_hours: restaurant.openHours || "",
+      max_capacity: restaurant.maxCapacity || "",
+      imagesText: (restaurant.images || []).join("\n"),
+      selectedCuisines: customValues.length ? [...selectedKnown, "Khác"] : selectedKnown,
+      customCuisine: customValues.join(", "),
+    });
     setOpen(true);
   };
 
@@ -220,65 +140,38 @@ function OwnerRestaurantsPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCuisineChange = (event) => {
-    const nextSelections = Array.isArray(event.target.value)
-      ? event.target.value
-      : String(event.target.value || "")
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean);
-
-    setForm((prev) => ({
-      ...prev,
-      cuisineSelections: nextSelections,
-      cuisineOther: nextSelections.includes(OTHER_CUISINE_OPTION) ? prev.cuisineOther : "",
-    }));
-  };
-
-  const buildPayload = () => ({
-    name: form.name,
-    address: form.address,
-    phone: form.phone,
-    description: form.description,
-    latitude: form.latitude,
-    longitude: form.longitude,
-    cuisine_type: serializeCuisineType(form.cuisineSelections, form.cuisineOther),
-    price_range: form.price_range,
-    max_capacity: Number(form.max_capacity),
-    open_hours: form.openHoursText,
-    images: form.imagesText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean),
-  });
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError("");
 
-    if (
-      form.cuisineSelections.includes(OTHER_CUISINE_OPTION) &&
-      !form.cuisineOther.trim()
-    ) {
-      setSaving(false);
-      setError("Bạn hãy nhập thêm nội dung cho mục Khác.");
-      return;
-    }
+    const payload = {
+      name: form.name,
+      address: form.address,
+      phone: form.phone,
+      description: form.description,
+      price_range: form.price_range,
+      open_hours: form.open_hours,
+      max_capacity: Number(form.max_capacity),
+      images: form.imagesText
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+      cuisine_type: toCuisineText(form.selectedCuisines, form.customCuisine),
+    };
 
     try {
-      const payload = buildPayload();
       if (mode === "create") {
         await restaurantService.createRestaurant(payload);
-        setMessage("Đã gửi chi nhánh mới lên trang admin để duyệt.");
+        setMessage("Đã gửi hồ sơ chi nhánh lên admin để duyệt.");
       } else {
         await restaurantService.updateRestaurant(form.restaurantId, payload);
         setMessage("Đã cập nhật thông tin chi nhánh.");
       }
-      setOpen(false);
+      handleClose();
       await loadData();
-    } catch (submitError) {
-      setError(submitError.message);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setSaving(false);
     }
@@ -289,7 +182,7 @@ function OwnerRestaurantsPage() {
   return (
     <Stack spacing={3}>
       <SectionHeader
-        title="Quản lý chi nhánh nhà hàng"
+        title="Nhà hàng"
         action={
           <CustomButton startIcon={<AddRoundedIcon />} onClick={handleOpenCreate}>
             Đăng ký chi nhánh
@@ -298,144 +191,131 @@ function OwnerRestaurantsPage() {
       />
 
       {message ? <Alert severity="success">{message}</Alert> : null}
+      {error ? <Alert severity="error">{error}</Alert> : null}
 
-      {!restaurants.length ? (
-        <Stack spacing={2}>
-          <EmptyState title="Trang chủ owner đang trống" />
-          <CustomButton startIcon={<AddRoundedIcon />} onClick={handleOpenCreate} sx={{ alignSelf: "flex-start" }}>
-            Tạo chi nhánh đầu tiên
-          </CustomButton>
-        </Stack>
-      ) : (
+      {restaurants.length ? (
         <Grid container spacing={3}>
-          {restaurants.map((restaurant) => {
-            const cuisineLabels = getCuisineLabels(restaurant.cuisineType);
+          {restaurants.map((restaurant) => (
+            <Grid key={restaurant.id} size={{ xs: 12 }}>
+              <CustomCard>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5}>
+                    <Box
+                      sx={{
+                        width: { xs: "100%", lg: 280 },
+                        minWidth: { lg: 280 },
+                        height: 180,
+                        borderRadius: 2,
+                        overflow: "hidden",
+                        background: restaurant.image
+                          ? `linear-gradient(180deg, rgba(18,22,44,0.05), rgba(18,22,44,0.18)), url(${restaurant.image})`
+                          : "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 20%, white), color-mix(in srgb, var(--app-secondary) 18%, white))",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }}
+                    />
 
-            return (
-              <Grid key={restaurant.id} size={{ xs: 12, xl: 6 }}>
-                <CustomCard>
-                  <Stack spacing={2}>
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                      <Box
-                        sx={{
-                          width: { xs: "100%", md: 184 },
-                          height: 146,
-                          borderRadius: 2,
-                          flexShrink: 0,
-                          background: restaurant.image
-                            ? `linear-gradient(180deg, rgba(18,22,44,0.08), rgba(18,22,44,0.24)), url(${restaurant.image})`
-                            : "linear-gradient(135deg, rgba(255,159,28,0.22), rgba(47,107,255,0.18))",
-                          backgroundPosition: "center",
-                          backgroundSize: "cover",
-                          border: "1px solid rgba(15,23,42,0.06)",
-                        }}
-                      />
+                    <Stack spacing={1.2} flex={1}>
+                      <Typography variant="h3">{restaurant.name}</Typography>
+                      <Typography color="text.secondary">{restaurant.address}</Typography>
 
-                      <Stack spacing={1.15} flex={1}>
-                        <Typography variant="h4">{restaurant.name}</Typography>
-                        <Typography color="text.secondary">{restaurant.address}</Typography>
-
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          {cuisineLabels.length ? (
-                            cuisineLabels.map((label) => <Chip key={label} label={label} />)
-                          ) : (
-                            <Chip label="Chưa có loại ẩm thực" />
-                          )}
-                          <Chip label={getPriceRangeLabel(restaurant.priceRange)} variant="outlined" />
-                          <Chip
-                            label={getRestaurantStatusLabel(restaurant.status)}
-                            color={getStatusColor(restaurant.status)}
-                          />
-                          <Chip
-                            icon={<StarRoundedIcon sx={{ fontSize: 18 }} />}
-                            label={getRestaurantRatingLabel(restaurant)}
-                            variant="outlined"
-                            color="warning"
-                          />
-                        </Stack>
-
-                        <Stack direction="row" spacing={0.9} alignItems="center">
-                          <LocalPhoneRoundedIcon sx={{ color: "text.secondary", fontSize: 18 }} />
-                          <Typography color="text.secondary">{restaurant.phone || "Chưa cập nhật"}</Typography>
-                        </Stack>
-                      </Stack>
-                    </Stack>
-
-                    <Grid container spacing={1.5}>
-                      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                        <RestaurantMetric label="Ngày tạo" value={formatDate(restaurant.createdAt)} />
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                        <RestaurantMetric label="Giờ mở cửa" value={formatOpenHours(restaurant.openHours)} />
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                        <RestaurantMetric
-                          label="Chỗ ngồi"
-                          value={
-                            <Stack direction="row" spacing={0.6} alignItems="center">
-                              <TableRestaurantRoundedIcon sx={{ fontSize: 18 }} />
-                              <span>{`${restaurant.availableCapacity || 0}/${restaurant.maxCapacity || 0}`}</span>
-                            </Stack>
-                          }
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {normalizeCuisineSelection(restaurant.cuisineType).map((item) => (
+                          <Chip key={item} label={item} />
+                        ))}
+                        <Chip label={getPriceRangeLabel(restaurant.priceRange)} variant="outlined" />
+                        <Chip
+                          label={getRestaurantStatusLabel(restaurant.status)}
+                          color={restaurant.status === "APPROVED" ? "success" : restaurant.status === "REJECTED" ? "error" : "warning"}
                         />
+                        <Chip
+                          icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
+                          label={
+                            restaurant.averageRating > 0
+                              ? `${restaurant.averageRating.toFixed(1)}`
+                              : "Không có đánh giá"
+                          }
+                          sx={{
+                            bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
+                            color: "var(--app-primary)",
+                          }}
+                        />
+                      </Stack>
+
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <LocalPhoneRoundedIcon sx={{ color: "var(--app-secondary)" }} />
+                        <Typography color="text.secondary">{restaurant.phone}</Typography>
+                      </Stack>
+
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 6, md: 3 }}>
+                          <Typography color="text.secondary">Ngày tạo</Typography>
+                          <Typography fontWeight={800}>{new Date(restaurant.createdAt).toLocaleDateString("vi-VN")}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6, md: 3 }}>
+                          <Typography color="text.secondary">Giờ mở cửa</Typography>
+                          <Typography fontWeight={800}>{formatOpenHours(restaurant.openHours)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6, md: 3 }}>
+                          <Typography color="text.secondary">Chỗ ngồi</Typography>
+                          <Typography fontWeight={800}>
+                            {restaurant.availableCapacity}/{restaurant.maxCapacity}
+                          </Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6, md: 3 }}>
+                          <Typography color="text.secondary">Số món ăn</Typography>
+                          <Typography fontWeight={800}>{restaurant.menu.length}</Typography>
+                        </Grid>
                       </Grid>
-                    </Grid>
 
-                    <Typography color="text.secondary">
-                      {restaurant.description || "Chi nhánh này chưa có mô tả chi tiết."}
-                    </Typography>
-
-                    <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
-                      <CustomButton
-                        component={RouterLink}
-                        to={`/chu-nha-hang/nha-hang/${restaurant.id}`}
-                        startIcon={<VisibilityRoundedIcon />}
-                      >
-                        Xem chi tiết
-                      </CustomButton>
-                      <CustomButton
-                        component={RouterLink}
-                        to={`/chu-nha-hang/menu?restaurantId=${restaurant.id}&action=create`}
-                        startIcon={<RestaurantMenuRoundedIcon />}
-                        disabled={restaurant.status !== "APPROVED"}
-                        sx={{ background: "linear-gradient(135deg, #2E8B57 0%, #57CC99 100%)" }}
-                      >
-                        Thêm món
-                      </CustomButton>
-                      <CustomButton
-                        startIcon={<EditRoundedIcon />}
-                        onClick={() => handleOpenEdit(restaurant)}
-                        disabled={restaurant.status !== "APPROVED"}
-                        sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
-                      >
-                        Sửa thông tin
-                      </CustomButton>
+                      <Typography color="text.secondary">
+                        {restaurant.description || "Chưa có mô tả chi tiết cho chi nhánh này."}
+                      </Typography>
                     </Stack>
+                  </Stack>
 
-                    {restaurant.status !== "APPROVED" ? (
-                      <Alert severity={restaurant.status === "REJECTED" ? "error" : "info"} icon={<PlaceRoundedIcon />}>
-                        {restaurant.status === "PENDING"
-                          ? "Chi nhánh đang chờ admin duyệt. Sau khi duyệt bạn mới có thể sửa thông tin, quản lý menu và sức chứa đặt bàn."
-                          : "Chi nhánh đã bị từ chối. Bạn có thể tạo chi nhánh mới hoặc cập nhật lại hồ sơ sau khi quy trình duyệt được mở rộng."}
-                      </Alert>
+                  <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
+                    <CustomButton
+                      component={RouterLink}
+                      to={`/chu-nha-hang/nha-hang/${restaurant.id}`}
+                      startIcon={<VisibilityRoundedIcon />}
+                    >
+                      Xem chi tiết
+                    </CustomButton>
+                    {restaurant.status === "APPROVED" ? (
+                      <>
+                        <CustomButton
+                          startIcon={<EditRoundedIcon />}
+                          onClick={() => handleOpenEdit(restaurant)}
+                          sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
+                        >
+                          Sửa thông tin
+                        </CustomButton>
+                        <CustomButton
+                          component={RouterLink}
+                          to={`/chu-nha-hang/menu?restaurantId=${restaurant.id}&focus=create`}
+                        >
+                          Thêm món
+                        </CustomButton>
+                      </>
                     ) : null}
                   </Stack>
-                </CustomCard>
-              </Grid>
-            );
-          })}
+                </Stack>
+              </CustomCard>
+            </Grid>
+          ))}
         </Grid>
+      ) : (
+        <EmptyState title="Chưa có chi nhánh nào" description="" />
       )}
 
       <CustomModal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={handleClose}
         title={mode === "create" ? "Đăng ký chi nhánh mới" : "Cập nhật chi nhánh đã duyệt"}
-        width={760}
+        width={1040}
       >
         <Stack component="form" spacing={2} onSubmit={handleSubmit}>
-          {error ? <Alert severity="error">{error}</Alert> : null}
-
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 6 }}>
               <FormInput label="Tên chi nhánh" name="name" value={form.name} onChange={handleChange} required />
@@ -444,42 +324,25 @@ function OwnerRestaurantsPage() {
               <FormInput
                 select
                 label="Loại ẩm thực"
-                name="cuisineSelections"
-                value={form.cuisineSelections}
-                onChange={handleCuisineChange}
-                SelectProps={{
-                  multiple: true,
-                  displayEmpty: true,
-                  renderValue: (selected) => {
-                    const labels = Array.isArray(selected)
-                      ? selected.map((item) =>
-                          item === OTHER_CUISINE_OPTION && form.cuisineOther.trim()
-                            ? `Khác: ${form.cuisineOther.trim()}`
-                            : item
-                        )
-                      : [];
-
-                    return labels.length ? labels.join(", ") : "Chọn loại ẩm thực";
-                  },
-                }}
-                helperText="Bạn có thể chọn nhiều loại ẩm thực."
+                name="selectedCuisines"
+                value={form.selectedCuisines}
+                onChange={handleChange}
+                SelectProps={{ multiple: true }}
               >
-                {cuisineOptions.map((option) => (
+                {CUISINE_OPTIONS.map((option) => (
                   <MenuItem key={option} value={option}>
-                    <Checkbox checked={form.cuisineSelections.includes(option)} size="small" />
                     {option}
                   </MenuItem>
                 ))}
               </FormInput>
             </Grid>
-            {form.cuisineSelections.includes(OTHER_CUISINE_OPTION) ? (
+            {form.selectedCuisines.includes("Khác") ? (
               <Grid size={{ xs: 12 }}>
                 <FormInput
-                  label="Loại ẩm thực khác"
-                  name="cuisineOther"
-                  value={form.cuisineOther}
+                  label="Ẩm thực khác"
+                  name="customCuisine"
+                  value={form.customCuisine}
                   onChange={handleChange}
-                  required
                 />
               </Grid>
             ) : null}
@@ -488,6 +351,7 @@ function OwnerRestaurantsPage() {
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <FormInput select label="Khoảng giá" name="price_range" value={form.price_range} onChange={handleChange}>
+                <MenuItem value="">Chọn khoảng giá</MenuItem>
                 <MenuItem value="cheap">Dưới 100k</MenuItem>
                 <MenuItem value="mid">100k - 300k</MenuItem>
                 <MenuItem value="expensive">Trên 300k</MenuItem>
@@ -495,6 +359,22 @@ function OwnerRestaurantsPage() {
             </Grid>
             <Grid size={{ xs: 12 }}>
               <FormInput label="Địa chỉ" name="address" value={form.address} onChange={handleChange} required />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormInput multiline rows={4} label="Mô tả" name="description" value={form.description} onChange={handleChange} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormInput
+                multiline
+                rows={4}
+                label="Danh sách ảnh, mỗi dòng 1 URL"
+                name="imagesText"
+                value={form.imagesText}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormInput label="Giờ mở cửa" name="open_hours" value={form.open_hours} onChange={handleChange} helperText="Ví dụ: 08:00 - 22:00" />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <FormInput
@@ -504,39 +384,6 @@ function OwnerRestaurantsPage() {
                 value={form.max_capacity}
                 onChange={handleChange}
                 required
-                inputProps={{ min: 1 }}
-                helperText="Số bàn này sẽ dùng để tính bàn trống khi khách đặt bàn."
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <FormInput
-                multiline
-                rows={2}
-                label="Giờ mở cửa"
-                name="openHoursText"
-                value={form.openHoursText}
-                onChange={handleChange}
-                helperText="Ví dụ: 08:00 - 22:00"
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormInput
-                multiline
-                rows={3}
-                label="Mô tả"
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormInput
-                multiline
-                rows={3}
-                label="Danh sách ảnh, mỗi dòng 1 URL"
-                name="imagesText"
-                value={form.imagesText}
-                onChange={handleChange}
               />
             </Grid>
           </Grid>
@@ -547,7 +394,7 @@ function OwnerRestaurantsPage() {
             </CustomButton>
             <CustomButton
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
             >
               Đóng

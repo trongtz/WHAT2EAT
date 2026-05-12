@@ -9,6 +9,6 @@ api_router.include_router(restaurants.router, prefix="/restaurants", tags=["Rest
 api_router.include_router(favorites.router, prefix="/favorites", tags=["Favorites"])
 api_router.include_router(bookings.router, prefix="/bookings", tags=["Bookings"])
 api_router.include_router(ai.router, prefix="/ai", tags=["AI Recommendations"])
-api_router.include_router(owner.router, prefix="/owner", tags=["Owner Dashboard"])
+api_router.include_router(owner.router, prefix="/owner", tags=["Owner"])
 api_router.include_router(dishes.router, prefix="/dishes", tags=["Dishes"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])

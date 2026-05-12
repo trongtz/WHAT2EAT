@@ -1,4 +1,3 @@
-# File: core/init_db.py
 from datetime import time
 
 from sqlalchemy.orm import Session
@@ -16,17 +15,17 @@ def seed_data():
     db: Session = SessionLocal()
     try:
         if db.query(User).first() or db.query(Restaurant).first():
-            print("Database đã có dữ liệu mẫu. Bỏ qua bước khởi tạo.")
+            print("Database already has seed data. Skipping initialization.")
             return
 
-        print("Đang khởi tạo bộ dữ liệu mẫu (Mock Data)...")
+        print("Initializing seed data...")
 
         hashed_pw = get_password_hash("123456")
 
         admin = User(full_name="Super Admin", email="admin@what2eat.com", password_hash=hashed_pw, role="ADMIN")
-        owner = User(full_name="Trần Chủ Quán", email="owner@what2eat.com", password_hash=hashed_pw, role="OWNER")
+        owner = User(full_name="Tran Chu Quan", email="owner@what2eat.com", password_hash=hashed_pw, role="OWNER")
         customer = User(
-            full_name="Nguyễn Thực Khách",
+            full_name="Nguyen Thuc Khach",
             email="customer@what2eat.com",
             password_hash=hashed_pw,
             role="CUSTOMER",
@@ -42,34 +41,34 @@ def seed_data():
         db.add_all([owner_profile, customer_profile])
 
         restaurants = [
-          Restaurant(
-              owner_id=owner.user_id,
-              name="Phở Bát Đàn Gia Truyền",
-              address="49 Bát Đàn, Hoàn Kiếm, Hà Nội",
-              latitude=10.762622,
-              longitude=106.660172,
-              phone="0123456789",
-              description="Phở bò chuẩn vị Bắc.",
-              open_hours="06:00 - 10:00",
-              images=["https://images.unsplash.com/photo-1628294895950-9805252327bc"],
-              cuisine_type="Phở",
-              price_range="mid",
-              status="APPROVED",
-          ),
-          Restaurant(
-              owner_id=owner.user_id,
-              name="Cơm Tấm Ba Ghiền",
-              address="84 Đặng Văn Ngữ, Phú Nhuận, TP.HCM",
-              latitude=10.793836,
-              longitude=106.664875,
-              phone="0987654321",
-              description="Sườn nướng than hoa.",
-              open_hours="07:00 - 21:00",
-              images=["https://images.unsplash.com/photo-1626804475297-41609ea004eb"],
-              cuisine_type="Cơm",
-              price_range="mid",
-              status="APPROVED",
-          ),
+            Restaurant(
+                owner_id=owner.user_id,
+                name="Pho Bat Dan Gia Truyen",
+                address="49 Bat Dan, Hoan Kiem, Ha Noi",
+                latitude=10.762622,
+                longitude=106.660172,
+                phone="0123456789",
+                description="Pho bo chuan vi Bac.",
+                open_hours="06:00 - 10:00",
+                images=["https://images.unsplash.com/photo-1628294895950-9805252327bc"],
+                cuisine_type="Pho",
+                price_range="mid",
+                status="APPROVED",
+            ),
+            Restaurant(
+                owner_id=owner.user_id,
+                name="Com Tam Ba Ghien",
+                address="84 Dang Van Ngu, Phu Nhuan, TP.HCM",
+                latitude=10.793836,
+                longitude=106.664875,
+                phone="0987654321",
+                description="Suon nuong than hoa.",
+                open_hours="07:00 - 21:00",
+                images=["https://images.unsplash.com/photo-1626804475297-41609ea004eb"],
+                cuisine_type="Com",
+                price_range="mid",
+                status="APPROVED",
+            ),
         ]
         db.add_all(restaurants)
         db.commit()
@@ -95,10 +94,10 @@ def seed_data():
         db.add_all(capacities)
         db.commit()
 
-        print("Đã bơm dữ liệu mẫu thành công!")
+        print("Seed data initialized successfully.")
 
-    except Exception as e:
+    except Exception as error:
         db.rollback()
-        print(f"Lỗi khi khởi tạo dữ liệu: {e}")
+        print(f"Seed initialization error: {error}")
     finally:
         db.close()

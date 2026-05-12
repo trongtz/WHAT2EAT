@@ -4,10 +4,14 @@ import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import { formatCurrency, getStatusColor } from "../utils/helpers";
 import CustomCard from "./CustomCard";
+import { formatCurrency, getPriceRangeLabel } from "../utils/helpers";
 
 function RestaurantCard({ restaurant, action, compact = false }) {
+  const ratingValue = Number(restaurant.rating || restaurant.averageRating || 0);
+  const ratingLabel = ratingValue > 0 ? ratingValue.toFixed(1) : "Mới";
+  const topLabel = restaurant.category || getPriceRangeLabel(restaurant.priceRange);
+
   return (
     <CustomCard
       sx={{
@@ -46,14 +50,23 @@ function RestaurantCard({ restaurant, action, compact = false }) {
               transition: "transform 0.35s ease",
             }}
           />
-          <Chip
-            label={restaurant.status}
-            color={getStatusColor(restaurant.status)}
-            sx={{ position: "absolute", top: 16, left: 16, fontWeight: 700, zIndex: 1 }}
-          />
+          {topLabel ? (
+            <Chip
+              label={topLabel}
+              sx={{
+                position: "absolute",
+                top: 16,
+                left: 16,
+                fontWeight: 700,
+                zIndex: 1,
+                bgcolor: "rgba(255,255,255,0.92)",
+                color: "var(--app-primary)",
+              }}
+            />
+          ) : null}
           <Chip
             icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
-            label={`${restaurant.rating} (${restaurant.reviews})`}
+            label={ratingLabel}
             sx={{
               position: "absolute",
               right: 16,
@@ -89,18 +102,20 @@ function RestaurantCard({ restaurant, action, compact = false }) {
             </Typography>
             <Typography color="text.secondary">{restaurant.category}</Typography>
           </Box>
-          <Chip
-            label={restaurant.distance}
-            sx={{
-              bgcolor: "color-mix(in srgb, var(--app-secondary) 12%, white)",
-              color: "var(--app-secondary)",
-              flexShrink: 0,
-            }}
-          />
+          {restaurant.distance ? (
+            <Chip
+              label={restaurant.distance}
+              sx={{
+                bgcolor: "color-mix(in srgb, var(--app-secondary) 12%, white)",
+                color: "var(--app-secondary)",
+                flexShrink: 0,
+              }}
+            />
+          ) : null}
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center">
-          <LocationOnRoundedIcon sx={{ fontSize: 18, color: "var(--app-secondary)" }} />
+          <LocationOnRoundedIcon sx={{ fontSize: 18, color: "#4A90E2" }} />
           <Typography color="text.secondary" sx={{ fontSize: "0.95rem" }}>
             {restaurant.address}
           </Typography>
@@ -108,17 +123,9 @@ function RestaurantCard({ restaurant, action, compact = false }) {
 
         <Typography color="text.secondary">{restaurant.description}</Typography>
 
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          spacing={2}
-          sx={{ mt: "auto", pt: 0.5 }}
-        >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ mt: "auto", pt: 0.5 }}>
           <Box>
-            <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
-              Mức giá tham khảo
-            </Typography>
+            <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>Mức giá tham khảo</Typography>
             <Typography fontWeight={800} color="primary.main">
               {restaurant.averagePrice ? `Từ ${formatCurrency(restaurant.averagePrice)}` : restaurant.priceRange}
             </Typography>

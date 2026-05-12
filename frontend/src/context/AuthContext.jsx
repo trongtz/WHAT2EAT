@@ -1,11 +1,13 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { authService } from "../services/authService";
+import { clearAllCachedResources } from "../services/requestCache";
 import { clearGuestSessionData, createGuestUser } from "../utils/guestSession";
 import {
   GUEST_AUTH_TOKEN,
   clearStoredAuth,
   getStoredToken,
   getStoredUser,
+  normalizeStoredUser,
   setStoredAuth,
   storageKeys,
 } from "../utils/storage";
@@ -25,11 +27,16 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const response = await authService.login(payload);
+      const normalizedResponse = {
+        ...response,
+        user: normalizeStoredUser(response.user),
+      };
+      clearAllCachedResources();
       clearGuestSessionData();
-      setStoredAuth(response);
-      setUser(response.user);
-      setToken(response.token);
-      return response;
+      setStoredAuth(normalizedResponse);
+      setUser(normalizedResponse.user);
+      setToken(normalizedResponse.token);
+      return normalizedResponse;
     } finally {
       setLoading(false);
     }
@@ -49,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const guestUser = createGuestUser();
+      clearAllCachedResources();
       clearStoredAuth();
       clearGuestSessionData();
       setStoredAuth({ token: GUEST_AUTH_TOKEN, user: guestUser });
@@ -61,6 +69,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    clearAllCachedResources();
     clearStoredAuth();
     clearGuestSessionData();
     setUser(null);
@@ -68,8 +77,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = (nextUser) => {
-    setUser(nextUser);
-    sessionStorage.setItem(storageKeys.user, JSON.stringify(nextUser));
+    const normalizedUser = normalizeStoredUser(nextUser);
+    setUser(normalizedUser);
+    sessionStorage.setItem(storageKeys.user, JSON.stringify(normalizedUser));
   };
 
   const value = useMemo(

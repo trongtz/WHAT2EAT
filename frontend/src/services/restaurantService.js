@@ -1,5 +1,37 @@
 import apiClient from "./apiClient";
+import { getCachedResource, invalidateCachePrefix } from "./requestCache";
 import { getPriceRangeLabel } from "../utils/helpers";
+
+const RESTAURANT_LIST_TTL_MS = 5 * 60 * 1000;
+const RESTAURANT_DETAIL_TTL_MS = 5 * 60 * 1000;
+const OWNER_RESTAURANTS_TTL_MS = 2 * 60 * 1000;
+const OWNER_MANAGE_TTL_MS = 60 * 1000;
+const MENU_TTL_MS = 60 * 1000;
+const ADMIN_TTL_MS = 60 * 1000;
+
+const stableSerialize = (value) => JSON.stringify(value || {});
+
+const invalidateRestaurantCaches = (restaurantId, ownerId) => {
+  invalidateCachePrefix("restaurants:list");
+  invalidateCachePrefix("restaurants:detail:");
+  invalidateCachePrefix("restaurants:menu:");
+  invalidateCachePrefix("restaurants:owner:");
+  invalidateCachePrefix("restaurants:manage:");
+  invalidateCachePrefix("admin:restaurants");
+  invalidateCachePrefix("admin:overview");
+  invalidateCachePrefix("owner:bookings");
+  invalidateCachePrefix("owner:reviews");
+
+  if (restaurantId) {
+    invalidateCachePrefix(`restaurants:detail:${restaurantId}`);
+    invalidateCachePrefix(`restaurants:menu:${restaurantId}`);
+    invalidateCachePrefix(`restaurants:manage:${restaurantId}`);
+  }
+
+  if (ownerId) {
+    invalidateCachePrefix(`restaurants:owner:${ownerId}`);
+  }
+};
 
 const normalizeMenuItem = (item) => ({
   ...item,
@@ -97,55 +129,105 @@ const mapRestaurantPayload = (payload) => ({
 
 export const restaurantService = {
   getRestaurants: async (params) => {
-    const response = await apiClient.get("/restaurants", { params });
-    return response.data.map(normalizeRestaurant);
+    const hasFilters =
+      params &&
+      Object.values({
+        keyword: params.keyword,
+        category: params.category,
+        price: params.price,
+      }).some(Boolean);
+    const apiParams = hasFilters
+      ? {
+          query: params.keyword || undefined,
+          cuisine_type: params.category || undefined,
+          price_range: params.price || undefined,
+        }
+      : params;
+    const cacheKey = `restaurants:list:${hasFilters ? "search" : "all"}:${stableSerialize(apiParams)}`;
+
+    return getCachedResource(
+      cacheKey,
+      async () => {
+        const response = await apiClient.get(hasFilters ? "/restaurants/search" : "/restaurants", { params: apiParams });
+        return response.data.map(normalizeRestaurant);
+      },
+      { ttlMs: RESTAURANT_LIST_TTL_MS }
+    );
   },
 
   getRestaurantDetail: async (restaurantId) => {
-    const [restaurantResponse, menuResponse, reviewResponse] = await Promise.all([
-      apiClient.get(`/restaurants/${restaurantId}`),
-      apiClient.get(`/restaurants/${restaurantId}/menu`),
-      apiClient.get(`/restaurants/${restaurantId}/reviews`),
-    ]);
+    return getCachedResource(
+      `restaurants:detail:${restaurantId}`,
+      async () => {
+        const [restaurantResponse, menuResponse, reviewResponse] = await Promise.all([
+          apiClient.get(`/restaurants/${restaurantId}`),
+          apiClient.get(`/restaurants/${restaurantId}/menu`),
+          apiClient.get(`/restaurants/${restaurantId}/reviews`),
+        ]);
 
-    return normalizeRestaurant({
-      ...restaurantResponse.data,
-      menu: menuResponse.data,
-      reviewsList: reviewResponse.data,
-      reviews: reviewResponse.data.length,
-    });
+        return normalizeRestaurant({
+          ...restaurantResponse.data,
+          menu: menuResponse.data,
+          reviewsList: reviewResponse.data,
+          reviews: reviewResponse.data.length,
+        });
+      },
+      { ttlMs: RESTAURANT_DETAIL_TTL_MS }
+    );
   },
 
   getOwnerRestaurants: async (ownerId) => {
-    const response = await apiClient.get(`/restaurants/owner/${ownerId}`);
-    return response.data.map(normalizeRestaurant);
+    return getCachedResource(
+      `restaurants:owner:${ownerId}`,
+      async () => {
+        const response = await apiClient.get(`/restaurants/owner/${ownerId}`);
+        return response.data.map(normalizeRestaurant);
+      },
+      { ttlMs: OWNER_RESTAURANTS_TTL_MS }
+    );
   },
 
   getManageRestaurant: async (restaurantId) => {
-    const [restaurantResponse, menuResponse] = await Promise.all([
-      apiClient.get(`/restaurants/manage/${restaurantId}`),
-      apiClient.get(`/dishes/restaurant/${restaurantId}`),
-    ]);
+    return getCachedResource(
+      `restaurants:manage:${restaurantId}`,
+      async () => {
+        const [restaurantResponse, menuResponse] = await Promise.all([
+          apiClient.get(`/restaurants/manage/${restaurantId}`),
+          apiClient.get(`/dishes/restaurant/${restaurantId}`),
+        ]);
 
-    return normalizeRestaurant({
-      ...restaurantResponse.data,
-      menu: menuResponse.data,
-    });
+        return normalizeRestaurant({
+          ...restaurantResponse.data,
+          menu: menuResponse.data,
+        });
+      },
+      { ttlMs: OWNER_MANAGE_TTL_MS }
+    );
   },
 
   createRestaurant: async (payload) => {
     const response = await apiClient.post("/restaurants", mapRestaurantPayload(payload));
-    return normalizeRestaurant(response.data);
+    const restaurant = normalizeRestaurant(response.data);
+    invalidateRestaurantCaches(restaurant.id, restaurant.ownerId ?? payload.owner_id ?? payload.ownerId);
+    return restaurant;
   },
 
   updateRestaurant: async (restaurantId, payload) => {
     const response = await apiClient.put(`/restaurants/${restaurantId}`, mapRestaurantPayload(payload));
-    return normalizeRestaurant(response.data);
+    const restaurant = normalizeRestaurant(response.data);
+    invalidateRestaurantCaches(restaurantId, restaurant.ownerId ?? payload.owner_id ?? payload.ownerId);
+    return restaurant;
   },
 
   getRestaurantMenu: async (restaurantId) => {
-    const response = await apiClient.get(`/dishes/restaurant/${restaurantId}`);
-    return response.data.map(normalizeMenuItem);
+    return getCachedResource(
+      `restaurants:menu:${restaurantId}`,
+      async () => {
+        const response = await apiClient.get(`/dishes/restaurant/${restaurantId}`);
+        return response.data.map(normalizeMenuItem);
+      },
+      { ttlMs: MENU_TTL_MS }
+    );
   },
 
   createMenuItem: async (restaurantId, payload) => {
@@ -157,6 +239,7 @@ export const restaurantService = {
       image_url: payload.image_url?.trim() || null,
       is_available: Boolean(payload.is_available),
     });
+    invalidateRestaurantCaches(restaurantId);
     return normalizeMenuItem(response.data);
   },
 
@@ -169,22 +252,32 @@ export const restaurantService = {
       image_url: payload.image_url?.trim() || null,
       is_available: Boolean(payload.is_available),
     });
+    invalidateRestaurantCaches(payload.restaurantId ?? payload.restaurant_id);
     return normalizeMenuItem(response.data);
   },
 
   deleteMenuItem: async (itemId) => {
     await apiClient.delete(`/dishes/${itemId}`);
+    invalidateRestaurantCaches();
   },
 
   getAdminRestaurants: async (status) => {
-    const response = await apiClient.get("/admin/restaurants", {
-      params: status ? { status } : undefined,
-    });
-    return response.data.map(normalizeRestaurant);
+    return getCachedResource(
+      `admin:restaurants:${status || "all"}`,
+      async () => {
+        const response = await apiClient.get("/admin/restaurants", {
+          params: status ? { status_filter: status } : undefined,
+        });
+        return response.data.map(normalizeRestaurant);
+      },
+      { ttlMs: ADMIN_TTL_MS }
+    );
   },
 
   updateAdminRestaurantStatus: async (restaurantId, status) => {
     const response = await apiClient.put(`/admin/restaurants/${restaurantId}/status`, { status });
-    return normalizeRestaurant(response.data);
+    const restaurant = normalizeRestaurant(response.data);
+    invalidateRestaurantCaches(restaurantId, restaurant.ownerId);
+    return restaurant;
   },
 };

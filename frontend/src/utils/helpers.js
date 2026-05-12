@@ -29,17 +29,12 @@ export const getStatusColor = (status) => {
     "Đã xác nhận": "success",
     "Chờ duyệt": "warning",
     "Đã hủy": "error",
-    "Con cho": "success",
-    "Sap day": "warning",
-    "Het cho": "error",
-    "Da xac nhan": "success",
-    "Cho duyet": "warning",
-    "Da huy": "error",
+    "Cần xử lý": "warning",
     PENDING: "warning",
     CONFIRMED: "success",
     CANCELLED: "error",
-    APPROVED: "success",
     REJECTED: "error",
+    APPROVED: "success",
     ACTIVE: "success",
     BANNED: "error",
   };
@@ -48,9 +43,9 @@ export const getStatusColor = (status) => {
 
 export const getRestaurantStatusLabel = (status) => {
   const map = {
-    PENDING: "Chờ admin duyệt",
+    PENDING: "Chờ duyệt",
     APPROVED: "Đã duyệt",
-    REJECTED: "Bị từ chối",
+    REJECTED: "Từ chối",
   };
   return map[status] || status || "--";
 };

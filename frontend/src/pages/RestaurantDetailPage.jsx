@@ -69,7 +69,7 @@ function RestaurantDetailPage() {
       return;
     }
 
-    await favoriteService.toggle({ userId: user.id, restaurantId: Number(id) });
+    await favoriteService.toggle({ userId: user.id, restaurantId: id });
     setMessage("Đã cập nhật danh sách yêu thích.");
   };
 

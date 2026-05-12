@@ -2,7 +2,6 @@ import ApprovalRoundedIcon from "@mui/icons-material/ApprovalRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
-import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
 import { Avatar, Box, Button, Container, Stack, Typography } from "@mui/material";
@@ -24,14 +23,14 @@ const navByRole = {
 
 const roleMeta = {
   owner: {
+    subtitle: "Chủ nhà hàng",
     accent: "var(--app-primary-gradient)",
     avatarColor: "var(--app-primary)",
-    chip: "Chủ nhà hàng",
   },
   admin: {
+    subtitle: "Admin",
     accent: "var(--app-secondary-gradient)",
     avatarColor: "var(--app-secondary-dark)",
-    chip: "Admin",
   },
 };
 
@@ -47,12 +46,7 @@ function BackofficeLayout({ role, children }) {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        background: "var(--app-shell-gradient)",
-      }}
-    >
+    <Box sx={{ minHeight: "100vh", background: "var(--app-shell-gradient)" }}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Box
           sx={{
@@ -87,14 +81,14 @@ function BackofficeLayout({ role, children }) {
                     boxShadow: "0 18px 36px color-mix(in srgb, var(--app-text-primary) 16%, transparent)",
                   }}
                 >
-                  {role === "admin" ? <RestaurantRoundedIcon /> : <StorefrontRoundedIcon />}
+                  <StorefrontRoundedIcon />
                 </Box>
                 <Box>
                   <Typography variant="h4" sx={{ fontSize: "1.2rem" }}>
                     WHAT2EAT
                   </Typography>
                   <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-                    {meta.chip}
+                    {meta.subtitle}
                   </Typography>
                 </Box>
               </Stack>
@@ -145,11 +139,7 @@ function BackofficeLayout({ role, children }) {
                 </Stack>
               </Box>
 
-              <Button
-                onClick={handleLogout}
-                startIcon={<LogoutRoundedIcon />}
-                sx={{ justifyContent: "flex-start", borderRadius: 2 }}
-              >
+              <Button onClick={handleLogout} startIcon={<LogoutRoundedIcon />} sx={{ justifyContent: "flex-start", borderRadius: 2 }}>
                 Đăng xuất
               </Button>
             </Stack>

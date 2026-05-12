@@ -67,7 +67,7 @@ def get_owner_reviews(
         db.query(Review)
         .filter(
             Review.restaurant_id.in_(restaurant_ids),
-            Review.status == "APPROVED",
+            Review.status != "REJECTED",
         )
         .order_by(Review.created_at.desc())
         .all()

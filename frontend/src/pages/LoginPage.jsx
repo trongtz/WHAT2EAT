@@ -55,7 +55,7 @@ function LoginPage() {
   return (
     <AuthLayout
       title="Đăng nhập để tiếp tục hành trình khám phá món ngon."
-      subtitle="Lưu quán yêu thích, đặt bàn nhanh và nhận gợi ý phù hợp với khẩu vị của bạn trong một trải nghiệm gọn gàng, hiện đại."
+      subtitle="Lưu quán yêu thích, đặt bàn nhanh và nhận gợi ý phù hợp với khẩu vị của bạn."
     >
       <CustomCard
         sx={{
@@ -77,8 +77,9 @@ function LoginPage() {
                 sx={{
                   alignSelf: "flex-start",
                   height: 34,
-                  bgcolor: "rgba(255,138,42,0.10)",
-                  color: "primary.main",
+                  bgcolor: "color-mix(in srgb, var(--app-primary) 12%, var(--app-paper))",
+                  color: "var(--app-primary)",
+                  border: "1px solid color-mix(in srgb, var(--app-primary) 18%, white)",
                   borderRadius: 2,
                 }}
               />
@@ -99,15 +100,28 @@ function LoginPage() {
               onClick={handleGuestLogin}
               startIcon={<PersonOutlineRoundedIcon />}
               sx={{
-                background: "linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)",
-                boxShadow: "0 14px 28px rgba(20, 184, 166, 0.24)",
+                backgroundColor: "var(--app-primary-dark)",
+                backgroundImage:
+                  "linear-gradient(135deg, color-mix(in srgb, var(--app-primary-dark) 86%, var(--app-text-primary) 14%) 0%, color-mix(in srgb, var(--app-primary) 68%, var(--app-secondary-dark) 32%) 100%)",
+                boxShadow: "0 14px 28px color-mix(in srgb, var(--app-primary-dark) 28%, transparent)",
+                "&:hover": {
+                  backgroundColor: "var(--app-primary-dark)",
+                  backgroundImage:
+                    "linear-gradient(135deg, color-mix(in srgb, var(--app-primary-dark) 86%, var(--app-text-primary) 14%) 0%, color-mix(in srgb, var(--app-primary) 68%, var(--app-secondary-dark) 32%) 100%)",
+                  filter: "brightness(1.02)",
+                },
               }}
             >
               {loading ? "Đang vào với tư cách khách..." : "Vào với tư cách Khách"}
             </CustomButton>
             <Typography color="text.secondary" sx={{ fontSize: "0.94rem" }}>
               Chưa có tài khoản?{" "}
-              <Link component={RouterLink} to="/dang-ky" underline="hover">
+              <Link
+                component={RouterLink}
+                to="/dang-ky"
+                underline="hover"
+                sx={{ color: "var(--app-primary)", fontWeight: 700 }}
+              >
                 Đăng ký ngay
               </Link>
             </Typography>
