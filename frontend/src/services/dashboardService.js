@@ -1,5 +1,16 @@
 import apiClient from "./apiClient";
 
+const normalizeOwnerReview = (review) => ({
+  ...review,
+  id: review.id ?? review.review_id,
+  reviewId: review.review_id ?? review.id,
+  restaurantId: review.restaurant_id ?? review.restaurantId,
+  customerId: review.customer_id ?? review.customerId,
+  createdAt: review.created_at ?? review.createdAt,
+  updatedAt: review.updated_at ?? review.updatedAt,
+  userName: review.userName ?? "Khách hàng",
+});
+
 export const dashboardService = {
   getOwnerRestaurants: async (ownerId) => {
     const response = await apiClient.get("/owner/restaurants", { params: { ownerId } });
@@ -11,7 +22,7 @@ export const dashboardService = {
   },
   getOwnerReviews: async (ownerId) => {
     const response = await apiClient.get("/owner/reviews", { params: { ownerId } });
-    return response.data;
+    return Array.isArray(response.data) ? response.data.map(normalizeOwnerReview) : [];
   },
   updateOwnerRestaurant: async (payload) => {
     const response = await apiClient.post("/owner/restaurants/update", payload);

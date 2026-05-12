@@ -4,8 +4,8 @@ import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import CustomCard from "./CustomCard";
 import { formatCurrency, getStatusColor } from "../utils/helpers";
+import CustomCard from "./CustomCard";
 
 function RestaurantCard({ restaurant, action, compact = false }) {
   return (
@@ -92,15 +92,15 @@ function RestaurantCard({ restaurant, action, compact = false }) {
           <Chip
             label={restaurant.distance}
             sx={{
-              bgcolor: "rgba(74,144,226,0.12)",
-              color: "#4A90E2",
+              bgcolor: "color-mix(in srgb, var(--app-secondary) 12%, white)",
+              color: "var(--app-secondary)",
               flexShrink: 0,
             }}
           />
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center">
-          <LocationOnRoundedIcon sx={{ fontSize: 18, color: "#4A90E2" }} />
+          <LocationOnRoundedIcon sx={{ fontSize: 18, color: "var(--app-secondary)" }} />
           <Typography color="text.secondary" sx={{ fontSize: "0.95rem" }}>
             {restaurant.address}
           </Typography>
@@ -108,9 +108,17 @@ function RestaurantCard({ restaurant, action, compact = false }) {
 
         <Typography color="text.secondary">{restaurant.description}</Typography>
 
-        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ mt: "auto", pt: 0.5 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          spacing={2}
+          sx={{ mt: "auto", pt: 0.5 }}
+        >
           <Box>
-            <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>Mức giá tham khảo</Typography>
+            <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
+              Mức giá tham khảo
+            </Typography>
             <Typography fontWeight={800} color="primary.main">
               {restaurant.averagePrice ? `Từ ${formatCurrency(restaurant.averagePrice)}` : restaurant.priceRange}
             </Typography>
@@ -125,8 +133,8 @@ function RestaurantCard({ restaurant, action, compact = false }) {
               label="Xem chi tiết"
               sx={{
                 px: 1,
-                bgcolor: "rgba(255, 138, 42, 0.12)",
-                color: "primary.main",
+                bgcolor: "color-mix(in srgb, var(--app-primary) 12%, white)",
+                color: "var(--app-primary)",
               }}
             />
           )}

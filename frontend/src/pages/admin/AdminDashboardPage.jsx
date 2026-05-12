@@ -1,76 +1,84 @@
-import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
-import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
-import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import PhotoLibraryRoundedIcon from "@mui/icons-material/PhotoLibraryRounded";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import { Box, Grid, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import CustomCard from "../../components/CustomCard";
 import LoadingScreen from "../../components/LoadingScreen";
 import SectionHeader from "../../components/SectionHeader";
 import StatsCard from "../../components/StatsCard";
-import { dashboardService } from "../../services/dashboardService";
+import { restaurantService } from "../../services/restaurantService";
 
 function AdminDashboardPage() {
-  const [overview, setOverview] = useState(null);
+  const [restaurants, setRestaurants] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
-      const data = await dashboardService.getAdminOverview();
-      setOverview(data);
+      const data = await restaurantService.getAdminRestaurants();
+      setRestaurants(data);
     };
     loadData();
   }, []);
 
-  if (!overview) return <LoadingScreen message="Dang tai tong quan he thong..." />;
+  if (!restaurants) return <LoadingScreen message="Đang tải tổng quan hệ thống..." />;
+
+  const pendingRestaurants = restaurants.filter((item) => item.status === "PENDING").length;
+  const approvedRestaurants = restaurants.filter((item) => item.status === "APPROVED").length;
+  const rejectedRestaurants = restaurants.filter((item) => item.status === "REJECTED").length;
+  const ownerCount = new Set(restaurants.map((item) => item.ownerId)).size;
+  const averageRating =
+    restaurants.length > 0
+      ? (
+          restaurants.reduce((sum, item) => sum + Number(item.averageRating || 0), 0) / restaurants.length
+        ).toFixed(1)
+      : "0.0";
+  const withImages = restaurants.filter((item) => Array.isArray(item.images) && item.images.length > 0).length;
 
   return (
     <Stack spacing={3}>
-      <SectionHeader
-        eyebrow="Admin workspace"
-        title="Tong quan he thong"
-        description="So lieu tong hop de admin nhan biet tang truong, rui ro va cac muc can kiem soat ngay."
-      />
+      <SectionHeader title="Tổng quan" />
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Tong nguoi dung" value={overview.totalUsers} color="rgba(47,107,255,0.18)" />
+          <StatsCard label="Tổng chi nhánh" value={restaurants.length} color="rgba(47,107,255,0.18)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Tong nha hang" value={overview.totalRestaurants} color="rgba(17,24,39,0.14)" />
+          <StatsCard label="Chờ duyệt" value={pendingRestaurants} color="rgba(245,158,11,0.22)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Cho duyet" value={overview.pendingRestaurants} color="rgba(245,158,11,0.22)" />
+          <StatsCard label="Đã duyệt" value={approvedRestaurants} color="rgba(32,180,134,0.18)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Tong dat ban" value={overview.totalBookings} color="rgba(232,93,117,0.18)" />
+          <StatsCard label="Chủ nhà hàng" value={ownerCount} color="rgba(232,93,117,0.18)" />
         </Grid>
       </Grid>
 
       <Grid container spacing={3}>
         {[
           {
-            icon: <PeopleRoundedIcon color="primary" />,
-            title: "Tai khoan dang hoat dong",
-            value: overview.totalCustomers,
-            text: "Nguoi dung khach hang dang su dung nen tang.",
+            icon: <ApartmentRoundedIcon color="primary" />,
+            title: "Chi nhánh bị từ chối",
+            value: rejectedRestaurants,
+            text: "Cần theo dõi chất lượng hồ sơ và hướng dẫn owner bổ sung thông tin.",
           },
           {
-            icon: <ApartmentRoundedIcon color="warning" />,
-            title: "Chu nha hang",
-            value: overview.totalOwners,
-            text: "So tai khoan doi tac dang tham gia he thong.",
+            icon: <CheckCircleRoundedIcon color="success" />,
+            title: "Đánh giá trung bình",
+            value: averageRating,
+            text: "Chỉ số tổng hợp của các chi nhánh hiện có.",
           },
           {
-            icon: <AdminPanelSettingsRoundedIcon color="success" />,
-            title: "Co so da duyet",
-            value: overview.activeRestaurants,
-            text: "Nha hang da dat dieu kien hien thi cong khai.",
+            icon: <PhotoLibraryRoundedIcon color="warning" />,
+            title: "Chi nhánh có hình ảnh",
+            value: withImages,
+            text: "Số hồ sơ đã có ảnh minh họa để hỗ trợ duyệt và hiển thị tốt hơn.",
           },
           {
-            icon: <ReceiptLongRoundedIcon color="error" />,
-            title: "Danh gia trung binh",
-            value: overview.averageRating,
-            text: "Chat luong dich vu tong hop tren toan he thong.",
+            icon: <ScheduleRoundedIcon color="error" />,
+            title: "Chi nhánh đang chờ xử lý",
+            value: pendingRestaurants,
+            text: "Khối lượng công việc mà admin cần phê duyệt tiếp theo.",
           },
         ].map((item) => (
           <Grid key={item.title} size={{ xs: 12, md: 6, xl: 3 }}>
@@ -88,17 +96,17 @@ function AdminDashboardPage() {
 
       <CustomCard>
         <Stack spacing={2}>
-          <Typography variant="h4">Can xu ly hom nay</Typography>
+          <Typography variant="h4">Cần xử lý hôm nay</Typography>
           <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(245,158,11,0.12)" }}>
-            <Typography fontWeight={700}>{overview.pendingRestaurants} nha hang cho duyet</Typography>
+            <Typography fontWeight={700}>{pendingRestaurants} chi nhánh chờ duyệt</Typography>
             <Typography color="text.secondary">
-              Uu tien doi chieu thong tin va menu de giam thoi gian cho doi tac.
+              Chi nhánh owner mới tạo sẽ chỉ có quyền sửa thông tin và menu sau khi được admin chấp thuận.
             </Typography>
           </Box>
           <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(47,107,255,0.1)" }}>
-            <Typography fontWeight={700}>Theo doi tang truong luot dat ban</Typography>
+            <Typography fontWeight={700}>{approvedRestaurants} chi nhánh đã sẵn sàng vận hành</Typography>
             <Typography color="text.secondary">
-              Tong {overview.totalBookings} luot dat ban dang duoc ghi nhan trong moi truong mock.
+              Đây là nhóm chi nhánh đã mở khóa cập nhật menu, hình ảnh và thông tin kinh doanh.
             </Typography>
           </Box>
         </Stack>

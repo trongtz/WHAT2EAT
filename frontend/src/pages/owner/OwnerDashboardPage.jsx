@@ -1,119 +1,160 @@
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
-import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import RestaurantMenuRoundedIcon from "@mui/icons-material/RestaurantMenuRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, Grid, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
+import EmptyState from "../../components/EmptyState";
 import LoadingScreen from "../../components/LoadingScreen";
 import SectionHeader from "../../components/SectionHeader";
 import StatsCard from "../../components/StatsCard";
 import { useAuth } from "../../hooks/useAuth";
-import { dashboardService } from "../../services/dashboardService";
+import { restaurantService } from "../../services/restaurantService";
 
 function OwnerDashboardPage() {
   const { user } = useAuth();
-  const [data, setData] = useState({
-    restaurants: [],
-    bookings: [],
-    reviews: [],
-  });
   const [loading, setLoading] = useState(true);
+  const [restaurants, setRestaurants] = useState([]);
+  const [menuCount, setMenuCount] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
-      const [restaurants, bookings, reviews] = await Promise.all([
-        dashboardService.getOwnerRestaurants(user.id),
-        dashboardService.getOwnerBookings(user.id),
-        dashboardService.getOwnerReviews(user.id),
-      ]);
-      setData({ restaurants, bookings, reviews });
+      const ownerRestaurants = await restaurantService.getOwnerRestaurants(user.id);
+      const approvedRestaurants = ownerRestaurants.filter((item) => item.status === "APPROVED");
+      const menus = await Promise.all(
+        approvedRestaurants.map((restaurant) => restaurantService.getRestaurantMenu(restaurant.id))
+      );
+
+      setRestaurants(ownerRestaurants);
+      setMenuCount(menus.reduce((sum, items) => sum + items.length, 0));
       setLoading(false);
     };
+
     loadData();
   }, [user.id]);
 
-  if (loading) return <LoadingScreen message="Dang tai tong quan van hanh..." />;
+  if (loading) return <LoadingScreen message="Đang tải tổng quan chi nhánh..." />;
 
-  const confirmedBookings = data.bookings.filter((item) => item.status === "Đã xác nhận").length;
-  const averageRating =
-    data.reviews.length > 0
-      ? (data.reviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / data.reviews.length).toFixed(1)
-      : "0.0";
+  if (!restaurants.length) {
+    return (
+      <Stack spacing={3}>
+        <SectionHeader title="Khởi tạo hệ thống chi nhánh" />
+        <EmptyState title="Chưa có chi nhánh nào" />
+        <CustomButton component={RouterLink} to="/chu-nha-hang/nha-hang" sx={{ alignSelf: "flex-start" }}>
+          Đăng ký chi nhánh đầu tiên
+        </CustomButton>
+      </Stack>
+    );
+  }
+
+  const approvedCount = restaurants.filter((item) => item.status === "APPROVED").length;
+  const pendingCount = restaurants.filter((item) => item.status === "PENDING").length;
+  const featuredBranches = [...restaurants]
+    .sort((a, b) => Number(b.averageRating || 0) - Number(a.averageRating || 0))
+    .slice(0, 3);
 
   return (
     <Stack spacing={3}>
       <SectionHeader
-        eyebrow="Owner workspace"
-        title="Tong quan kinh doanh"
-        description="Theo doi doanh thu tiem nang, chat luong phuc vu va tinh trang van hanh cac co so."
+        title="Tổng quan"
+        action={
+          <CustomButton component={RouterLink} to="/chu-nha-hang/nha-hang">
+            Quản lý chi nhánh
+          </CustomButton>
+        }
       />
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Co so dang quan ly" value={data.restaurants.length} color="rgba(255,159,28,0.22)" />
+          <StatsCard label="Tổng chi nhánh" value={restaurants.length} color="rgba(255,159,28,0.22)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Luot dat ban" value={data.bookings.length} color="rgba(47,107,255,0.18)" />
+          <StatsCard label="Đã duyệt" value={approvedCount} color="rgba(32,180,134,0.18)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Da xac nhan" value={confirmedBookings} color="rgba(32,180,134,0.18)" />
+          <StatsCard label="Chờ duyệt" value={pendingCount} color="rgba(245,158,11,0.22)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Diem danh gia TB" value={averageRating} color="rgba(232,93,117,0.18)" />
+          <StatsCard label="Số món ăn" value={menuCount} color="rgba(47,107,255,0.18)" />
         </Grid>
       </Grid>
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, lg: 8 }}>
           <CustomCard>
-            <Stack spacing={2.5}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="h4">Suc khoe hoat dong hom nay</Typography>
-                <Chip label="Cap nhat luc 10:30" color="primary" variant="outlined" />
+            <Stack spacing={2.25}>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", md: "center" }}
+                spacing={1}
+              >
+                <Typography variant="h4">Chi nhánh nổi bật</Typography>
+                <Chip
+                  icon={<CheckCircleRoundedIcon />}
+                  label={`${approvedCount}/${restaurants.length} chi nhánh đã duyệt`}
+                  color="success"
+                  variant="outlined"
+                />
               </Stack>
 
               <Grid container spacing={2}>
-                {[
-                  {
-                    icon: <StorefrontRoundedIcon color="warning" />,
-                    title: "Ty le duyet nha hang",
-                    value: `${data.restaurants.filter((item) => item.approved).length}/${data.restaurants.length}`,
-                    text: "Co so da duyet san sang nhan dat ban.",
-                  },
-                  {
-                    icon: <CalendarMonthRoundedIcon color="primary" />,
-                    title: "Lich hen can xu ly",
-                    value: data.bookings.filter((item) => item.status === "Chờ duyệt").length,
-                    text: "Dat ban moi can xac nhan trong ca hien tai.",
-                  },
-                  {
-                    icon: <RateReviewRoundedIcon color="error" />,
-                    title: "Danh gia moi",
-                    value: data.reviews.length,
-                    text: "Can theo doi phan hoi de cai thien trai nghiem.",
-                  },
-                  {
-                    icon: <InsightsRoundedIcon color="success" />,
-                    title: "Menu dang hien thi",
-                    value: data.restaurants.reduce((sum, item) => sum + item.menu.length, 0),
-                    text: "Tong so mon dang hien thi tren ung dung.",
-                  },
-                ].map((item) => (
-                  <Grid key={item.title} size={{ xs: 12, md: 6 }}>
+                {featuredBranches.map((restaurant) => (
+                  <Grid key={restaurant.id} size={{ xs: 12, md: 6, xl: 4 }}>
                     <Box
                       sx={{
-                        p: 2,
+                        height: "100%",
+                        overflow: "hidden",
                         borderRadius: 2,
-                        border: "1px solid rgba(15,23,42,0.06)",
-                        bgcolor: "rgba(248,250,255,0.92)",
+                        border: "1px solid rgba(15,23,42,0.08)",
+                        bgcolor: "rgba(248,250,255,0.94)",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
                       }}
                     >
-                      <Stack spacing={1.25}>
-                        {item.icon}
-                        <Typography color="text.secondary">{item.title}</Typography>
-                        <Typography variant="h3">{item.value}</Typography>
-                        <Typography color="text.secondary">{item.text}</Typography>
+                      <Box
+                        sx={{
+                          height: 132,
+                          background: restaurant.image
+                            ? `linear-gradient(180deg, rgba(18,22,44,0.06), rgba(18,22,44,0.2)), url(${restaurant.image})`
+                            : "linear-gradient(135deg, rgba(255,159,28,0.24), rgba(47,107,255,0.18))",
+                          backgroundPosition: "center",
+                          backgroundSize: "cover",
+                        }}
+                      />
+                      <Stack spacing={1.1} sx={{ p: 1.75 }}>
+                        <Stack direction="row" justifyContent="space-between" spacing={1}>
+                          <Typography fontWeight={800} sx={{ lineHeight: 1.35 }}>
+                            {restaurant.name}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={restaurant.status === "APPROVED" ? "Đã duyệt" : "Chờ duyệt"}
+                            color={restaurant.status === "APPROVED" ? "success" : "warning"}
+                          />
+                        </Stack>
+
+                        <Stack direction="row" spacing={0.75} alignItems="center">
+                          <StarRoundedIcon sx={{ color: "#F59E0B", fontSize: 20 }} />
+                          <Typography fontWeight={700}>
+                            {Number(restaurant.averageRating || 0) > 0
+                              ? `${Number(restaurant.averageRating).toFixed(1)} / 5`
+                              : "Không có đánh giá"}
+                          </Typography>
+                        </Stack>
+
+                        <Stack direction="row" spacing={0.75} alignItems="flex-start">
+                          <PlaceRoundedIcon sx={{ color: "text.secondary", fontSize: 20, mt: 0.1 }} />
+                          <Typography color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                            {restaurant.address || "Chưa cập nhật địa chỉ"}
+                          </Typography>
+                        </Stack>
+
+                        <Typography color="text.secondary" sx={{ lineHeight: 1.55 }}>
+                          {restaurant.description || "Chi nhánh này chưa có mô tả ngắn."}
+                        </Typography>
                       </Stack>
                     </Box>
                   </Grid>
@@ -125,28 +166,54 @@ function OwnerDashboardPage() {
 
         <Grid size={{ xs: 12, lg: 4 }}>
           <CustomCard>
-            <Stack spacing={2}>
-              <Typography variant="h4">Can uu tien</Typography>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(255,159,28,0.12)" }}>
-                <Typography fontWeight={700}>1 nha hang dang cho duyet</Typography>
-                <Typography color="text.secondary">
-                  Hoan thien ho so va menu de duoc admin duyet nhanh hon.
-                </Typography>
+            <Stack spacing={1.5}>
+              <Typography variant="h4">Thông báo</Typography>
+
+              <Box
+                sx={{
+                  p: 1.75,
+                  borderRadius: 2,
+                  bgcolor: "rgba(245,158,11,0.12)",
+                  border: "1px solid rgba(245,158,11,0.16)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+                }}
+              >
+                <Stack spacing={0.6}>
+                  <Typography fontWeight={700} sx={{ fontSize: "1rem", lineHeight: 1.45 }}>
+                    Trà Hương đã đánh giá 5 sao cho món Jolibee
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                    "tôi đã ăn món này 1 tuần liên tục"
+                  </Typography>
+                </Stack>
               </Box>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(47,107,255,0.1)" }}>
-                <Typography fontWeight={700}>
-                  {data.bookings.filter((item) => item.status === "Chờ duyệt").length} dat ban can xac nhan
-                </Typography>
-                <Typography color="text.secondary">
-                  Xac nhan som de khong bo lo khach hang co nhu cau cao.
-                </Typography>
+
+              <Box
+                sx={{
+                  p: 1.75,
+                  borderRadius: 2,
+                  bgcolor: "rgba(47,107,255,0.1)",
+                  border: "1px solid rgba(47,107,255,0.14)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+                }}
+              >
+                <Stack spacing={0.6}>
+                  <Typography fontWeight={700} sx={{ fontSize: "1rem", lineHeight: 1.45 }}>
+                    Minh Anh đã đánh giá 4 sao cho món Gà rán sốt cay
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                    "vỏ giòn, sốt ngon nhưng mình muốn phần salad nhiều hơn một chút"
+                  </Typography>
+                </Stack>
               </Box>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(232,93,117,0.1)" }}>
-                <Typography fontWeight={700}>Theo doi phan hoi moi nhat</Typography>
-                <Typography color="text.secondary">
-                  Danh gia khach hang anh huong truc tiep den kha nang duoc de xuat.
-                </Typography>
-              </Box>
+
+              <CustomButton
+                type="button"
+                startIcon={<RestaurantMenuRoundedIcon />}
+                onClick={(event) => event.preventDefault()}
+              >
+                Xem thêm
+              </CustomButton>
             </Stack>
           </CustomCard>
         </Grid>

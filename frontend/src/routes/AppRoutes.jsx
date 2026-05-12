@@ -21,6 +21,7 @@ import AdminUsersPage from "../pages/admin/AdminUsersPage";
 import OwnerBookingsPage from "../pages/owner/OwnerBookingsPage";
 import OwnerDashboardPage from "../pages/owner/OwnerDashboardPage";
 import OwnerMenuPage from "../pages/owner/OwnerMenuPage";
+import OwnerRestaurantDetailPage from "../pages/owner/OwnerRestaurantDetailPage";
 import OwnerRestaurantsPage from "../pages/owner/OwnerRestaurantsPage";
 import OwnerReviewsPage from "../pages/owner/OwnerReviewsPage";
 
@@ -126,6 +127,15 @@ function AppRoutes() {
           "owner",
           <ProtectedRoute roles={["owner"]}>
             <OwnerRestaurantsPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/chu-nha-hang/nha-hang/:id"
+        element={withBackofficeLayout(
+          "owner",
+          <ProtectedRoute roles={["owner"]}>
+            <OwnerRestaurantDetailPage />
           </ProtectedRoute>
         )}
       />
