@@ -6,6 +6,7 @@ import {
   clearStoredAuth,
   getStoredToken,
   getStoredUser,
+  normalizeStoredUser,
   setStoredAuth,
   storageKeys,
 } from "../utils/storage";
@@ -25,11 +26,15 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const response = await authService.login(payload);
+      const normalizedResponse = {
+        ...response,
+        user: normalizeStoredUser(response.user),
+      };
       clearGuestSessionData();
-      setStoredAuth(response);
-      setUser(response.user);
-      setToken(response.token);
-      return response;
+      setStoredAuth(normalizedResponse);
+      setUser(normalizedResponse.user);
+      setToken(normalizedResponse.token);
+      return normalizedResponse;
     } finally {
       setLoading(false);
     }
@@ -68,8 +73,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = (nextUser) => {
-    setUser(nextUser);
-    sessionStorage.setItem(storageKeys.user, JSON.stringify(nextUser));
+    const normalizedUser = normalizeStoredUser(nextUser);
+    setUser(normalizedUser);
+    sessionStorage.setItem(storageKeys.user, JSON.stringify(normalizedUser));
   };
 
   const value = useMemo(

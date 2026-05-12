@@ -19,7 +19,7 @@ function AuthLayout({ title, subtitle, children }) {
         alignItems: "center",
         py: { xs: 2, md: 1.5 },
         background:
-          "radial-gradient(circle at top left, var(--app-surface-glow-a), transparent 24%), radial-gradient(circle at top right, var(--app-surface-glow-b), transparent 22%), var(--app-background)",
+          "radial-gradient(circle at top left, color-mix(in srgb, var(--app-surface-glow-a) 92%, transparent), transparent 24%), radial-gradient(circle at top right, color-mix(in srgb, var(--app-surface-glow-b) 88%, transparent), transparent 22%), linear-gradient(180deg, color-mix(in srgb, var(--app-background-elevated) 72%, var(--app-primary-dark) 28%) 0%, color-mix(in srgb, var(--app-background) 78%, var(--app-text-primary) 22%) 100%)",
       }}
     >
       <Container maxWidth="xl">
@@ -31,8 +31,10 @@ function AuthLayout({ title, subtitle, children }) {
             width: "100%",
             p: { xs: 1.5, md: 2 },
             borderRadius: 4,
-            background: "var(--app-surface-soft)",
-            boxShadow: "0 28px 64px var(--app-glass-shadow)",
+            background:
+              "linear-gradient(180deg, color-mix(in srgb, var(--app-surface-soft) 84%, var(--app-primary-dark) 16%) 0%, color-mix(in srgb, var(--app-surface-strong) 80%, var(--app-text-primary) 20%) 100%)",
+            border: "1px solid color-mix(in srgb, var(--app-glass-border) 70%, var(--app-text-primary) 30%)",
+            boxShadow: "0 28px 64px color-mix(in srgb, var(--app-glass-shadow) 75%, rgba(15, 23, 42, 0.24))",
           }}
         >
           <Grid container spacing={{ xs: 2, md: 2 }} alignItems="stretch">
@@ -145,7 +147,20 @@ function AuthLayout({ title, subtitle, children }) {
                   py: { xs: 0.5, md: 0.75 },
                 }}
               >
-                <Box sx={{ width: "100%" }}>{children}</Box>
+                <Box
+                  sx={{
+                    width: "100%",
+                    borderRadius: 3.5,
+                    px: { xs: 1.2, md: 1.6 },
+                    py: { xs: 1.25, md: 1.8 },
+                    background:
+                      "linear-gradient(180deg, color-mix(in srgb, var(--app-surface-strong) 88%, var(--app-paper) 12%) 0%, color-mix(in srgb, var(--app-surface-muted) 84%, var(--app-background-elevated) 16%) 100%)",
+                    border: "1px solid color-mix(in srgb, var(--app-glass-border) 74%, var(--app-primary-dark) 26%)",
+                    boxShadow: "0 18px 42px color-mix(in srgb, var(--app-text-primary) 10%, transparent)",
+                  }}
+                >
+                  {children}
+                </Box>
               </Box>
             </Grid>
           </Grid>
