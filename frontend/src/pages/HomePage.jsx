@@ -14,7 +14,10 @@ import CustomModal from "../components/CustomModal";
 import LoadingScreen from "../components/LoadingScreen";
 import RestaurantCard from "../components/RestaurantCard";
 import SectionHeader from "../components/SectionHeader";
+import { useAuth } from "../hooks/useAuth";
+import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
+import { getGuestFavoriteIds, toggleGuestFavorite } from "../utils/guestSession";
 import { formatCurrency, formatDate, formatOpenHours, getPriceRangeLabel } from "../utils/helpers";
 
 const DEFAULT_MAP_CENTER = [10.7769, 106.7009];
@@ -215,7 +218,9 @@ function MapViewportController({ onChange }) {
 }
 
 function HomePage() {
+  const { user } = useAuth();
   const [restaurants, setRestaurants] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
@@ -244,6 +249,30 @@ function HomePage() {
 
     fetchRestaurants();
   }, []);
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!user) {
+        setFavoriteIds([]);
+        return;
+      }
+
+      if (user.isGuest) {
+        setFavoriteIds(getGuestFavoriteIds().map(String));
+        return;
+      }
+
+      if (user.role !== "customer") {
+        setFavoriteIds([]);
+        return;
+      }
+
+      const ids = await favoriteService.getFavoriteRestaurantIds();
+      setFavoriteIds(ids.map(String));
+    };
+
+    loadFavorites();
+  }, [user]);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -455,6 +484,35 @@ function HomePage() {
     setActiveRestaurantError("");
   };
 
+  const handleToggleFavorite = async (restaurant) => {
+    try {
+      if (!user) {
+        setError("Vui lòng đăng nhập để lưu yêu thích.");
+        return;
+      }
+
+      if (user.isGuest) {
+        setFavoriteIds(toggleGuestFavorite(restaurant.id).map(String));
+        return;
+      }
+
+      if (user.role !== "customer") {
+        return;
+      }
+
+      const result = await favoriteService.toggle(restaurant.id);
+      setFavoriteIds((currentValue) => {
+        const currentIds = currentValue.map(String);
+        if (result.isFavorite) {
+          return currentIds.includes(String(restaurant.id)) ? currentIds : [...currentIds, String(restaurant.id)];
+        }
+        return currentIds.filter((item) => item !== String(restaurant.id));
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const heroViewportHeight = {
     xs: "min(68svh, 560px)",
     md: "calc(100svh - 190px)",
@@ -653,6 +711,8 @@ function HomePage() {
           <Grid key={restaurant.id} size={{ xs: 12, md: 6, xl: 4 }}>
             <RestaurantCard
               restaurant={restaurant}
+              isFavorite={favoriteIds.includes(String(restaurant.id))}
+              onToggleFavorite={handleToggleFavorite}
               action={
                 <Chip
                   component={RouterLink}

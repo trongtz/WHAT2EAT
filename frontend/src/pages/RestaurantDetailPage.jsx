@@ -1,4 +1,5 @@
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocalPhoneRoundedIcon from "@mui/icons-material/LocalPhoneRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
@@ -14,8 +15,8 @@ import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
-import { getGuestReviewsByRestaurant, toggleGuestFavorite } from "../utils/guestSession";
-import { formatCurrency, formatDate, formatOpenHours, getPriceRangeLabel } from "../utils/helpers";
+import { getGuestFavoriteIds, getGuestReviewsByRestaurant, toggleGuestFavorite } from "../utils/guestSession";
+import { formatCurrency, formatDate, formatOpenHours, formatPriceRangeDisplay } from "../utils/helpers";
 
 const buildFallbackImage = () =>
   "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 18%, white), color-mix(in srgb, var(--app-secondary) 14%, white))";
@@ -24,6 +25,7 @@ function RestaurantDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const [restaurant, setRestaurant] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -57,6 +59,30 @@ function RestaurantDetailPage() {
     fetchRestaurant();
   }, [id, user?.isGuest]);
 
+  useEffect(() => {
+    const loadFavoriteState = async () => {
+      if (!user) {
+        setIsFavorite(false);
+        return;
+      }
+
+      if (user.isGuest) {
+        setIsFavorite(getGuestFavoriteIds().map(String).includes(String(id)));
+        return;
+      }
+
+      if (user.role !== "customer") {
+        setIsFavorite(false);
+        return;
+      }
+
+      const state = await favoriteService.isFavorite(id);
+      setIsFavorite(state);
+    };
+
+    loadFavoriteState();
+  }, [id, user]);
+
   const handleFavorite = async () => {
     if (!user) {
       setMessage("Vui lòng đăng nhập để lưu yêu thích.");
@@ -64,13 +90,19 @@ function RestaurantDetailPage() {
     }
 
     if (user.isGuest) {
-      toggleGuestFavorite(id);
-      setMessage("Đã cập nhật danh sách yêu thích trong phiên khách.");
+      const nextValue = toggleGuestFavorite(id).map(String).includes(String(id));
+      setIsFavorite(nextValue);
+      setMessage(nextValue ? "Đã thêm vào danh sách yêu thích." : "Đã bỏ khỏi danh sách yêu thích.");
       return;
     }
 
-    await favoriteService.toggle({ userId: user.id, restaurantId: id });
-    setMessage("Đã cập nhật danh sách yêu thích.");
+    if (user.role !== "customer") {
+      return;
+    }
+
+    const result = await favoriteService.toggle(id);
+    setIsFavorite(result.isFavorite);
+    setMessage(result.isFavorite ? "Đã thêm vào danh sách yêu thích." : "Đã bỏ khỏi danh sách yêu thích.");
   };
 
   const ratingText = useMemo(() => {
@@ -267,24 +299,22 @@ function RestaurantDetailPage() {
             <CustomCard>
               <Stack spacing={2}>
                 <Typography variant="h4">Thao tác nhanh</Typography>
-                <Typography color="text.secondary">
-                  Khoảng giá: {getPriceRangeLabel(restaurant.priceRange)}
-                </Typography>
-                <Typography color="text.secondary">
-                  Số món hiện có: {restaurant.menu.length}
-                </Typography>
+                <Typography color="text.secondary">Khoảng giá: {formatPriceRangeDisplay(restaurant.priceRange)}</Typography>
+                <Typography color="text.secondary">Số món hiện có: {restaurant.menu.length}</Typography>
                 <CustomButton component={RouterLink} to={`/dat-ban?nhaHang=${restaurant.id}`}>
                   Đặt bàn ngay
                 </CustomButton>
                 <CustomButton
                   onClick={handleFavorite}
-                  startIcon={<FavoriteRoundedIcon />}
+                  startIcon={isFavorite ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
                   sx={{
-                    background: "linear-gradient(135deg, #FF7A90 0%, #FF9C8A 100%)",
+                    background: isFavorite
+                      ? "linear-gradient(135deg, #E85D75 0%, #FF9C8A 100%)"
+                      : "linear-gradient(135deg, #FF7A90 0%, #FF9C8A 100%)",
                     boxShadow: "0 14px 28px rgba(232,93,117,0.22)",
                   }}
                 >
-                  Lưu yêu thích
+                  {isFavorite ? "Đã yêu thích" : "Lưu yêu thích"}
                 </CustomButton>
               </Stack>
             </CustomCard>

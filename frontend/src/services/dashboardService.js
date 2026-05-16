@@ -2,8 +2,8 @@ import apiClient from "./apiClient";
 import { getCachedResource, invalidateCachePrefix } from "./requestCache";
 import { restaurantService } from "./restaurantService";
 
-const OWNER_DASHBOARD_TTL_MS = 30 * 1000;
-const ADMIN_OVERVIEW_TTL_MS = 30 * 1000;
+const OWNER_DASHBOARD_TTL_MS = 2 * 60 * 1000;
+const ADMIN_OVERVIEW_TTL_MS = 2 * 60 * 1000;
 
 const normalizeOwnerReview = (review) => ({
   ...review,

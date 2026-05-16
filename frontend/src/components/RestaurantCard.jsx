@@ -1,16 +1,30 @@
 import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import CustomCard from "./CustomCard";
-import { formatCurrency, getPriceRangeLabel } from "../utils/helpers";
+import { formatCurrency, formatPriceRangeDisplay, getPriceRangeLabel } from "../utils/helpers";
 
-function RestaurantCard({ restaurant, action, compact = false }) {
+function RestaurantCard({
+  restaurant,
+  action,
+  compact = false,
+  isFavorite = false,
+  onToggleFavorite,
+  hideFavoriteButton = false,
+}) {
   const ratingValue = Number(restaurant.rating || restaurant.averageRating || 0);
   const ratingLabel = ratingValue > 0 ? ratingValue.toFixed(1) : "Mới";
   const topLabel = restaurant.category || getPriceRangeLabel(restaurant.priceRange);
+
+  const handleToggleFavorite = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggleFavorite?.(restaurant);
+  };
 
   return (
     <CustomCard
@@ -76,18 +90,24 @@ function RestaurantCard({ restaurant, action, compact = false }) {
               color: "#18212F",
             }}
           />
-          <IconButton
-            sx={{
-              position: "absolute",
-              top: 14,
-              right: 14,
-              zIndex: 1,
-              bgcolor: "rgba(255,255,255,0.9)",
-              "&:hover": { bgcolor: "white" },
-            }}
-          >
-            <FavoriteBorderRoundedIcon />
-          </IconButton>
+          {!hideFavoriteButton ? (
+            <IconButton
+              onClick={handleToggleFavorite}
+              sx={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                zIndex: 1,
+                bgcolor: isFavorite ? "rgba(255,236,240,0.96)" : "rgba(255,255,255,0.9)",
+                color: isFavorite ? "#E85D75" : "rgba(15,23,42,0.72)",
+                "&:hover": {
+                  bgcolor: isFavorite ? "rgba(255,228,235,1)" : "white",
+                },
+              }}
+            >
+              {isFavorite ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+            </IconButton>
+          ) : null}
         </Box>
 
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
@@ -127,7 +147,9 @@ function RestaurantCard({ restaurant, action, compact = false }) {
           <Box>
             <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>Mức giá tham khảo</Typography>
             <Typography fontWeight={800} color="primary.main">
-              {restaurant.averagePrice ? `Từ ${formatCurrency(restaurant.averagePrice)}` : restaurant.priceRange}
+              {restaurant.averagePrice
+                ? `Từ ${formatCurrency(restaurant.averagePrice)}`
+                : formatPriceRangeDisplay(restaurant.priceRange)}
             </Typography>
           </Box>
 

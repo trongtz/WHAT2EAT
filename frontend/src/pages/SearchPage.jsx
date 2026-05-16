@@ -9,9 +9,13 @@ import FormInput from "../components/FormInput";
 import LoadingScreen from "../components/LoadingScreen";
 import RestaurantCard from "../components/RestaurantCard";
 import SectionHeader from "../components/SectionHeader";
+import { useAuth } from "../hooks/useAuth";
+import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
+import { getGuestFavoriteIds, toggleGuestFavorite } from "../utils/guestSession";
 
 function SearchPage() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     keyword: searchParams.get("keyword") || "",
@@ -19,14 +23,35 @@ function SearchPage() {
     price: searchParams.get("price") || "",
   });
   const [restaurants, setRestaurants] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const loadFavorites = async () => {
+    if (!user) {
+      setFavoriteIds([]);
+      return;
+    }
+
+    if (user.isGuest) {
+      setFavoriteIds(getGuestFavoriteIds().map(String));
+      return;
+    }
+
+    if (user.role !== "customer") {
+      setFavoriteIds([]);
+      return;
+    }
+
+    const ids = await favoriteService.getFavoriteRestaurantIds();
+    setFavoriteIds(ids.map(String));
+  };
 
   const loadRestaurants = async (currentFilters = filters) => {
     setLoading(true);
     setError("");
     try {
-      const data = await restaurantService.getRestaurants(currentFilters);
+      const [data] = await Promise.all([restaurantService.getRestaurants(currentFilters), loadFavorites()]);
       setRestaurants(data);
       setSearchParams(currentFilters);
     } catch (err) {
@@ -39,12 +64,43 @@ function SearchPage() {
   useEffect(() => {
     loadRestaurants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id, user?.isGuest, user?.role]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
+
+  const handleToggleFavorite = async (restaurant) => {
+    try {
+      if (!user) {
+        setError("Vui lòng đăng nhập để lưu yêu thích.");
+        return;
+      }
+
+      if (user.isGuest) {
+        setFavoriteIds(toggleGuestFavorite(restaurant.id).map(String));
+        return;
+      }
+
+      if (user.role !== "customer") {
+        return;
+      }
+
+      const result = await favoriteService.toggle(restaurant.id);
+      setFavoriteIds((currentValue) => {
+        const currentIds = currentValue.map(String);
+        if (result.isFavorite) {
+          return currentIds.includes(String(restaurant.id)) ? currentIds : [...currentIds, String(restaurant.id)];
+        }
+        return currentIds.filter((item) => item !== String(restaurant.id));
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (loading) return <LoadingScreen message="Đang lọc nhà hàng phù hợp..." />;
 
   return (
     <Stack spacing={3}>
@@ -95,15 +151,15 @@ function SearchPage() {
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      {loading ? (
-        <LoadingScreen message="Đang lọc nhà hàng phù hợp..." />
-      ) : restaurants.length ? (
+      {restaurants.length ? (
         <Grid container spacing={3}>
           {restaurants.map((restaurant) => (
             <Grid key={restaurant.id} size={{ xs: 12, md: 6 }}>
               <RestaurantCard
                 compact
                 restaurant={restaurant}
+                isFavorite={favoriteIds.includes(String(restaurant.id))}
+                onToggleFavorite={handleToggleFavorite}
                 action={
                   <CustomButton component={RouterLink} to={`/nha-hang/${restaurant.id}`}>
                     Xem ngay
@@ -114,7 +170,10 @@ function SearchPage() {
           ))}
         </Grid>
       ) : (
-        <EmptyState title="Chưa có kết quả phù hợp" description="Bạn thử nới rộng khoảng giá hoặc đổi từ khóa tìm kiếm nhé." />
+        <EmptyState
+          title="Chưa có kết quả phù hợp"
+          description="Bạn thử nới rộng khoảng giá hoặc đổi từ khóa tìm kiếm nhé."
+        />
       )}
     </Stack>
   );

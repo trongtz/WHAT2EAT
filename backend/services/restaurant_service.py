@@ -49,7 +49,10 @@ def get_restaurant_review_stats(db: Session, restaurant_id: UUID) -> dict:
 
 def attach_restaurant_review_summary(db: Session, restaurant: Restaurant) -> Restaurant:
     stats = get_restaurant_review_stats(db, restaurant.restaurant_id)
-    restaurant.average_rating = stats["average_rating"]
+    if stats["total_reviews"] > 0:
+        restaurant.average_rating = stats["average_rating"]
+    elif restaurant.average_rating is None:
+        restaurant.average_rating = Decimal("0.00")
     setattr(restaurant, "review_count", stats["total_reviews"])
     return restaurant
 

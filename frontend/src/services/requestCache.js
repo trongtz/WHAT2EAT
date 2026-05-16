@@ -2,6 +2,7 @@ import { getStoredToken, isGuestToken } from "../utils/storage";
 
 const responseCache = new Map();
 const inflightCache = new Map();
+const CACHE_STORAGE_KEY = "what2eat:request-cache";
 
 const DEFAULT_TTL_MS = 2 * 60 * 1000;
 
@@ -23,6 +24,43 @@ const getScopeKey = () => {
 };
 
 const buildScopedKey = (key) => `${getScopeKey()}::${key}`;
+
+const loadPersistedCache = () => {
+  if (typeof window === "undefined") return;
+
+  try {
+    const rawValue = window.sessionStorage.getItem(CACHE_STORAGE_KEY);
+    if (!rawValue) return;
+
+    const parsedValue = JSON.parse(rawValue);
+    if (!parsedValue || typeof parsedValue !== "object") return;
+
+    Object.entries(parsedValue).forEach(([key, value]) => {
+      if (
+        value &&
+        typeof value === "object" &&
+        typeof value.timestamp === "number" &&
+        Object.prototype.hasOwnProperty.call(value, "value")
+      ) {
+        responseCache.set(key, value);
+      }
+    });
+  } catch {
+    window.sessionStorage.removeItem(CACHE_STORAGE_KEY);
+  }
+};
+
+const persistCache = () => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(Object.fromEntries(responseCache.entries())));
+  } catch {
+    // Ignore storage quota or serialization issues and keep the in-memory cache.
+  }
+};
+
+loadPersistedCache();
 
 export const getCachedResource = async (key, fetcher, options = {}) => {
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
@@ -46,6 +84,7 @@ export const getCachedResource = async (key, fetcher, options = {}) => {
         value: cloneValue(value),
         timestamp: Date.now(),
       });
+      persistCache();
       inflightCache.delete(scopedKey);
       return value;
     })
@@ -66,6 +105,7 @@ export const invalidateCachePrefix = (prefix) => {
       responseCache.delete(key);
     }
   }
+  persistCache();
 
   for (const key of inflightCache.keys()) {
     if (key.startsWith(scopedPrefix)) {
@@ -77,4 +117,7 @@ export const invalidateCachePrefix = (prefix) => {
 export const clearAllCachedResources = () => {
   responseCache.clear();
   inflightCache.clear();
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(CACHE_STORAGE_KEY);
+  }
 };

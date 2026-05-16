@@ -3,6 +3,32 @@ export const formatCurrency = (value) =>
     Number(value || 0)
   );
 
+export const formatPriceText = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "";
+  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(amount)} VND`;
+};
+
+export const formatPriceRangeDisplay = (value) => {
+  if (!value) return "Chưa cập nhật";
+
+  if (["cheap", "mid", "expensive"].includes(value)) {
+    return getPriceRangeLabel(value);
+  }
+
+  const matches = String(value).match(/\d+(?:[.,]\d+)?/g);
+  if (!matches?.length) return value;
+
+  const formatted = matches
+    .map((item) => Number(String(item).replace(/,/g, "")))
+    .filter((item) => Number.isFinite(item))
+    .map((item) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(item));
+
+  if (!formatted.length) return value;
+  if (formatted.length === 1) return `${formatted[0]} VND`;
+  return `${formatted[0]} - ${formatted[1]} VND`;
+};
+
 export const formatDate = (value) =>
   value
     ? new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(

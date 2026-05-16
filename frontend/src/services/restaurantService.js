@@ -4,10 +4,10 @@ import { getPriceRangeLabel } from "../utils/helpers";
 
 const RESTAURANT_LIST_TTL_MS = 5 * 60 * 1000;
 const RESTAURANT_DETAIL_TTL_MS = 5 * 60 * 1000;
-const OWNER_RESTAURANTS_TTL_MS = 2 * 60 * 1000;
-const OWNER_MANAGE_TTL_MS = 60 * 1000;
-const MENU_TTL_MS = 60 * 1000;
-const ADMIN_TTL_MS = 60 * 1000;
+const OWNER_RESTAURANTS_TTL_MS = 5 * 60 * 1000;
+const OWNER_MANAGE_TTL_MS = 3 * 60 * 1000;
+const MENU_TTL_MS = 3 * 60 * 1000;
+const ADMIN_TTL_MS = 2 * 60 * 1000;
 
 const stableSerialize = (value) => JSON.stringify(value || {});
 
@@ -55,7 +55,7 @@ const normalizeReview = (review) => ({
   createdAt: review.created_at ?? review.createdAt,
 });
 
-const normalizeRestaurant = (restaurant) => {
+export const normalizeRestaurant = (restaurant) => {
   const images = Array.isArray(restaurant.images) ? restaurant.images.filter(Boolean) : [];
   const status = restaurant.status ?? "PENDING";
   const priceRange = restaurant.price_range ?? restaurant.priceRange ?? "";
