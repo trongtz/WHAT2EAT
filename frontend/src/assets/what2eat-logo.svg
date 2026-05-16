@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="48" fill="#050505"/>
+  <g transform="translate(66 40)">
+    <path d="M281 58C281 36 297 18 320 18C345 18 362 37 362 61V68H401L365 101C384 112 393 133 389 157C384 188 359 206 334 206H324V396H292V364H130C88 364 54 327 54 283V166C54 121 90 85 135 85H281V58Z" fill="#2F6B26"/>
+    <circle cx="321" cy="118" r="10" fill="#2F6B26"/>
+    <path d="M281 86C318 59 355 49 386 51V188C347 187 312 171 281 138V86Z" fill="#050505"/>
+    <path d="M93 142H292V188H93V142Z" fill="#2F6B26"/>
+    <path d="M103 159H132V292H103V159Z" fill="white"/>
+    <path d="M148 159H176V292H148V159Z" fill="white"/>
+    <path d="M193 159H221V292H193V159Z" fill="white"/>
+    <path d="M234 159H264V292H234V159Z" fill="white"/>
+    <path d="M278 159H360V193H319V292H278V159Z" fill="white"/>
+    <path d="M86 310H155V341H121V419H86V310Z" fill="white"/>
+    <path d="M168 310H236V341H202V356H231V386H202V419H168V310Z" fill="white"/>
+    <path d="M248 310H318V341H282V356H311V386H282V419H248V310Z" fill="white"/>
+    <path d="M330 310H399V341H365V419H330V310Z" fill="white"/>
+    <g fill="white" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-style="italic">
+      <text x="254" y="216" transform="rotate(-28 254 216)">q</text>
+      <text x="273" y="202" transform="rotate(-20 273 202)">u</text>
+      <text x="294" y="194" transform="rotate(-12 294 194)">i</text>
+      <text x="309" y="190" transform="rotate(-2 309 190)">t</text>
+      <text x="324" y="190" transform="rotate(8 324 190)">e</text>
+      <text x="356" y="223" transform="rotate(80 356 223)">s</text>
+      <text x="362" y="244" transform="rotate(92 362 244)">a</text>
+      <text x="360" y="265" transform="rotate(104 360 265)">u</text>
+      <text x="353" y="286" transform="rotate(116 353 286)">c</text>
+      <text x="341" y="302" transform="rotate(128 341 302)">y</text>
+    </g>
+  </g>
+</svg>

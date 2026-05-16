@@ -1,4 +1,3 @@
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
@@ -14,8 +13,9 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import AppLogoImage from "./AppLogoImage";
 import ThemeStudioModal from "./ThemeStudioModal";
 
 const roleLabel = {
@@ -29,16 +29,6 @@ function ProfileMenu({ user, onLogout }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [themeStudioOpen, setThemeStudioOpen] = useState(false);
   const navigate = useNavigate();
-
-  const initials = useMemo(() => {
-    if (!user?.fullName) return "W";
-    return user.fullName
-      .split(" ")
-      .slice(0, 2)
-      .map((word) => word.charAt(0).toUpperCase())
-      .join("");
-  }, [user]);
-
   const open = Boolean(anchorEl);
 
   return (
@@ -69,14 +59,11 @@ function ProfileMenu({ user, onLogout }) {
           sx={{
             width: 42,
             height: 42,
-            color: "white",
-            fontWeight: 800,
-            background:
-              "linear-gradient(135deg, var(--app-avatar-a, #FF7A18) 0%, var(--app-avatar-b, #FFB347) 100%)",
+            bgcolor: "#050505",
             boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.32)",
           }}
         >
-          {initials}
+          <AppLogoImage size={30} />
         </Avatar>
 
         <Box sx={{ display: { xs: "none", md: "block" }, textAlign: "left", minWidth: 0 }}>
@@ -92,9 +79,7 @@ function ProfileMenu({ user, onLogout }) {
           >
             {user?.fullName}
           </Typography>
-          <Typography
-            sx={{ mt: 0.25, fontSize: "0.82rem", color: "text.secondary", lineHeight: 1.1 }}
-          >
+          <Typography sx={{ mt: 0.25, fontSize: "0.82rem", color: "text.secondary", lineHeight: 1.1 }}>
             {roleLabel[user?.role] || "Food Explorer"}
           </Typography>
         </Box>
@@ -159,7 +144,7 @@ function ProfileMenu({ user, onLogout }) {
           sx={{ borderRadius: 2 }}
         >
           <ListItemIcon>
-            <AutoAwesomeRoundedIcon fontSize="small" />
+            <AppLogoImage size={18} />
           </ListItemIcon>
           Giao diện
         </MenuItem>

@@ -1,130 +1,316 @@
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
-import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import AddCommentRoundedIcon from "@mui/icons-material/AddCommentRounded";
+import FmdGoodRoundedIcon from "@mui/icons-material/FmdGoodRounded";
+import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import PsychologyRoundedIcon from "@mui/icons-material/PsychologyRounded";
-import RadarRoundedIcon from "@mui/icons-material/RadarRounded";
 import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
-import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
-import {
-  Alert,
-  Box,
-  Chip,
-  Divider,
-  Grid,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { useMemo, useState } from "react";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import { Alert, Avatar, Box, Chip, CircularProgress, Grid, Stack, Typography } from "@mui/material";
+import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
 import CustomCard from "../components/CustomCard";
-import EmptyState from "../components/EmptyState";
 import FormInput from "../components/FormInput";
-import RestaurantCard from "../components/RestaurantCard";
-import SectionHeader from "../components/SectionHeader";
+import AppLogoImage from "../components/AppLogoImage";
+import { useAuth } from "../hooks/useAuth";
 import { aiService } from "../services/aiService";
-import { restaurantService } from "../services/restaurantService";
+import { normalizeRestaurant, restaurantService } from "../services/restaurantService";
 import { formatPriceRangeDisplay } from "../utils/helpers";
 import { validatePrompt } from "../utils/validators";
 
-const starterPrompts = [
-  "Tối nay muốn ăn lãng mạn, yên tĩnh, ngân sách khoảng 500k cho 2 người ở quận 1.",
-  "Nhóm 4 người muốn ăn no, nhiều món chia sẻ, giá vừa phải và có chỗ ngồi thoải mái.",
-  "Mình cần quán gần trung tâm để gặp đối tác, không gian gọn gàng và phục vụ nhanh.",
-];
+const fallbackMessage =
+  "AI Assistant hiện chưa phản hồi được. Hệ thống đã chuyển sang tìm kiếm cơ bản dựa trên nội dung bạn nhập.";
 
-const scenarioChips = [
-  "Hẹn hò buổi tối",
-  "Đi ăn cùng nhóm bạn",
-  "Gia đình có trẻ nhỏ",
-  "Ăn trưa nhanh gần công ty",
-  "Tiệc sinh nhật nhỏ",
-  "Muốn thử món mới",
-];
+const noResultMessage =
+  "Không tìm thấy nhà hàng phù hợp với yêu cầu hiện tại. Bạn có thể thử mở rộng khu vực, tăng ngân sách hoặc thay đổi loại món ăn.";
+
+const createSessionId = () => `ai-chat-${Date.now()}`;
 
 const getPromptSignals = (prompt) => {
-  const normalizedPrompt = prompt.toLowerCase();
+  const normalizedPrompt = String(prompt || "").toLowerCase();
 
   return {
-    romantic: /(lang man|lãng mạn|hen ho|hẹn hò|toi|tối)/.test(normalizedPrompt),
-    group: /(nhom|nhóm|ban be|bạn bè|dong nghiep|đồng nghiệp|gia dinh|gia đình)/.test(normalizedPrompt),
-    premium: /(500k|cao cap|cao cấp|sang|fine dining|dat tien|đắt tiền)/.test(normalizedPrompt),
-    budget: /(re|rẻ|tiet kiem|tiết kiệm|duoi 100|cheap|binh dan|bình dân)/.test(normalizedPrompt),
-    quick: /(nhanh|gap|gấp|trua|trưa|van phong|văn phòng)/.test(normalizedPrompt),
+    hotFood: /(nong|lau|pho|bun|sup|chao)/.test(normalizedPrompt),
+    cafe: /(cafe|ca phe|coffee)/.test(normalizedPrompt),
+    quiet: /(yen tinh|hoc bai|lam viec|work|study)/.test(normalizedPrompt),
+    dateNight: /(hen ho|lang man|am cung|date)/.test(normalizedPrompt),
+    district1: /(quan 1|q1|district 1)/.test(normalizedPrompt),
+    budgetLow: /(duoi 100|100k|binh dan|gia re|re)/.test(normalizedPrompt),
+    tableNeed: /(con ban|dat ban|4 nguoi|19h|19:00)/.test(normalizedPrompt),
   };
 };
 
-const buildLocalRecommendation = (prompt, restaurants) => {
+const getRecommendationReason = (restaurant, prompt) => {
+  const signals = getPromptSignals(prompt);
+  const reasons = [];
+  const title = `${restaurant.name || ""} ${restaurant.category || ""}`.toLowerCase();
+
+  if (signals.cafe && /(cafe|coffee|tra|tea)/.test(title)) reasons.push("Phù hợp với nhu cầu tìm quán cà phê.");
+  if (signals.quiet) reasons.push("Không gian phù hợp cho nhu cầu ngồi lâu, trò chuyện hoặc học bài.");
+  if (signals.dateNight) reasons.push("Phong cách quán hợp cho buổi hẹn hò hoặc bữa tối ấm cúng.");
+  if (signals.hotFood && /(lau|pho|bun|nuoc|sup|chao|bo|nuong)/.test(title)) reasons.push("Menu có xu hướng hợp với món nóng.");
+  if (signals.budgetLow && restaurant.priceRange === "cheap") reasons.push("Mức giá đang nằm trong nhóm dễ tiếp cận.");
+  if (signals.district1 && /quan 1|district 1/i.test(restaurant.address || "")) reasons.push("Vị trí có vẻ gần khu vực Quận 1.");
+  if (signals.tableNeed && Number(restaurant.availableCapacity || 0) > 0) reasons.push("Hiện có thông tin sức chứa khả dụng cho nhu cầu đặt bàn.");
+  if (Number(restaurant.averageRating || restaurant.rating || 0) >= 4.2) reasons.push("Điểm đánh giá đang ở mức tốt.");
+
+  return reasons[0] || "Thông tin nhà hàng khớp khá tốt với mô tả bạn vừa nhập.";
+};
+
+const buildFallbackRecommendation = (prompt, restaurants) => {
   const signals = getPromptSignals(prompt);
 
-  const scoredRestaurants = restaurants
-    .map((restaurant) => {
-      let score = Number(restaurant.averageRating || restaurant.rating || 0) * 12;
+  const picks = restaurants
+    .map((item) => {
+      const restaurant = normalizeRestaurant(item);
+      let score = Number(restaurant.averageRating || restaurant.rating || 0) * 10;
+      const title = `${restaurant.name || ""} ${restaurant.category || ""}`.toLowerCase();
+      const address = String(restaurant.address || "").toLowerCase();
 
-      if (signals.romantic && /(Âu|Nhật|Hàn|steak|cafe|cà phê|fine)/i.test(restaurant.name + restaurant.category)) {
-        score += 20;
-      }
+      if (signals.cafe && /(cafe|coffee|tra|tea)/.test(title)) score += 24;
+      if (signals.quiet) score += 12;
+      if (signals.dateNight && /(au|nhat|han|steak|bbq|fine|grill)/.test(title)) score += 20;
+      if (signals.hotFood && /(lau|pho|bun|sup|chao|nuoc)/.test(title)) score += 18;
+      if (signals.budgetLow && restaurant.priceRange === "cheap") score += 22;
+      if (signals.district1 && /quan 1|district 1/.test(address)) score += 18;
+      if (signals.tableNeed && Number(restaurant.availableCapacity || 0) >= 4) score += 20;
+      if (Number(restaurant.reviewCount || 0) > 0) score += Math.min(Number(restaurant.reviewCount || 0), 20);
 
-      if (signals.group && Number(restaurant.maxCapacity || 0) >= 20) {
-        score += 16;
-      }
-
-      if (signals.premium && restaurant.priceRange === "expensive") {
-        score += 18;
-      }
-
-      if (signals.budget && restaurant.priceRange === "cheap") {
-        score += 18;
-      }
-
-      if (signals.quick && /(ăn nhanh|fast|gà|cơm|bún|phở)/i.test(restaurant.category || restaurant.name)) {
-        score += 14;
-      }
-
-      if (restaurant.reviewCount) {
-        score += Math.min(Number(restaurant.reviewCount), 30);
-      }
-
-      return { ...restaurant, score };
+      return {
+        ...restaurant,
+        score,
+        aiReason: getRecommendationReason(restaurant, prompt),
+      };
     })
-    .sort((firstRestaurant, secondRestaurant) => secondRestaurant.score - firstRestaurant.score);
-
-  const picks = scoredRestaurants.slice(0, 4);
-  const averageBudget =
-    picks.find((restaurant) => restaurant.priceRange)?.priceRange || restaurants[0]?.priceRange || "mid";
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
 
   return {
-    summary: "Đây là bản xem trước giao diện gợi ý AI. Hệ thống đang dựng đề xuất từ dữ liệu nhà hàng hiện có để bạn hoàn thiện backend prompt sau.",
-    strategy: signals.romantic
-      ? "Ưu tiên không gian có cảm giác riêng tư, điểm đánh giá ổn định và mức giá phù hợp cho trải nghiệm buổi tối."
-      : signals.group
-        ? "Ưu tiên nhà hàng có sức chứa tốt, menu dễ chia sẻ và review đủ nhiều để giảm rủi ro khi đi nhóm."
-        : signals.quick
-          ? "Ưu tiên quán dễ chọn nhanh, tín hiệu phục vụ gọn và mức giá dễ tiếp cận cho nhu cầu hằng ngày."
-          : "Ưu tiên nhà hàng có đánh giá tốt, thông tin đầy đủ và mức giá cân bằng để ra quyết định nhanh hơn.",
-    highlights: [
-      `Ngân sách tham chiếu phù hợp nhất hiện tại: ${formatPriceRangeDisplay(averageBudget)}.`,
-      `${picks.length} lựa chọn đầu bảng được gom từ dữ liệu nhà hàng hiện có.`,
-      "Có thể thay phần scoring này bằng response thật từ backend AI mà không cần đổi cấu trúc màn hình.",
-    ],
     restaurants: picks,
+    isEmpty: picks.length === 0,
   };
 };
 
+const createAssistantMessage = ({ text, restaurants = [], isFallback = false, isEmpty = false }) => ({
+  id: `assistant-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  role: "assistant",
+  text,
+  restaurants,
+  isFallback,
+  isEmpty,
+});
+
+const createUserMessage = (text) => ({
+  id: `user-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  role: "user",
+  text,
+});
+
+const getRatingLabel = (restaurant) => {
+  const rating = Number(restaurant.averageRating || restaurant.rating || 0);
+  return rating > 0 ? rating.toFixed(1) : "Mới";
+};
+
+function RecommendationListCard({ restaurant, index }) {
+  return (
+    <Box
+      component={RouterLink}
+      to={`/nha-hang/${restaurant.id}`}
+      sx={{
+        display: "block",
+        p: 1.3,
+        borderRadius: 3.5,
+        textDecoration: "none",
+        bgcolor: "rgba(255,255,255,0.9)",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow: "0 18px 40px rgba(15,23,42,0.06)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        "&:hover": {
+          transform: "translateY(-2px)",
+          boxShadow: "0 24px 44px rgba(15,23,42,0.1)",
+        },
+      }}
+    >
+      <Stack direction="row" spacing={1.2} alignItems="stretch">
+        <Box
+          sx={{
+            width: 88,
+            minWidth: 88,
+            height: 88,
+            borderRadius: 3,
+            overflow: "hidden",
+            backgroundImage: restaurant.image
+              ? `linear-gradient(180deg, rgba(18,22,44,0.04), rgba(18,22,44,0.18)), url(${restaurant.image})`
+              : "linear-gradient(135deg, rgba(47,133,90,0.92), rgba(104,211,145,0.72))",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+
+        <Stack spacing={0.7} sx={{ minWidth: 0, flex: 1, justifyContent: "space-between" }}>
+          <Stack sx={{ minWidth: 0 }}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontSize: "0.95rem",
+                lineHeight: 1.22,
+                color: "var(--app-text-primary)",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {restaurant.name}
+            </Typography>
+            <Typography
+              color="text.secondary"
+              sx={{
+                fontSize: "0.86rem",
+                mt: 0.1,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {restaurant.address || "Chưa cập nhật địa chỉ"}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={0.8} alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={0.55} alignItems="center">
+              <FmdGoodRoundedIcon sx={{ fontSize: 15, color: "var(--app-secondary)" }} />
+              <Typography
+                fontWeight={700}
+                sx={{
+                  color: "var(--app-secondary)",
+                  fontSize: "0.82rem",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {restaurant.distance || "Chưa xác định"}
+              </Typography>
+            </Stack>
+
+            <Chip
+              size="small"
+              icon={<StarRoundedIcon sx={{ color: "#F6B500 !important", fontSize: 15 }} />}
+              label={getRatingLabel(restaurant)}
+              sx={{
+                height: 28,
+                bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
+                color: "var(--app-primary)",
+                flexShrink: 0,
+                "& .MuiChip-label": {
+                  px: 1,
+                  fontSize: "0.78rem",
+                },
+              }}
+            />
+          </Stack>
+
+          <Typography
+            sx={{
+              fontSize: "0.82rem",
+              color: "var(--app-primary)",
+              lineHeight: 1.35,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {restaurant.aiReason || `Gợi ý ${index + 1}`}
+          </Typography>
+        </Stack>
+      </Stack>
+    </Box>
+  );
+}
+
+function MessageBubble({ message }) {
+  const isAssistant = message.role === "assistant";
+
+  return (
+    <Stack
+      direction="row"
+      spacing={1.5}
+      justifyContent={isAssistant ? "flex-start" : "flex-end"}
+      alignItems="center"
+    >
+      {isAssistant ? (
+        <Avatar sx={{ bgcolor: "#050505", width: 42, height: 42, flexShrink: 0 }}>
+          <AppLogoImage size={32} />
+        </Avatar>
+      ) : null}
+
+      <Box
+        sx={{
+          width: "100%",
+          maxWidth: { xs: "100%", md: "86%" },
+          px: 2,
+          py: 1.6,
+          borderRadius: 3,
+          bgcolor: isAssistant ? "rgba(255,255,255,0.95)" : "var(--app-primary)",
+          color: isAssistant ? "var(--app-text-primary)" : "white",
+          border: isAssistant ? "1px solid rgba(15,23,42,0.08)" : "none",
+          boxShadow: isAssistant ? "0 18px 36px rgba(15,23,42,0.06)" : "0 18px 36px rgba(15,23,42,0.12)",
+        }}
+      >
+        <Stack spacing={1.2}>
+          <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{message.text}</Typography>
+          {message.isFallback ? <Alert severity="warning">{fallbackMessage}</Alert> : null}
+          {message.isEmpty ? <Alert severity="info">{noResultMessage}</Alert> : null}
+        </Stack>
+      </Box>
+
+      {!isAssistant ? (
+        <Avatar
+          sx={{
+            bgcolor: "color-mix(in srgb, var(--app-secondary) 22%, white)",
+            color: "var(--app-secondary)",
+            width: 38,
+            height: 38,
+            flexShrink: 0,
+          }}
+        >
+          U
+        </Avatar>
+      ) : null}
+    </Stack>
+  );
+}
+
 function AiRecommendationPage() {
-  const [prompt, setPrompt] = useState(starterPrompts[0]);
+  const { user } = useAuth();
+  const [sessionId, setSessionId] = useState(createSessionId);
+  const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [messages, setMessages] = useState([
+    createAssistantMessage({
+      text: "Chào bạn, hãy mô tả nhu cầu của bạn để mình gợi ý nhà hàng phù hợp.",
+    }),
+  ]);
 
-  const promptMeta = useMemo(() => {
-    const words = prompt.trim() ? prompt.trim().split(/\s+/).length : 0;
-    return {
-      words,
-      hasEnoughContext: words >= 8,
-    };
-  }, [prompt]);
+  const latestRecommendationMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && (message.restaurants?.length || message.isEmpty || message.isFallback));
+
+  const recommendedRestaurants = latestRecommendationMessage?.restaurants || [];
+
+  const handleNewChat = () => {
+    setSessionId(createSessionId());
+    setPrompt("");
+    setError("");
+    setLoading(false);
+    setMessages([
+      createAssistantMessage({
+        text: "Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?",
+      }),
+    ]);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -132,437 +318,242 @@ function AiRecommendationPage() {
     setError(nextError);
     if (nextError) return;
 
+    const userPrompt = prompt.trim();
+    setMessages((current) => [...current, createUserMessage(userPrompt)]);
+    setPrompt("");
     setLoading(true);
 
     try {
-      const data = await aiService.recommend({ prompt });
-      setResult(data);
+      const data = await aiService.recommend({
+        prompt: userPrompt,
+        query: userPrompt,
+        customer_id: user?.id ?? null,
+        session_id: sessionId,
+      });
+
+      const restaurants = Array.isArray(data.restaurants)
+        ? data.restaurants.map((restaurant) => {
+            const normalized = normalizeRestaurant(restaurant);
+            return {
+              ...normalized,
+              aiReason: getRecommendationReason(normalized, userPrompt),
+            };
+          })
+        : [];
+
+      setMessages((current) => [
+        ...current,
+        createAssistantMessage({
+          text: data.message || "Mình đã tìm được một vài gợi ý phù hợp cho bạn.",
+          restaurants,
+          isEmpty: restaurants.length === 0,
+        }),
+      ]);
     } catch {
       const restaurants = await restaurantService.getRestaurants();
-      setResult(buildLocalRecommendation(prompt, restaurants));
+      const fallbackResult = buildFallbackRecommendation(userPrompt, restaurants);
+
+      setMessages((current) => [
+        ...current,
+        createAssistantMessage({
+          text: fallbackResult.restaurants.length
+            ? "Mình vẫn tìm được một vài lựa chọn gần với nội dung bạn nhập."
+            : noResultMessage,
+          restaurants: fallbackResult.restaurants,
+          isFallback: true,
+          isEmpty: fallbackResult.isEmpty,
+        }),
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUsePrompt = (value) => {
-    setPrompt(value);
-    setError("");
-  };
-
   return (
-    <Stack spacing={4}>
-      <SectionHeader
-        eyebrow="AI Concierge"
-        title="Gợi ý quán ăn theo ngữ cảnh của bạn"
-        description="Thiết kế theo kiểu trợ lý chọn quán: nhập brief, xem cách hệ thống hiểu nhu cầu, rồi nhận danh sách đề xuất có cấu trúc rõ ràng."
-      />
-
-      <Grid container spacing={3} alignItems="stretch">
-        <Grid size={{ xs: 12, lg: 4.5 }}>
-          <CustomCard sx={{ height: "100%" }}>
-            <Stack component="form" spacing={2.3} onSubmit={handleSubmit}>
-              <Stack spacing={0.75}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <TuneRoundedIcon sx={{ color: "var(--app-secondary)" }} />
-                  <Typography variant="h4">Viết brief cho trợ lý gợi ý</Typography>
-                </Stack>
-                <Typography color="text.secondary">
-                  Cứ mô tả như đang nhắn với một người bạn biết nhiều quán ăn.
-                </Typography>
-              </Stack>
-
-              {error ? <Alert severity="error">{error}</Alert> : null}
-
-              <FormInput
-                multiline
-                rows={9}
-                label="Prompt mô tả nhu cầu"
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                helperText={
-                  promptMeta.hasEnoughContext
-                    ? `${promptMeta.words} từ. Mô tả hiện đã đủ để trả về gợi ý có cấu trúc.`
-                    : `${promptMeta.words} từ. Thêm ngân sách, số người hoặc bối cảnh để kết quả tốt hơn.`
-                }
-              />
-
-              <Stack spacing={1}>
-                <Typography sx={{ fontSize: "0.92rem", fontWeight: 700 }}>Prompt mẫu</Typography>
-                <Stack spacing={1}>
-                  {starterPrompts.map((item) => (
-                    <Box
-                      key={item}
-                      onClick={() => handleUsePrompt(item)}
-                      sx={{
-                        p: 1.25,
-                        borderRadius: 2,
-                        cursor: "pointer",
-                        bgcolor: "rgba(248,250,255,0.9)",
-                        border: "1px solid rgba(15,23,42,0.08)",
-                        transition: "border-color 0.2s ease, transform 0.2s ease",
-                        "&:hover": {
-                          borderColor: "color-mix(in srgb, var(--app-primary) 24%, white)",
-                          transform: "translateY(-1px)",
-                        },
-                      }}
-                    >
-                      <Typography color="text.secondary" sx={{ fontSize: "0.93rem", lineHeight: 1.55 }}>
-                        {item}
-                      </Typography>
-                    </Box>
+    <Box sx={{ pb: { xs: 2, lg: 8 } }}>
+      <Grid container spacing={3} alignItems="start">
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <CustomCard
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(247,249,255,0.98) 100%)",
+            }}
+          >
+            <Stack spacing={2.2}>
+              <Box
+                sx={{
+                  p: { xs: 1.2, md: 1.6 },
+                  borderRadius: 3,
+                  overflowY: "auto",
+                  bgcolor: "rgba(244,247,255,0.95)",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                  minHeight: { xs: 220, lg: 320 },
+                  maxHeight: { xs: 360, lg: 380 },
+                }}
+              >
+                <Stack spacing={2}>
+                  {messages.map((message) => (
+                    <MessageBubble key={message.id} message={message} />
                   ))}
+
+                  {loading ? (
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar sx={{ bgcolor: "#050505", width: 42, height: 42, flexShrink: 0 }}>
+                        <AppLogoImage size={32} />
+                      </Avatar>
+                      <Box
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "rgba(255,255,255,0.95)",
+                          border: "1px solid rgba(15,23,42,0.08)",
+                        }}
+                      >
+                        <Stack direction="row" spacing={1.25} alignItems="center">
+                          <CircularProgress size={18} />
+                          <Typography color="text.secondary">AI Assistant đang xử lý yêu cầu của bạn...</Typography>
+                        </Stack>
+                      </Box>
+                    </Stack>
+                  ) : null}
+                </Stack>
+              </Box>
+
+              <Stack component="form" spacing={1.4} onSubmit={handleSubmit}>
+                {error ? <Alert severity="error">{error}</Alert> : null}
+
+                <Box
+                  sx={{
+                    position: "relative",
+                    width: "100%",
+                    maxWidth: { xs: "100%", lg: 860 },
+                  }}
+                >
+                  <FormInput
+                    multiline
+                    minRows={1}
+                    maxRows={2}
+                    label="Tin nhắn"
+                    placeholder="Ví dụ: Gợi ý nhà hàng ấm cúng cho buổi hẹn hò gần Quận 1."
+                    value={prompt}
+                    disabled={loading}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        pr: { xs: 18, sm: 20 },
+                        pb: 1,
+                        minHeight: 78,
+                        alignItems: "center",
+                      },
+                    }}
+                  />
+
+                  <CustomButton
+                    type="submit"
+                    disabled={loading}
+                    endIcon={<SendRoundedIcon />}
+                    sx={{
+                      position: "absolute",
+                      right: 18,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      minWidth: "auto",
+                      px: 2.2,
+                      zIndex: 1,
+                    }}
+                  >
+                    Send
+                  </CustomButton>
+                </Box>
+
+                <Stack direction="row" justifyContent="flex-end">
+                  <CustomButton
+                    variant="outlined"
+                    startIcon={<AddCommentRoundedIcon />}
+                    onClick={handleNewChat}
+                    sx={{
+                      boxShadow: "none",
+                      color: "var(--app-primary)",
+                      bgcolor: "rgba(255,255,255,0.9)",
+                      backgroundImage: "none",
+                      border: "1px solid color-mix(in srgb, var(--app-primary) 22%, white)",
+                      "&:hover": {
+                        backgroundImage: "none",
+                        bgcolor: "rgba(255,255,255,1)",
+                      },
+                    }}
+                  >
+                    New Chat
+                  </CustomButton>
                 </Stack>
               </Stack>
-
-              <CustomButton type="submit" startIcon={<PsychologyRoundedIcon />} sx={{ alignSelf: "flex-start" }}>
-                Tạo gợi ý ngay
-              </CustomButton>
             </Stack>
           </CustomCard>
         </Grid>
 
-        <Grid size={{ xs: 12, lg: 7.5 }}>
-          <Stack spacing={3}>
-            {!result && !loading ? (
-              <CustomCard>
-                <Stack spacing={2}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <RestaurantRoundedIcon sx={{ color: "var(--app-primary)" }} />
-                    <Typography variant="h4">Kết quả đề xuất sẽ hiện ở đây</Typography>
-                  </Stack>
-                  <Typography color="text.secondary">
-                    Sau khi nhập prompt, màn hình sẽ hiển thị 3 phần chính: tóm tắt brief, logic gợi ý và danh sách
-                    quán nên xem trước.
-                  </Typography>
-                  <Grid container spacing={1.5}>
-                    {[
-                      { label: "Brief", text: "AI hiểu bạn đang tìm trải nghiệm gì." },
-                      { label: "Insight", text: "Vì sao hệ thống chọn nhóm quán này." },
-                      { label: "Picks", text: "Danh sách quán với CTA rõ ràng để đi tiếp." },
-                    ].map((item) => (
-                      <Grid key={item.label} size={{ xs: 12, md: 4 }}>
-                        <Box
-                          sx={{
-                            p: 1.5,
-                            borderRadius: 2,
-                            bgcolor: "rgba(248,250,255,0.92)",
-                            border: "1px solid rgba(15,23,42,0.06)",
-                            height: "100%",
-                          }}
-                        >
-                          <Typography sx={{ fontWeight: 800, mb: 0.55 }}>{item.label}</Typography>
-                          <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-                            {item.text}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Stack>
-              </CustomCard>
-            ) : null}
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <CustomCard sx={{ display: "flex", flexDirection: "column" }}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <RestaurantRoundedIcon sx={{ color: "var(--app-primary)" }} />
+                <Typography variant="h4">Quán được gợi ý</Typography>
+              </Stack>
 
-            {loading ? (
-              <CustomCard>
-                <Stack spacing={2}>
-                  <Chip
-                    icon={<AutoAwesomeRoundedIcon />}
-                    label="Đang dựng đề xuất"
-                    sx={{
-                      alignSelf: "flex-start",
-                      bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
-                      color: "var(--app-primary)",
-                    }}
-                  />
-                  <Typography variant="h4">Hệ thống đang đọc brief và ghép nhóm quán phù hợp.</Typography>
-                  <Typography color="text.secondary">
-                    Sau này bạn có thể thay bước này bằng response streaming hoặc reasoning thật từ backend AI.
-                  </Typography>
-                </Stack>
-              </CustomCard>
-            ) : null}
-
-            {result ? (
-              <>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <CustomCard sx={{ height: "100%" }}>
-                      <Stack spacing={1.25}>
-                        <Chip
-                          icon={<TipsAndUpdatesRoundedIcon />}
-                          label="Tóm tắt đề xuất"
-                          sx={{
-                            alignSelf: "flex-start",
-                            bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
-                            color: "var(--app-primary)",
-                          }}
-                        />
-                        <Typography variant="h4">AI brief</Typography>
-                        <Typography color="text.secondary">{result.summary}</Typography>
-                      </Stack>
-                    </CustomCard>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <CustomCard sx={{ height: "100%" }}>
-                      <Stack spacing={1.25}>
-                        <Chip
-                          icon={<InsightsRoundedIcon />}
-                          label="Cách hệ thống đang suy luận"
-                          sx={{
-                            alignSelf: "flex-start",
-                            bgcolor: "color-mix(in srgb, var(--app-secondary) 10%, white)",
-                            color: "var(--app-secondary)",
-                          }}
-                        />
-                        <Typography variant="h4">Strategy</Typography>
-                        <Typography color="text.secondary">
-                          {result.strategy || "Backend AI có thể trả về phần giải thích này để người dùng hiểu vì sao được gợi ý."}
-                        </Typography>
-                      </Stack>
-                    </CustomCard>
-                  </Grid>
-                </Grid>
-
-                {Array.isArray(result.highlights) && result.highlights.length ? (
-                  <CustomCard>
-                    <Stack spacing={1.35}>
-                      <Typography variant="h4">Điểm đáng chú ý</Typography>
-                      <Grid container spacing={1.5}>
-                        {result.highlights.map((item) => (
-                          <Grid key={item} size={{ xs: 12, md: 4 }}>
-                            <Box
-                              sx={{
-                                p: 1.55,
-                                height: "100%",
-                                borderRadius: 2,
-                                bgcolor: "rgba(248,250,255,0.92)",
-                                border: "1px solid rgba(15,23,42,0.06)",
-                              }}
-                            >
-                              <Typography color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                                {item}
-                              </Typography>
-                            </Box>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Stack>
-                  </CustomCard>
+              <Box
+                sx={{
+                  overflowY: "auto",
+                  pr: 0.5,
+                  minHeight: { xs: 220, lg: 320 },
+                  maxHeight: { xs: "none", lg: 620 },
+                }}
+              >
+                {latestRecommendationMessage?.isFallback ? (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    {fallbackMessage}
+                  </Alert>
                 ) : null}
 
-                {Array.isArray(result.restaurants) && result.restaurants.length ? (
+                {recommendedRestaurants.length ? (
                   <Stack spacing={2}>
-                    <SectionHeader
-                      eyebrow="Top Picks"
-                      title="Những quán nên xem trước"
-                      description="Giữ bố cục kiểu editorial để sau này backend AI có thể thay đổi nội dung mà không phải sửa lại màn hình."
-                    />
-                    <Grid container spacing={3}>
-                      {result.restaurants.map((restaurant, index) => (
-                        <Grid key={restaurant.id || `${restaurant.name}-${index}`} size={{ xs: 12, md: 6 }}>
-                          <Stack spacing={1.1}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Chip
-                                label={`Lựa chọn ${index + 1}`}
-                                sx={{
-                                  bgcolor: "rgba(255,255,255,0.92)",
-                                  color: "var(--app-primary)",
-                                  fontWeight: 800,
-                                }}
-                              />
-                              <Stack direction="row" spacing={0.6} alignItems="center">
-                                <PlaceRoundedIcon sx={{ fontSize: 16, color: "var(--app-secondary)" }} />
-                                <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-                                  {restaurant.address || "Chưa có địa chỉ chi tiết"}
-                                </Typography>
-                              </Stack>
-                            </Stack>
-                            <RestaurantCard
-                              compact
-                              restaurant={restaurant}
-                              hideFavoriteButton
-                              action={
-                                <CustomButton component={RouterLink} to={`/nha-hang/${restaurant.id}`}>
-                                  Xem nhà hàng
-                                </CustomButton>
-                              }
-                            />
-                          </Stack>
-                        </Grid>
-                      ))}
-                    </Grid>
+                    {recommendedRestaurants.map((restaurant, index) => (
+                      <RecommendationListCard
+                        key={restaurant.id || `${restaurant.name}-${index}`}
+                        restaurant={restaurant}
+                        index={index}
+                      />
+                    ))}
                   </Stack>
                 ) : (
-                  <EmptyState
-                    title="Chưa có gợi ý phù hợp"
-                    description="Bạn có thể nới ngân sách, đổi khu vực hoặc mô tả mục tiêu buổi ăn cụ thể hơn."
-                  />
+                  <Box
+                    sx={{
+                      minHeight: { xs: 220, lg: 0 },
+                      height: "100%",
+                      display: "grid",
+                      placeItems: "center",
+                      borderRadius: 3,
+                      border: "1px dashed rgba(140, 177, 255, 0.45)",
+                      px: 3,
+                      py: 4,
+                    }}
+                  >
+                    <Stack spacing={1.2} alignItems="center" sx={{ maxWidth: 320, textAlign: "center" }}>
+                      <Typography variant="h4">Chưa có gợi ý nhà hàng</Typography>
+                      <Typography color="text.secondary">
+                        {latestRecommendationMessage?.isEmpty
+                          ? noResultMessage
+                          : "Hãy gửi một yêu cầu ở khung chat để xem danh sách nhà hàng được đề xuất."}
+                      </Typography>
+                    </Stack>
+                  </Box>
                 )}
-              </>
-            ) : null}
-          </Stack>
+              </Box>
+            </Stack>
+          </CustomCard>
         </Grid>
       </Grid>
-
-      <Box
-        className="glass-panel"
-        sx={{
-          p: { xs: 2, md: 2.4 },
-          borderRadius: 3,
-          overflow: "hidden",
-          background:
-            "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 10%, white) 0%, rgba(255,255,255,0.94) 42%, color-mix(in srgb, var(--app-secondary) 10%, white) 100%)",
-          border: "1px solid rgba(255,255,255,0.8)",
-          boxShadow: "0 26px 56px rgba(15, 23, 42, 0.08)",
-        }}
-      >
-        <Grid container spacing={2.2} alignItems="stretch">
-          <Grid size={{ xs: 12, lg: 7.4 }}>
-            <Stack spacing={2.2} sx={{ height: "100%", justifyContent: "space-between" }}>
-              <Stack spacing={1.35}>
-                <Chip
-                  icon={<TipsAndUpdatesRoundedIcon />}
-                  label="Preview mode cho màn AI suggestion"
-                  sx={{
-                    alignSelf: "flex-start",
-                    bgcolor: "rgba(255,255,255,0.84)",
-                    color: "var(--app-primary)",
-                  }}
-                />
-                <Typography
-                  variant="h1"
-                  sx={{
-                    maxWidth: 760,
-                    fontSize: { xs: "2rem", md: "2.9rem" },
-                    lineHeight: { xs: 1.14, md: 1.06 },
-                  }}
-                >
-                  Một màn gợi ý đủ đẹp để sau này chỉ việc cắm backend AI thật vào.
-                </Typography>
-                <Typography color="text.secondary" sx={{ maxWidth: 700, fontSize: "1.03rem" }}>
-                  Trang này tập trung vào trải nghiệm nhập nhu cầu và đọc kết quả. Nếu backend AI chưa sẵn sàng,
-                  hệ thống sẽ tự dùng dữ liệu nhà hàng hiện có để dựng bản xem trước có cấu trúc tương tự.
-                </Typography>
-              </Stack>
-
-              <Grid container spacing={1.5}>
-                {[
-                  {
-                    icon: PsychologyRoundedIcon,
-                    label: "Prompt rõ ngữ cảnh",
-                    value: "mood, ngân sách, khu vực",
-                  },
-                  {
-                    icon: InsightsRoundedIcon,
-                    label: "Tóm tắt lý do chọn",
-                    value: "đọc nhanh trong 5 giây",
-                  },
-                  {
-                    icon: RadarRoundedIcon,
-                    label: "Kết quả có cấu trúc",
-                    value: "brief, insight, danh sách",
-                  },
-                ].map((item) => {
-                  const Icon = item.icon;
-
-                  return (
-                    <Grid key={item.label} size={{ xs: 12, md: 4 }}>
-                      <Box
-                        sx={{
-                          p: 1.65,
-                          height: "100%",
-                          borderRadius: 2.4,
-                          bgcolor: "rgba(255,255,255,0.76)",
-                          border: "1px solid rgba(255,255,255,0.72)",
-                        }}
-                      >
-                        <Stack spacing={0.8}>
-                          <Box
-                            sx={{
-                              width: 44,
-                              height: 44,
-                              borderRadius: 1.8,
-                              display: "grid",
-                              placeItems: "center",
-                              background:
-                                "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 16%, white), color-mix(in srgb, var(--app-secondary) 12%, white))",
-                            }}
-                          >
-                            <Icon sx={{ color: "var(--app-primary)" }} />
-                          </Box>
-                          <Typography sx={{ fontWeight: 800 }}>{item.label}</Typography>
-                          <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-                            {item.value}
-                          </Typography>
-                        </Stack>
-                      </Box>
-                    </Grid>
-                  );
-                })}
-              </Grid>
-            </Stack>
-          </Grid>
-
-          <Grid size={{ xs: 12, lg: 4.6 }}>
-            <CustomCard
-              sx={{
-                height: "100%",
-                background: "rgba(255,255,255,0.88)",
-                boxShadow: "0 24px 48px rgba(15, 23, 42, 0.08)",
-              }}
-            >
-              <Stack spacing={1.8}>
-                <Stack direction="row" spacing={1.1} alignItems="center">
-                  <AutoAwesomeRoundedIcon sx={{ color: "var(--app-primary)" }} />
-                  <Typography variant="h4">Những gì AI nên hiểu từ prompt</Typography>
-                </Stack>
-
-                <Stack spacing={1.2}>
-                  {[
-                    "Bạn đi một mình, đi đôi hay đi nhóm.",
-                    "Mức ngân sách mong muốn và khung thời gian.",
-                    "Khu vực, khoảng cách chấp nhận hoặc phong cách quán.",
-                    "Mục tiêu buổi ăn: chill, hẹn hò, gặp đối tác hay ăn nhanh.",
-                  ].map((item) => (
-                    <Stack key={item} direction="row" spacing={1.1} alignItems="flex-start">
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          mt: "8px",
-                          borderRadius: "50%",
-                          bgcolor: "var(--app-secondary)",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Typography color="text.secondary">{item}</Typography>
-                    </Stack>
-                  ))}
-                </Stack>
-
-                <Divider />
-
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {scenarioChips.map((item) => (
-                    <Chip
-                      key={item}
-                      label={item}
-                      onClick={() => handleUsePrompt(`Mình cần gợi ý cho trường hợp: ${item}.`)}
-                      sx={{
-                        bgcolor: "color-mix(in srgb, var(--app-primary) 9%, white)",
-                        color: "var(--app-primary)",
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </Stack>
-            </CustomCard>
-          </Grid>
-        </Grid>
-      </Box>
-    </Stack>
+    </Box>
   );
 }
 
