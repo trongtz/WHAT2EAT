@@ -67,12 +67,13 @@ export const getCachedResource = async (key, fetcher, options = {}) => {
   const scopedKey = buildScopedKey(key);
   const now = Date.now();
   const cachedEntry = responseCache.get(scopedKey);
+  const forceRefresh = options.forceRefresh === true;
 
-  if (cachedEntry && now - cachedEntry.timestamp < ttlMs) {
+  if (!forceRefresh && cachedEntry && now - cachedEntry.timestamp < ttlMs) {
     return cloneValue(cachedEntry.value);
   }
 
-  const inflightRequest = inflightCache.get(scopedKey);
+  const inflightRequest = forceRefresh ? null : inflightCache.get(scopedKey);
   if (inflightRequest) {
     return cloneValue(await inflightRequest);
   }

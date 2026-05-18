@@ -261,7 +261,7 @@ export const restaurantService = {
     invalidateRestaurantCaches();
   },
 
-  getAdminRestaurants: async (status) => {
+  getAdminRestaurants: async (status, options = {}) => {
     return getCachedResource(
       `admin:restaurants:${status || "all"}`,
       async () => {
@@ -270,7 +270,7 @@ export const restaurantService = {
         });
         return response.data.map(normalizeRestaurant);
       },
-      { ttlMs: ADMIN_TTL_MS }
+      { ttlMs: ADMIN_TTL_MS, forceRefresh: options.forceRefresh }
     );
   },
 
