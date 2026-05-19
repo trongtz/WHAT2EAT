@@ -18,7 +18,7 @@ class Restaurant(Base):
     longitude = Column(Numeric(9, 6), nullable=True)
     phone = Column(String(20), nullable=False)
     description = Column(Text, nullable=True)
-    open_hours = Column(JSONB, nullable=True)  # {"mon": {"open": "08:00", "close": "22:00"}, ...}
+    open_hours = Column(String(100), nullable=True)
     images = Column(JSONB, nullable=True)  # Bộ sưu tập hình ảnh
     cuisine_type = Column(String(100), nullable=True)  # "Lẩu", "Cơm", "Cà phê", etc.
     price_range = Column(String(20), nullable=True)  # "cheap", "mid", "expensive"

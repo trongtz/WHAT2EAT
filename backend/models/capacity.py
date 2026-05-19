@@ -1,5 +1,5 @@
 # File: models/capacity.py
-from sqlalchemy import Column, String, Integer, Time, Date, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, Time, Date, ForeignKey, UniqueConstraint, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -15,7 +15,11 @@ class Capacity(Base):
     day_of_week = Column(Integer, nullable=False)  # 0=CN, 1=T2, ..., 6=T7
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    max_capacity = Column(Integer, nullable=False)  # 0 = ngừng nhận đặt chỗ
+    max_capacity = Column(Integer, nullable=False)  # Tổng số bàn/chỗ tối đa
+    
+    # Thêm các trường này để giống restaurant.py
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint('restaurant_id', 'day_of_week', 'start_time', 'end_time', name='unique_capacity'),
@@ -26,6 +30,7 @@ class Capacity(Base):
 
 
 class CapacityOverride(Base):
+    """Dùng cho các ngày lễ hoặc thay đổi đột xuất"""
     __tablename__ = "capacity_overrides"
 
     override_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -34,12 +39,10 @@ class CapacityOverride(Base):
     override_date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    max_capacity = Column(Integer, nullable=False)  # 0 = đóng cửa
-    note = Column(Text, nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint('restaurant_id', 'override_date', 'start_time', 'end_time', name='unique_override'),
-    )
+    max_capacity = Column(Integer, nullable=False)
+    
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relationships
     restaurant = relationship("Restaurant", back_populates="capacity_overrides")

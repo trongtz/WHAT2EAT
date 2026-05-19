@@ -25,7 +25,15 @@ class CapacityUpdate(BaseModel):
 class CapacityResponse(CapacityBase):
     """Schema để trả về capacity"""
     capacity_id: UUID
-    restaurant_id: UUID
+    start_time: time
+    end_time: time
+    max_capacity: int  # Đây là "Tổng số bàn"
+    current_booked: int = 0 # Số bàn đã được đặt (Tính từ bảng Reservations)
+    
+    @property
+    def available_capacity(self) -> int:
+        # Số bàn trống = Tổng - Đã đặt
+        return max(0, self.max_capacity - self.current_booked)
 
     model_config = ConfigDict(from_attributes=True)
 
