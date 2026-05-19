@@ -1,0 +1,101 @@
+item_id,restaurant_id,name,description,price,category,image_url,availability_status
+df01513f-9c76-4d4c-a12f-52380bd7e865,5c297d4b-ef79-41ca-8694-3470ef745d70,Món đặc biệt 53,Mô tả món ăn thơm ngon hấp dẫn.,148000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+87425e85-b8f9-45fc-b134-cc8c9c3dd315,5c297d4b-ef79-41ca-8694-3470ef745d70,Món đặc biệt 73,Mô tả món ăn thơm ngon hấp dẫn.,123000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+48ae167f-a392-45bd-8824-f7a5cd67265e,54adba30-9e56-4161-8ecc-a04c872b025a,Món đặc biệt 80,Mô tả món ăn thơm ngon hấp dẫn.,140000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+4d2787c1-b3d1-4cc4-889c-06a944464831,54adba30-9e56-4161-8ecc-a04c872b025a,Món đặc biệt 34,Mô tả món ăn thơm ngon hấp dẫn.,142000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+a4322064-eee7-42fa-8b6e-a47d7ef1c3bc,34ddcfa4-8895-4e55-bf2b-21f147acf9a0,Món đặc biệt 5,Mô tả món ăn thơm ngon hấp dẫn.,180000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+619c5ef3-85cf-450a-8723-a5bf27205110,34ddcfa4-8895-4e55-bf2b-21f147acf9a0,Món đặc biệt 2,Mô tả món ăn thơm ngon hấp dẫn.,33000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+af3d9ae9-f3a1-48cb-96d1-6487417a6053,0437c85a-ea0e-4bfb-a34a-acf718ac0025,Món đặc biệt 87,Mô tả món ăn thơm ngon hấp dẫn.,161000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+ebc75049-725f-4e59-82ab-4314718f4334,0437c85a-ea0e-4bfb-a34a-acf718ac0025,Món đặc biệt 21,Mô tả món ăn thơm ngon hấp dẫn.,188000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+36ba12e1-6d75-4cee-88e9-ba35154a023a,fbfcce1d-4268-4e87-86a5-1aef5ce65d2e,Món đặc biệt 94,Mô tả món ăn thơm ngon hấp dẫn.,150000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+d48f179a-a650-4931-9e0c-fd1498f3be7d,fbfcce1d-4268-4e87-86a5-1aef5ce65d2e,Món đặc biệt 35,Mô tả món ăn thơm ngon hấp dẫn.,85000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+9918f32d-d0a8-44e4-9532-bd5bb4db4379,d159f85e-202b-46e3-bb9d-3cce31f920b2,Món đặc biệt 37,Mô tả món ăn thơm ngon hấp dẫn.,94000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+aa459a8f-d739-449a-8e5d-47cf5d5f87f5,d159f85e-202b-46e3-bb9d-3cce31f920b2,Món đặc biệt 52,Mô tả món ăn thơm ngon hấp dẫn.,148000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+8a6d11f3-d43a-4d87-96cb-9505c29a2a69,0c9ea858-f40f-4042-a6ee-cda02d9fe9ce,Món đặc biệt 17,Mô tả món ăn thơm ngon hấp dẫn.,129000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+c0efb03f-fe61-499d-8ea6-5a92eb04cffc,0c9ea858-f40f-4042-a6ee-cda02d9fe9ce,Món đặc biệt 13,Mô tả món ăn thơm ngon hấp dẫn.,175000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+1ff642fb-ff10-4716-bea1-c46ecf66ef62,cecb0cee-b012-4cd5-b63b-649dd5836558,Món đặc biệt 72,Mô tả món ăn thơm ngon hấp dẫn.,187000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+5849585d-fd6d-4db5-af04-fe72e299ab29,cecb0cee-b012-4cd5-b63b-649dd5836558,Món đặc biệt 27,Mô tả món ăn thơm ngon hấp dẫn.,195000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+e033fc95-995c-4ddd-97f8-d6041efa1b44,2d8a8fff-25d0-4cec-825a-c2e9021fd542,Món đặc biệt 79,Mô tả món ăn thơm ngon hấp dẫn.,138000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+6afb6598-abe7-4466-ad0c-530e29af2d71,2d8a8fff-25d0-4cec-825a-c2e9021fd542,Món đặc biệt 48,Mô tả món ăn thơm ngon hấp dẫn.,32000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+f8735425-012b-4173-8d68-0c23eb219768,8fea7445-4c7f-48be-b69e-309f1bdcc4c5,Món đặc biệt 34,Mô tả món ăn thơm ngon hấp dẫn.,81000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+4b8db10b-baf4-4810-94bd-7d3736900528,8fea7445-4c7f-48be-b69e-309f1bdcc4c5,Món đặc biệt 43,Mô tả món ăn thơm ngon hấp dẫn.,71000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+92c4f66c-455a-4f0b-9ac6-d7cc2af28536,8dd0953c-5923-4748-9652-5a10f3a2c894,Món đặc biệt 85,Mô tả món ăn thơm ngon hấp dẫn.,66000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+9e80ab25-6f03-4aac-a0cf-d7b3371389be,8dd0953c-5923-4748-9652-5a10f3a2c894,Món đặc biệt 21,Mô tả món ăn thơm ngon hấp dẫn.,139000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+a1d90e54-6a1d-4d58-8e9e-cc3ce9dafa3d,bedf4b43-0416-45a0-862e-f75e17552c17,Món đặc biệt 1,Mô tả món ăn thơm ngon hấp dẫn.,85000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+71b33404-3fd4-42ad-9fae-4fc46d503b3a,bedf4b43-0416-45a0-862e-f75e17552c17,Món đặc biệt 61,Mô tả món ăn thơm ngon hấp dẫn.,159000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+eb7abd1b-0756-4b4d-a19f-9193fed566d9,f3d1139f-4bc0-4ac8-8178-73db94263aae,Món đặc biệt 48,Mô tả món ăn thơm ngon hấp dẫn.,155000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+8d55eb5d-8b72-4466-a852-9cb1aa46af77,f3d1139f-4bc0-4ac8-8178-73db94263aae,Món đặc biệt 34,Mô tả món ăn thơm ngon hấp dẫn.,122000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+b78db165-2b43-4164-b330-dcecc9a73b06,b77fae37-0832-4b6c-806f-77513777669e,Món đặc biệt 27,Mô tả món ăn thơm ngon hấp dẫn.,49000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+f7700c5e-181b-4481-b124-2aa2c2ee8da8,b77fae37-0832-4b6c-806f-77513777669e,Món đặc biệt 96,Mô tả món ăn thơm ngon hấp dẫn.,189000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+e20d05ea-8975-4683-a215-fd5ae0eb3002,72dd696c-9196-46cd-8fb6-38ff060cb7ad,Món đặc biệt 11,Mô tả món ăn thơm ngon hấp dẫn.,163000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+3309a279-7f74-4805-873b-e6c791a6a72c,72dd696c-9196-46cd-8fb6-38ff060cb7ad,Món đặc biệt 52,Mô tả món ăn thơm ngon hấp dẫn.,77000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+353edb59-440e-4655-9919-a35a8dfa57dd,2149d9f0-510d-4901-a12d-e4df87498d9d,Món đặc biệt 79,Mô tả món ăn thơm ngon hấp dẫn.,175000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+d6bf8bf3-114f-42c7-a9d5-8feca242265d,2149d9f0-510d-4901-a12d-e4df87498d9d,Món đặc biệt 28,Mô tả món ăn thơm ngon hấp dẫn.,35000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+26c6b7cc-524a-4ce7-a83e-684b399b3389,7c87765d-7009-4e47-8f89-222dfe02a037,Món đặc biệt 74,Mô tả món ăn thơm ngon hấp dẫn.,56000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+7cf5106f-3e32-4a63-b23e-1f2a43e1bae3,7c87765d-7009-4e47-8f89-222dfe02a037,Món đặc biệt 45,Mô tả món ăn thơm ngon hấp dẫn.,106000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+5ef66ae2-3c22-4621-8090-3a83251270e9,a25f2c72-4869-488e-918e-3447575e25dc,Món đặc biệt 100,Mô tả món ăn thơm ngon hấp dẫn.,75000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+f458ce92-a01c-4610-b43a-19e8a1fcf1d6,a25f2c72-4869-488e-918e-3447575e25dc,Món đặc biệt 25,Mô tả món ăn thơm ngon hấp dẫn.,54000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+c03aed1a-429d-4fd1-b977-613305c0a921,3a9a9664-9664-4676-a52d-0c703e9161fb,Món đặc biệt 56,Mô tả món ăn thơm ngon hấp dẫn.,158000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+d0ee15cb-0eb1-47af-bde8-74715025d640,3a9a9664-9664-4676-a52d-0c703e9161fb,Món đặc biệt 41,Mô tả món ăn thơm ngon hấp dẫn.,63000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+6d7556a0-e399-477d-ac62-2f3a0efa43c0,df14d106-b081-44f9-8327-4465898fe525,Món đặc biệt 33,Mô tả món ăn thơm ngon hấp dẫn.,162000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+d729f87f-f31e-44cd-8602-f6286e0c0139,df14d106-b081-44f9-8327-4465898fe525,Món đặc biệt 98,Mô tả món ăn thơm ngon hấp dẫn.,132000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+98256b99-1f6d-42a7-b5f3-ea5d61b9ab34,3e839ac1-1046-4fc7-b957-e42cdb1021ae,Món đặc biệt 54,Mô tả món ăn thơm ngon hấp dẫn.,99000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+b3d91df0-53f8-4c42-a64a-cb44a325f2de,3e839ac1-1046-4fc7-b957-e42cdb1021ae,Món đặc biệt 83,Mô tả món ăn thơm ngon hấp dẫn.,47000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+a559372b-c7a5-4f6c-aa33-ce5e14f02b36,61f4e40c-0ed2-4287-8b07-9d07309049e2,Món đặc biệt 34,Mô tả món ăn thơm ngon hấp dẫn.,118000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+2d1e27af-4d7b-483f-bbc2-3949fd4cf09b,61f4e40c-0ed2-4287-8b07-9d07309049e2,Món đặc biệt 43,Mô tả món ăn thơm ngon hấp dẫn.,169000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+8e09cfa2-d83a-4a3a-8d3a-f79963a5e06f,11dd8d6c-4a3f-42b8-83ce-05f182f5f5bf,Món đặc biệt 35,Mô tả món ăn thơm ngon hấp dẫn.,122000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+3f45ed60-8c23-4281-9a68-001396eb31b5,11dd8d6c-4a3f-42b8-83ce-05f182f5f5bf,Món đặc biệt 35,Mô tả món ăn thơm ngon hấp dẫn.,148000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+0d2949ef-2f3c-4011-8753-d59543750341,82b1f50e-27e7-4096-810f-fca8b0caab9a,Món đặc biệt 71,Mô tả món ăn thơm ngon hấp dẫn.,32000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+01ae9829-5a66-4a63-bbf5-016de792b2eb,82b1f50e-27e7-4096-810f-fca8b0caab9a,Món đặc biệt 64,Mô tả món ăn thơm ngon hấp dẫn.,117000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+b487e509-fb24-4948-9d00-06e125110483,7eaf537d-cead-41f3-b19f-26b9cd04eeba,Món đặc biệt 5,Mô tả món ăn thơm ngon hấp dẫn.,190000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+9bc6fbca-ed07-4d9d-baf9-9f6d875880b8,7eaf537d-cead-41f3-b19f-26b9cd04eeba,Món đặc biệt 40,Mô tả món ăn thơm ngon hấp dẫn.,137000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+0485aaa3-84d8-465a-a478-4428ec9ba153,50c82fd4-a6f2-4766-bf35-0537c77c3d2a,Món đặc biệt 43,Mô tả món ăn thơm ngon hấp dẫn.,155000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+0abc27f8-c679-4493-b9ec-b79f85a9246e,50c82fd4-a6f2-4766-bf35-0537c77c3d2a,Món đặc biệt 86,Mô tả món ăn thơm ngon hấp dẫn.,67000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+e79365cb-1994-4508-a98f-051bd34739f3,b898caa4-dc3d-47ed-9f6a-f43279609730,Món đặc biệt 45,Mô tả món ăn thơm ngon hấp dẫn.,31000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+e40c8d5a-6f9a-40aa-aa84-d9a5b1d8274b,b898caa4-dc3d-47ed-9f6a-f43279609730,Món đặc biệt 34,Mô tả món ăn thơm ngon hấp dẫn.,164000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+c30ceaff-9d4a-4874-8ef9-984e7807b446,6afb625f-a216-4c23-b037-bf4547348ddd,Món đặc biệt 26,Mô tả món ăn thơm ngon hấp dẫn.,195000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+03f293fa-be67-47ea-91c1-fbcdff4a5410,6afb625f-a216-4c23-b037-bf4547348ddd,Món đặc biệt 32,Mô tả món ăn thơm ngon hấp dẫn.,49000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+72a1d60e-cc11-4afa-ad6b-e19c1e3ccb0d,c388298f-db03-4c58-9171-f765f0fc4381,Món đặc biệt 93,Mô tả món ăn thơm ngon hấp dẫn.,52000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+608fa57a-40a8-44f9-9cee-6f21f338976c,c388298f-db03-4c58-9171-f765f0fc4381,Món đặc biệt 78,Mô tả món ăn thơm ngon hấp dẫn.,62000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+4a0af20c-4898-4649-809e-55c03ebf8803,ae44956e-3170-4e64-843d-418cae461df7,Món đặc biệt 56,Mô tả món ăn thơm ngon hấp dẫn.,82000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+8607f9d7-79ec-4793-a96c-fe9f37792408,ae44956e-3170-4e64-843d-418cae461df7,Món đặc biệt 37,Mô tả món ăn thơm ngon hấp dẫn.,128000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+61d02c52-d4f7-46c2-a9f3-22c2757e521b,3a789878-7e85-4636-8f48-12fddf52f71f,Món đặc biệt 68,Mô tả món ăn thơm ngon hấp dẫn.,157000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+a96bdcff-a368-4fa7-a950-8211c1adf39b,3a789878-7e85-4636-8f48-12fddf52f71f,Món đặc biệt 13,Mô tả món ăn thơm ngon hấp dẫn.,189000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+10fa686c-d827-4c1b-a69c-88b319f78713,e909f7b6-ceaf-4ee3-b082-c4fc1714f851,Món đặc biệt 67,Mô tả món ăn thơm ngon hấp dẫn.,168000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+5cfdc2cd-fd38-4d3a-bd50-6c34a5a5942e,e909f7b6-ceaf-4ee3-b082-c4fc1714f851,Món đặc biệt 60,Mô tả món ăn thơm ngon hấp dẫn.,172000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+dc67daf7-5cdb-4290-9bb8-e20c535c64ac,6eff06ca-c52d-4482-bf85-d5370a998d33,Món đặc biệt 89,Mô tả món ăn thơm ngon hấp dẫn.,179000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+1dbdb33c-b7c5-480c-aba9-12b592e1ec4e,6eff06ca-c52d-4482-bf85-d5370a998d33,Món đặc biệt 7,Mô tả món ăn thơm ngon hấp dẫn.,140000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+7ca19b5c-fffa-4d22-9077-7d329dc528c1,34ddebe3-700c-4f44-8fb5-13a9e4db0c77,Món đặc biệt 79,Mô tả món ăn thơm ngon hấp dẫn.,185000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+63c402cf-2326-4e84-9c57-5c2ada94da00,34ddebe3-700c-4f44-8fb5-13a9e4db0c77,Món đặc biệt 50,Mô tả món ăn thơm ngon hấp dẫn.,38000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+253b8145-b13e-47e9-a18e-62918d89a22d,4228ca94-f3ec-4c8b-b628-e08882e93571,Món đặc biệt 5,Mô tả món ăn thơm ngon hấp dẫn.,53000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+2072a39d-fe77-44b2-8759-7a79d227e775,4228ca94-f3ec-4c8b-b628-e08882e93571,Món đặc biệt 7,Mô tả món ăn thơm ngon hấp dẫn.,138000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+87bd740b-154e-47f4-ae04-807921de876a,d83139cd-5c61-4e28-9ef8-dda3bb3eaac5,Món đặc biệt 5,Mô tả món ăn thơm ngon hấp dẫn.,80000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+8f479c52-658f-4a96-be13-d7533b8b1c0a,d83139cd-5c61-4e28-9ef8-dda3bb3eaac5,Món đặc biệt 88,Mô tả món ăn thơm ngon hấp dẫn.,183000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+6fe099ae-5f58-450f-a054-6e45966b9660,9115f685-f7cb-4e1f-b3a5-8d8323d8d162,Món đặc biệt 93,Mô tả món ăn thơm ngon hấp dẫn.,185000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+2d8067b2-b78c-4f52-8d12-4abeea7de2ec,9115f685-f7cb-4e1f-b3a5-8d8323d8d162,Món đặc biệt 71,Mô tả món ăn thơm ngon hấp dẫn.,71000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+3a57bea5-05c1-45dc-835b-0641c0bd0cbc,248bdbdf-9236-4240-a4e2-af009a22c829,Món đặc biệt 16,Mô tả món ăn thơm ngon hấp dẫn.,95000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+07166fee-983d-4bc5-a68d-cfb3461a38fe,248bdbdf-9236-4240-a4e2-af009a22c829,Món đặc biệt 36,Mô tả món ăn thơm ngon hấp dẫn.,168000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+c604b9e3-7d54-4f49-bcfd-ebc955a0b0eb,e7b478fc-9c55-47e8-a36a-ac56b7833f54,Món đặc biệt 33,Mô tả món ăn thơm ngon hấp dẫn.,102000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+e80c897f-9efa-4e36-85ae-28ea14f4be26,e7b478fc-9c55-47e8-a36a-ac56b7833f54,Món đặc biệt 47,Mô tả món ăn thơm ngon hấp dẫn.,35000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+36cace24-18d3-469c-8fbd-84c4dd7ff172,85b50845-5211-48bb-b520-1b5b3eb7653a,Món đặc biệt 75,Mô tả món ăn thơm ngon hấp dẫn.,116000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+e45f3aac-c291-4da0-bf9b-2ce770610235,85b50845-5211-48bb-b520-1b5b3eb7653a,Món đặc biệt 57,Mô tả món ăn thơm ngon hấp dẫn.,76000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+e2d0fdbd-e03f-49f9-a651-c633e6346fb9,e4f6ff36-34f5-4ec5-a08a-69c56e9ac9b0,Món đặc biệt 25,Mô tả món ăn thơm ngon hấp dẫn.,35000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+a1387659-8d91-49e5-bbd0-07fe09ad7b2e,e4f6ff36-34f5-4ec5-a08a-69c56e9ac9b0,Món đặc biệt 88,Mô tả món ăn thơm ngon hấp dẫn.,61000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+c76dd053-b4b8-4a3c-a402-d6ead4e5de84,04fdbdc0-e134-4e9a-8c8f-011dea3649e9,Món đặc biệt 22,Mô tả món ăn thơm ngon hấp dẫn.,147000.0,Nước uống,https://via.placeholder.com/200x200,AVAILABLE
+e3a201fd-07c0-413c-8888-4b56a7f04f4d,04fdbdc0-e134-4e9a-8c8f-011dea3649e9,Món đặc biệt 26,Mô tả món ăn thơm ngon hấp dẫn.,156000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+e17e1455-5e98-4a7e-86dd-e122bbae0d9b,56b7794d-5450-4e9e-81f3-58b71ff367ef,Món đặc biệt 93,Mô tả món ăn thơm ngon hấp dẫn.,191000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+36ce0195-4886-439e-b315-5e01aeee4f26,56b7794d-5450-4e9e-81f3-58b71ff367ef,Món đặc biệt 74,Mô tả món ăn thơm ngon hấp dẫn.,36000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+a4682685-1f15-42c7-a1e3-1861962e0e2d,0d4286ac-25f3-44f3-b627-6c27c02a9e16,Món đặc biệt 33,Mô tả món ăn thơm ngon hấp dẫn.,89000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+33e2ab4b-31ed-452c-983a-91df69912705,0d4286ac-25f3-44f3-b627-6c27c02a9e16,Món đặc biệt 85,Mô tả món ăn thơm ngon hấp dẫn.,103000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+90fc1f4f-4ab8-4c4b-907e-4616db7d39f2,df607804-275a-4168-839a-fe6455868469,Món đặc biệt 20,Mô tả món ăn thơm ngon hấp dẫn.,186000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+1dd6e24f-3117-4f9e-9109-3a4331998a9a,df607804-275a-4168-839a-fe6455868469,Món đặc biệt 32,Mô tả món ăn thơm ngon hấp dẫn.,126000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+72ca6614-364c-4a00-8cac-9cf9cc505a2a,d5c3c6fc-29bb-4560-8073-93a28098387c,Món đặc biệt 78,Mô tả món ăn thơm ngon hấp dẫn.,98000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+1c69cd80-9de4-49a0-85ea-c578eb79a6f9,d5c3c6fc-29bb-4560-8073-93a28098387c,Món đặc biệt 10,Mô tả món ăn thơm ngon hấp dẫn.,94000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+ac65a843-ba59-4e03-ac2f-201a2a22df2f,1ba7bf82-6779-4950-847e-353aa519843a,Món đặc biệt 3,Mô tả món ăn thơm ngon hấp dẫn.,158000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+b170a603-8ed6-4284-a41d-904867787291,1ba7bf82-6779-4950-847e-353aa519843a,Món đặc biệt 10,Mô tả món ăn thơm ngon hấp dẫn.,195000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+3e76f8e4-6af4-4a40-877d-c20c1ad3db8e,782d34b8-a6de-4def-baa1-1178a252ede8,Món đặc biệt 18,Mô tả món ăn thơm ngon hấp dẫn.,156000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+f228a5b2-0a24-4adc-9083-1a4ed27f06be,782d34b8-a6de-4def-baa1-1178a252ede8,Món đặc biệt 74,Mô tả món ăn thơm ngon hấp dẫn.,73000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+0937da7b-864b-47fd-83c0-67a43d4628a2,845968f0-a7b5-4216-b018-6de1569f620e,Món đặc biệt 45,Mô tả món ăn thơm ngon hấp dẫn.,186000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE
+19fbbdae-b652-4263-a9de-ae38e191337b,845968f0-a7b5-4216-b018-6de1569f620e,Món đặc biệt 79,Mô tả món ăn thơm ngon hấp dẫn.,158000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+64c220c0-0ba0-4663-b22f-e5edc47fb2e6,1b06312a-1520-48c7-b968-a0b82d2dc847,Món đặc biệt 7,Mô tả món ăn thơm ngon hấp dẫn.,146000.0,Combo,https://via.placeholder.com/200x200,AVAILABLE
+d6fcc5f3-51b2-4cad-9ef1-c53b60f53444,1b06312a-1520-48c7-b968-a0b82d2dc847,Món đặc biệt 57,Mô tả món ăn thơm ngon hấp dẫn.,137000.0,Đồ ăn,https://via.placeholder.com/200x200,AVAILABLE

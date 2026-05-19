@@ -5,18 +5,80 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from models.restaurant import Restaurant
+from models.restaurant_taxonomy import CuisineCategory, RestaurantCuisine, RestaurantImage
 from schemas.restaurant import RestaurantCreate, RestaurantUpdate
+from services.opening_hours_service import normalize_opening_hours
+
+
+def _extract_related_restaurant_data(data: dict) -> tuple[list[str] | None, str | None, list[UUID] | None]:
+    images = data.pop("images", None)
+    cuisine_type = data.pop("cuisine_type", None)
+    cuisine_category_ids = data.pop("cuisine_category_ids", None)
+    legacy_open_hours = data.pop("open_hours", None)
+    if "opening_hours" not in data and legacy_open_hours is not None:
+        data["opening_hours"] = legacy_open_hours
+    if "opening_hours" in data:
+        data["opening_hours"] = normalize_opening_hours(data["opening_hours"])
+    data.pop("max_capacity", None)
+    return images, cuisine_type, cuisine_category_ids
+
+
+def _replace_restaurant_images(db: Session, restaurant_id: UUID, image_urls: list[str] | None) -> None:
+    if image_urls is None:
+        return
+
+    db.query(RestaurantImage).filter(RestaurantImage.restaurant_id == restaurant_id).delete()
+    for index, image_url in enumerate(image_urls):
+        if not image_url:
+            continue
+        db.add(
+            RestaurantImage(
+                restaurant_id=restaurant_id,
+                image_url=image_url,
+                image_type="cover" if index == 0 else "general",
+            )
+        )
+
+
+def _replace_restaurant_cuisines(
+    db: Session,
+    restaurant_id: UUID,
+    cuisine_type: str | None,
+    cuisine_category_ids: list[UUID] | None,
+) -> None:
+    if cuisine_type is None and cuisine_category_ids is None:
+        return
+
+    db.query(RestaurantCuisine).filter(RestaurantCuisine.restaurant_id == restaurant_id).delete()
+    category_ids = list(cuisine_category_ids or [])
+
+    if cuisine_type:
+        for cuisine_name in [item.strip() for item in cuisine_type.split(",") if item.strip()]:
+            category = db.query(CuisineCategory).filter(CuisineCategory.name.ilike(cuisine_name)).first()
+            if not category:
+                category = CuisineCategory(name=cuisine_name)
+                db.add(category)
+                db.flush()
+            category_ids.append(category.category_id)
+
+    for category_id in dict.fromkeys(category_ids):
+        db.add(RestaurantCuisine(restaurant_id=restaurant_id, category_id=category_id))
 
 
 def create_restaurant(db: Session, restaurant: RestaurantCreate, owner_id: UUID) -> Restaurant:
     restaurant_data = restaurant.model_dump(exclude_unset=True)
-    restaurant_data.pop("max_capacity", None)
+    images, cuisine_type, cuisine_category_ids = _extract_related_restaurant_data(restaurant_data)
     db_restaurant = Restaurant(
         **restaurant_data,
         owner_id=owner_id,
-        status="PENDING",
+        approval_status="PENDING",
     )
     db.add(db_restaurant)
+    db.commit()
+    db.refresh(db_restaurant)
+
+    _replace_restaurant_images(db, db_restaurant.restaurant_id, images or [])
+    _replace_restaurant_cuisines(db, db_restaurant.restaurant_id, cuisine_type, cuisine_category_ids)
     db.commit()
     db.refresh(db_restaurant)
     return db_restaurant
@@ -25,9 +87,9 @@ def create_restaurant(db: Session, restaurant: RestaurantCreate, owner_id: UUID)
 def get_restaurants(db: Session, skip: int = 0, limit: int = 100, status: str | None = None) -> list:
     query = db.query(Restaurant)
     if status:
-        query = query.filter(Restaurant.status == status)
+        query = query.filter(Restaurant.approval_status == status)
     else:
-        query = query.filter(Restaurant.status == "APPROVED")
+        query = query.filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
     return query.offset(skip).limit(limit).all()
 
 
@@ -51,11 +113,16 @@ def update_restaurant(db: Session, restaurant_id: UUID, restaurant_in: Restauran
         return None
 
     update_data = restaurant_in.model_dump(exclude_unset=True)
-    update_data.pop("max_capacity", None)
+    images, cuisine_type, cuisine_category_ids = _extract_related_restaurant_data(update_data)
     for field, value in update_data.items():
         setattr(db_restaurant, field, value)
 
     db.add(db_restaurant)
+    db.commit()
+    db.refresh(db_restaurant)
+
+    _replace_restaurant_images(db, restaurant_id, images)
+    _replace_restaurant_cuisines(db, restaurant_id, cuisine_type, cuisine_category_ids)
     db.commit()
     db.refresh(db_restaurant)
     return db_restaurant
@@ -80,7 +147,10 @@ def search_restaurants(
     skip: int = 0,
     limit: int = 100,
 ) -> list:
-    base_query = db.query(Restaurant).filter(Restaurant.status == "APPROVED")
+    base_query = db.query(Restaurant).filter(
+        Restaurant.approval_status == "APPROVED",
+        Restaurant.is_active.is_(True),
+    )
 
     if query:
         search_term = f"%{query}%"
@@ -88,19 +158,24 @@ def search_restaurants(
             or_(
                 Restaurant.name.ilike(search_term),
                 Restaurant.address.ilike(search_term),
+                Restaurant.description.ilike(search_term),
             )
         )
 
     if cuisine_type:
-        base_query = base_query.filter(Restaurant.cuisine_type.ilike(f"%{cuisine_type}%"))
+        base_query = (
+            base_query.join(RestaurantCuisine, RestaurantCuisine.restaurant_id == Restaurant.restaurant_id)
+            .join(CuisineCategory, CuisineCategory.category_id == RestaurantCuisine.category_id)
+            .filter(CuisineCategory.name.ilike(f"%{cuisine_type}%"))
+        )
 
-    if price_range and price_range in ["cheap", "mid", "expensive"]:
+    if price_range:
         base_query = base_query.filter(Restaurant.price_range == price_range)
 
     if min_rating is not None:
-        base_query = base_query.filter(Restaurant.average_rating >= min_rating)
+        base_query = base_query.filter(Restaurant.rating_avg >= min_rating)
 
-    return base_query.offset(skip).limit(limit).all()
+    return base_query.distinct().offset(skip).limit(limit).all()
 
 
 def search_by_location(
@@ -122,7 +197,8 @@ def search_by_location(
     return (
         db.query(Restaurant)
         .filter(
-            Restaurant.status == "APPROVED",
+            Restaurant.approval_status == "APPROVED",
+            Restaurant.is_active.is_(True),
             Restaurant.latitude.isnot(None),
             Restaurant.longitude.isnot(None),
             Restaurant.latitude >= min_lat,
@@ -139,8 +215,8 @@ def search_by_location(
 def get_popular_restaurants(db: Session, limit: int = 10) -> list:
     return (
         db.query(Restaurant)
-        .filter(Restaurant.status == "APPROVED")
-        .order_by(Restaurant.average_rating.desc())
+        .filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
+        .order_by(Restaurant.rating_avg.desc())
         .limit(limit)
         .all()
     )
@@ -149,7 +225,7 @@ def get_popular_restaurants(db: Session, limit: int = 10) -> list:
 def get_newly_added_restaurants(db: Session, limit: int = 10) -> list:
     return (
         db.query(Restaurant)
-        .filter(Restaurant.status == "APPROVED")
+        .filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
         .order_by(Restaurant.created_at.desc())
         .limit(limit)
         .all()

@@ -16,7 +16,7 @@ import { useAuth } from "../hooks/useAuth";
 import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
 import { getGuestFavoriteIds, getGuestReviewsByRestaurant, toggleGuestFavorite } from "../utils/guestSession";
-import { formatCurrency, formatDate, formatOpenHours, formatPriceRangeDisplay } from "../utils/helpers";
+import { formatCurrency, formatDate, formatOpenHours, formatPriceRangeDisplay, getTableAvailabilityLabel } from "../utils/helpers";
 
 const buildFallbackImage = () =>
   "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 18%, white), color-mix(in srgb, var(--app-secondary) 14%, white))";
@@ -166,6 +166,10 @@ function RestaurantDetailPage() {
               label={formatOpenHours(restaurant.openHours)}
               sx={{ bgcolor: "rgba(255,255,255,0.18)", color: "white" }}
             />
+            <Chip
+              label={`Bàn trống: ${getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}`}
+              sx={{ bgcolor: "rgba(255,255,255,0.18)", color: "white" }}
+            />
           </Stack>
         </Stack>
       </Box>
@@ -196,6 +200,9 @@ function RestaurantDetailPage() {
                   <AccessTimeRoundedIcon sx={{ color: "var(--app-secondary)" }} />
                   <Typography color="text.secondary">{formatOpenHours(restaurant.openHours)}</Typography>
                 </Stack>
+                <Typography color="text.secondary">
+                  Bàn trống: {getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}
+                </Typography>
               </Stack>
 
               {restaurant.tags?.length ? (
@@ -300,6 +307,9 @@ function RestaurantDetailPage() {
               <Stack spacing={2}>
                 <Typography variant="h4">Thao tác nhanh</Typography>
                 <Typography color="text.secondary">Khoảng giá: {formatPriceRangeDisplay(restaurant.priceRange)}</Typography>
+                <Typography color="text.secondary">
+                  Bàn trống: {getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}
+                </Typography>
                 <Typography color="text.secondary">Số món hiện có: {restaurant.menu.length}</Typography>
                 <CustomButton component={RouterLink} to={`/dat-ban?nhaHang=${restaurant.id}`}>
                   Đặt bàn ngay

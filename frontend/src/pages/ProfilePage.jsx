@@ -20,7 +20,6 @@ function ProfilePage() {
   const [form, setForm] = useState({
     fullName: user?.fullName || "",
     email: user?.email || "",
-    phone: user?.phone || "",
   });
 
   const accountStatus = useMemo(() => {
@@ -67,7 +66,6 @@ function ProfilePage() {
               {message ? <Alert severity="success">{message}</Alert> : null}
               <Typography variant="h4">{user?.fullName}</Typography>
               <Typography color="text.secondary">Email: {user?.email || "Chưa cung cấp"}</Typography>
-              <Typography color="text.secondary">Số điện thoại: {user?.phone || "Chưa cung cấp"}</Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Chip label={`Vai trò: ${user?.isGuest ? "khách" : user?.role}`} color="primary" />
                 <Chip label={accountStatus} color={user?.status === "active" ? "success" : "error"} />
@@ -79,8 +77,7 @@ function ProfilePage() {
                 </Alert>
               ) : (
                 <Alert severity="info">
-                  Bạn có thể chỉnh trực tiếp họ tên, email và số điện thoại ngay trong hồ sơ
-                  này.
+                  Bạn có thể chỉnh trực tiếp họ tên và email ngay trong hồ sơ này.
                 </Alert>
               )}
               <CustomButton startIcon={<EditRoundedIcon />} sx={{ alignSelf: "flex-start" }} onClick={() => setOpen(true)}>
@@ -115,7 +112,6 @@ function ProfilePage() {
         <Stack component="form" spacing={2} onSubmit={handleSubmit}>
           <FormInput label="Họ và tên" name="fullName" value={form.fullName} onChange={handleChange} />
           <FormInput label="Email" name="email" value={form.email} onChange={handleChange} />
-          <FormInput label="Số điện thoại" name="phone" value={form.phone} onChange={handleChange} />
           <Stack direction="row" spacing={1.5}>
             <CustomButton type="submit" disabled={saving}>
               {saving ? "Đang lưu..." : "Lưu thay đổi"}

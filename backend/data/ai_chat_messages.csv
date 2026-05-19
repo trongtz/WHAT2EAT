@@ -1,0 +1,6 @@
+message_id,session_id,role,content,extracted_intent,processing_status,created_at
+dff1b459-0df6-4ae8-883d-047fb6a3c024,3946fe9e-cac4-4f1f-8722-3cb86116eaf5,user,Tìm quán nướng,"{""intent"":""find""}",SUCCESS,2026-05-01T09:16:53Z
+60266242-496c-4221-9287-8330b8e8e442,2e0a5b16-a2db-43a6-a70e-101349561f7e,user,Tìm quán nướng,"{""intent"":""find""}",SUCCESS,2026-05-03T19:16:53Z
+e9bff459-bd27-4ce0-be6f-6165cea62c03,baf4b1cd-4cf9-4237-9fc4-d6adcd9d9983,user,Tìm quán nướng,"{""intent"":""find""}",SUCCESS,2026-04-19T12:16:53Z
+00261369-5154-427d-8d13-1ed1c91226e4,3b6ff383-d5e2-4d29-8e98-d311ded75e9f,user,Tìm quán nướng,"{""intent"":""find""}",SUCCESS,2026-04-26T00:16:53Z
+fc5a8437-d32d-4eb4-ab59-3e88820e075e,ff3eaf30-21e4-4ebb-b44e-a659d1b4b78c,user,Tìm quán nướng,"{""intent"":""find""}",SUCCESS,2026-04-20T00:16:53Z

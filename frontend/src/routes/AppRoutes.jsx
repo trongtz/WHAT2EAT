@@ -16,6 +16,7 @@ import ReviewPage from "../pages/ReviewPage";
 import SearchPage from "../pages/SearchPage";
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
 import AdminRestaurantsPage from "../pages/admin/AdminRestaurantsPage";
+import AdminUsersPage from "../pages/admin/AdminUsersPage";
 import OwnerBookingsPage from "../pages/owner/OwnerBookingsPage";
 import OwnerDashboardPage from "../pages/owner/OwnerDashboardPage";
 import OwnerMenuPage from "../pages/owner/OwnerMenuPage";
@@ -181,6 +182,15 @@ function AppRoutes() {
           "admin",
           <ProtectedRoute roles={["admin"]}>
             <AdminRestaurantsPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/nguoi-dung"
+        element={withBackofficeLayout(
+          "admin",
+          <ProtectedRoute roles={["admin"]}>
+            <AdminUsersPage />
           </ProtectedRoute>
         )}
       />

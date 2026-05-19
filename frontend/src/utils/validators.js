@@ -16,7 +16,6 @@ export const validateRegister = (values) => {
   const errors = validateLogin(values);
 
   if (!values.fullName) errors.fullName = "Vui lòng nhập họ tên";
-  if (!values.phone) errors.phone = "Vui lòng nhập số điện thoại";
   if (!values.role) errors.role = "Vui lòng chọn vai trò";
   else if (!["customer", "owner"].includes(values.role)) errors.role = "Vai trò không hợp lệ";
 
@@ -36,6 +35,13 @@ export const validateBooking = (values) => {
   if (!values.time) errors.time = "Vui lòng chọn giờ";
   if (!values.guests) errors.guests = "Vui lòng nhập số khách";
   if (Number(values.guests) <= 0) errors.guests = "Số khách phải lớn hơn 0";
+  if (values.date && values.time) {
+    const reservationTime = new Date(`${values.date}T${values.time}`);
+    const minimumTime = new Date(Date.now() + 30 * 60 * 1000);
+    if (Number.isNaN(reservationTime.getTime()) || reservationTime <= minimumTime) {
+      errors.time = "Vui lòng chọn thời gian sau hiện tại ít nhất 30 phút";
+    }
+  }
 
   return errors;
 };

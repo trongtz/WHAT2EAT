@@ -26,6 +26,17 @@ const normalizeOwnerBooking = (booking) => ({
   guestCount: Number(booking.guest_count ?? booking.guestCount ?? booking.guests ?? 0),
 });
 
+const normalizeAdminUser = (user) => ({
+  ...user,
+  id: user.id ?? user.user_id,
+  userId: user.user_id ?? user.id,
+  fullName: user.fullName ?? user.full_name ?? "",
+  avatarUrl: user.avatarUrl ?? user.avatar_url ?? null,
+  role: typeof user.role === "string" ? user.role.toLowerCase() : user.role,
+  status: typeof user.status === "string" ? user.status.toLowerCase() : user.status,
+  createdAt: user.created_at ?? user.createdAt,
+});
+
 export const dashboardService = {
   getOwnerRestaurants: async (ownerId) => restaurantService.getOwnerRestaurants(ownerId),
 
@@ -55,6 +66,10 @@ export const dashboardService = {
     const response = await apiClient.post("/owner/bookings/update-status", payload);
     invalidateCachePrefix("owner:bookings");
     invalidateCachePrefix("admin:overview");
+    invalidateCachePrefix("restaurants:list");
+    invalidateCachePrefix("restaurants:detail:");
+    invalidateCachePrefix("restaurants:owner:");
+    invalidateCachePrefix("restaurants:manage:");
     return normalizeOwnerBooking(response.data);
   },
 
@@ -70,4 +85,15 @@ export const dashboardService = {
   },
 
   getAdminRestaurants: async (status) => restaurantService.getAdminRestaurants(status),
+
+  getAdminUsers: async () => {
+    const response = await apiClient.get("/admin/users");
+    return response.data.map(normalizeAdminUser);
+  },
+
+  toggleUserStatus: async (userId) => {
+    const response = await apiClient.put(`/admin/users/${userId}/toggle-status`);
+    invalidateCachePrefix("admin:overview");
+    return normalizeAdminUser(response.data);
+  },
 };

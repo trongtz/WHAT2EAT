@@ -3,16 +3,39 @@ import { getCachedResource, invalidateCachePrefix } from "./requestCache";
 
 const BOOKING_HISTORY_TTL_MS = 30 * 1000;
 
-const normalizeBooking = (booking) => ({
-  ...booking,
-  id: booking.id ?? booking.reservation_id,
-  reservationId: booking.reservation_id ?? booking.id,
-  restaurantId: booking.restaurant_id ?? booking.restaurantId,
-  reservationTime: booking.reservation_time ?? booking.reservationTime,
-  guestCount: Number(booking.guest_count ?? booking.guestCount ?? booking.guests ?? 0),
-  notes: booking.notes ?? booking.note ?? "",
-  createdAt: booking.created_at ?? booking.createdAt,
-});
+const toDateInputValue = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
+const toTimeInputValue = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
+};
+
+const normalizeBooking = (booking) => {
+  const reservationTime = booking.reservation_time ?? booking.reservationTime;
+  const guestCount = Number(booking.guest_count ?? booking.guestCount ?? booking.guests ?? 0);
+  const notes = booking.notes ?? booking.note ?? "";
+
+  return {
+    ...booking,
+    id: booking.id ?? booking.reservation_id,
+    reservationId: booking.reservation_id ?? booking.id,
+    restaurantId: booking.restaurant_id ?? booking.restaurantId,
+    reservationTime,
+    guestCount,
+    guests: guestCount,
+    date: booking.date ?? toDateInputValue(reservationTime),
+    time: booking.time ?? toTimeInputValue(reservationTime),
+    notes,
+    note: notes,
+    createdAt: booking.created_at ?? booking.createdAt,
+  };
+};
 
 export const bookingService = {
   getHistory: async () => {

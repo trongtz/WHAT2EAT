@@ -1,0 +1,11 @@
+log_id,session_id,customer_id,restaurant_id,score,reason,source,rank_position,prompt_summary,model_version,created_at
+1196a473-5c92-48bf-82b8-c7168d61db8b,ff3eaf30-21e4-4ebb-b44e-a659d1b4b78c,79110d36-d940-40a0-9a64-3874c7ee9a3e,f3d1139f-4bc0-4ac8-8178-73db94263aae,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-05-11T07:16:53Z
+f800fc5d-262d-4a42-b1fd-e5f85de03853,3b6ff383-d5e2-4d29-8e98-d311ded75e9f,4f3f5855-b07e-4539-b9a7-49ce5234ed52,b898caa4-dc3d-47ed-9f6a-f43279609730,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-05-10T15:16:53Z
+fac7d041-5d15-4360-ad5f-35d6a99f5a1d,3b6ff383-d5e2-4d29-8e98-d311ded75e9f,1a4bd911-3dff-4273-b053-271e8dfa7bfb,56b7794d-5450-4e9e-81f3-58b71ff367ef,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-05-08T17:16:53Z
+4c9d45e4-3379-4a89-bc6f-99e2113adccb,3946fe9e-cac4-4f1f-8722-3cb86116eaf5,3afff1c3-8ba9-43c7-be2d-8f7ce1f023ed,ae44956e-3170-4e64-843d-418cae461df7,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-05-08T02:16:53Z
+94b57b64-62ff-4da1-9bdf-ca631b028658,3946fe9e-cac4-4f1f-8722-3cb86116eaf5,e696043d-d0e4-4e80-ba62-71422c07024f,bedf4b43-0416-45a0-862e-f75e17552c17,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-04-29T18:16:53Z
+a6d395c4-91d9-46f4-b635-f9d20dff7676,3b6ff383-d5e2-4d29-8e98-d311ded75e9f,230066f2-08c0-4049-97f0-4caa938c51f6,8fea7445-4c7f-48be-b69e-309f1bdcc4c5,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-05-08T12:16:53Z
+8685e084-cfe0-4ccf-a572-98b093092763,3946fe9e-cac4-4f1f-8722-3cb86116eaf5,90ebf0b3-55bf-466a-a74f-8cace6e7aa3e,6afb625f-a216-4c23-b037-bf4547348ddd,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-04-24T17:16:53Z
+b65f803a-e85d-44d2-9cc5-4de69e89e723,ff3eaf30-21e4-4ebb-b44e-a659d1b4b78c,e696043d-d0e4-4e80-ba62-71422c07024f,ae44956e-3170-4e64-843d-418cae461df7,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-05-11T22:16:53Z
+2c25cec3-f0bd-42ec-a979-44c80d22e740,2e0a5b16-a2db-43a6-a70e-101349561f7e,b30217cc-e24a-4292-ac75-f8c9c729d8d3,3a789878-7e85-4636-8f48-12fddf52f71f,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-04-24T20:16:53Z
+e667686a-a845-4795-9352-0ef8cd9b4162,3946fe9e-cac4-4f1f-8722-3cb86116eaf5,85d2faff-3df5-4cc2-872a-f7837b1b7ee2,2d8a8fff-25d0-4cec-825a-c2e9021fd542,0.95,Phù hợp,AI,1,Tìm quán lẩu,gpt-4o,2026-04-25T14:16:53Z

@@ -14,6 +14,7 @@ function ReviewPage() {
   const { user } = useAuth();
   const [restaurants, setRestaurants] = useState([]);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [values, setValues] = useState({ restaurantId: "", rating: 5, comment: "" });
 
   useEffect(() => {
@@ -26,41 +27,56 @@ function ReviewPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setMessage("");
+    setError("");
 
     if (!user) {
-      setMessage("Vui lòng đăng nhập để gửi đánh giá.");
+      setError("Vui lòng đăng nhập để gửi đánh giá.");
       return;
     }
 
-    if (user.isGuest) {
-      createGuestReview({
-        restaurantId: Number(values.restaurantId),
-        rating: values.rating,
-        comment: values.comment,
-        userName: user.fullName,
-      });
-      setMessage("Đánh giá của bạn đã được lưu trong phiên khách.");
-    } else {
-      await reviewService.create({
-        restaurantId: Number(values.restaurantId),
-        rating: values.rating,
-        comment: values.comment,
-        userName: user.fullName,
-      });
-      setMessage("Đánh giá của bạn đã được ghi nhận.");
+    if (!values.restaurantId) {
+      setError("Vui lòng chọn nhà hàng cần đánh giá.");
+      return;
     }
 
-    setValues({ restaurantId: "", rating: 5, comment: "" });
+    try {
+      if (user.isGuest) {
+        createGuestReview({
+          restaurantId: values.restaurantId,
+          rating: values.rating,
+          comment: values.comment,
+          userName: user.fullName,
+        });
+        setMessage("Đánh giá của bạn đã được lưu trong phiên khách.");
+      } else {
+        await reviewService.create({
+          restaurantId: values.restaurantId,
+          rating: values.rating,
+          comment: values.comment,
+          userName: user.fullName,
+        });
+        setMessage("Đánh giá của bạn đã được ghi nhận.");
+      }
+
+      setValues({ restaurantId: "", rating: 5, comment: "" });
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
     <Stack spacing={3}>
-      <SectionHeader title="Đánh giá nhà hàng" description="Chia sẻ trải nghiệm để cộng đồng có thêm thông tin trước khi đặt bàn." />
+      <SectionHeader
+        title="Đánh giá nhà hàng"
+        description="Chia sẻ trải nghiệm để cộng đồng có thêm thông tin trước khi đặt bàn."
+      />
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 7 }}>
           <CustomCard>
             <Stack component="form" spacing={2.5} onSubmit={handleSubmit}>
               {message ? <Alert severity="success">{message}</Alert> : null}
+              {error ? <Alert severity="error">{error}</Alert> : null}
               <FormInput
                 select
                 label="Nhà hàng"
@@ -76,7 +92,10 @@ function ReviewPage() {
               </FormInput>
               <Stack spacing={1}>
                 <Typography>Điểm đánh giá</Typography>
-                <Rating value={values.rating} onChange={(_, nextValue) => setValues((prev) => ({ ...prev, rating: nextValue || 5 }))} />
+                <Rating
+                  value={values.rating}
+                  onChange={(_, nextValue) => setValues((prev) => ({ ...prev, rating: nextValue || 5 }))}
+                />
               </Stack>
               <FormInput
                 multiline

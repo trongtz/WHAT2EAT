@@ -104,7 +104,7 @@ def get_restaurant_stats(db: Session, restaurant_id: UUID) -> dict:
         db.query(MenuItem)
         .filter(
             MenuItem.restaurant_id == restaurant_id,
-            MenuItem.is_available.is_(True),
+            MenuItem.availability_status == "AVAILABLE",
         )
         .count()
     )

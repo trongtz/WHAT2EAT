@@ -71,7 +71,10 @@ function OwnerDashboardPage() {
   const stats = useMemo(() => {
     const approvedRestaurants = data.restaurants.filter((item) => item.status === "APPROVED");
     const pendingRestaurants = data.restaurants.filter((item) => item.status === "PENDING");
-    const totalMenuItems = approvedRestaurants.reduce((sum, item) => sum + item.menu.length, 0);
+    const totalMenuItems = approvedRestaurants.reduce(
+      (sum, item) => sum + Number(item.menuCount ?? item.menu?.length ?? 0),
+      0
+    );
 
     return {
       totalRestaurants: data.restaurants.length,

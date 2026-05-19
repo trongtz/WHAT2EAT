@@ -28,12 +28,14 @@ export const normalizeUserRole = (role) => {
 
 export const normalizeStoredUser = (user) => {
   if (!user) return null;
+  const status = typeof user.status === "string" ? user.status.toLowerCase() : user.status;
   return {
     ...user,
     id: user.id ?? user.user_id,
     fullName: user.fullName ?? user.full_name ?? "",
     avatarUrl: user.avatarUrl ?? user.avatar_url ?? null,
     role: normalizeUserRole(user.role),
+    status,
   };
 };
 

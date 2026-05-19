@@ -23,7 +23,7 @@ import LoadingScreen from "../../components/LoadingScreen";
 import SectionHeader from "../../components/SectionHeader";
 import { useAuth } from "../../hooks/useAuth";
 import { restaurantService } from "../../services/restaurantService";
-import { formatOpenHours, getPriceRangeLabel, getRestaurantStatusLabel } from "../../utils/helpers";
+import { formatOpenHours, getPriceRangeLabel, getRestaurantStatusLabel, getTableAvailabilityLabel } from "../../utils/helpers";
 
 const CUISINE_OPTIONS = [
   "Món ăn Thái Lan",
@@ -257,9 +257,9 @@ function OwnerRestaurantsPage() {
                           <Typography fontWeight={800}>{formatOpenHours(restaurant.openHours)}</Typography>
                         </Grid>
                         <Grid size={{ xs: 6, md: 3 }}>
-                          <Typography color="text.secondary">Chỗ ngồi</Typography>
+                          <Typography color="text.secondary">Bàn trống</Typography>
                           <Typography fontWeight={800}>
-                            {restaurant.availableCapacity}/{restaurant.maxCapacity}
+                            {getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}
                           </Typography>
                         </Grid>
                         <Grid size={{ xs: 6, md: 3 }}>

@@ -52,7 +52,8 @@ def get_favorite_restaurants_by_customer(
         .join(Favorite, Favorite.restaurant_id == Restaurant.restaurant_id)
         .filter(
             Favorite.customer_id == customer_id,
-            Restaurant.status == "APPROVED",
+            Restaurant.approval_status == "APPROVED",
+            Restaurant.is_active.is_(True),
         )
         .order_by(Favorite.created_at.desc())
         .offset(skip)

@@ -51,7 +51,7 @@ const getRecommendationReason = (restaurant, prompt) => {
   if (signals.hotFood && /(lau|pho|bun|nuoc|sup|chao|bo|nuong)/.test(title)) reasons.push("Menu có xu hướng hợp với món nóng.");
   if (signals.budgetLow && restaurant.priceRange === "cheap") reasons.push("Mức giá đang nằm trong nhóm dễ tiếp cận.");
   if (signals.district1 && /quan 1|district 1/i.test(restaurant.address || "")) reasons.push("Vị trí có vẻ gần khu vực Quận 1.");
-  if (signals.tableNeed && Number(restaurant.availableCapacity || 0) > 0) reasons.push("Hiện có thông tin sức chứa khả dụng cho nhu cầu đặt bàn.");
+  if (signals.tableNeed && Number(restaurant.availableCapacity || 0) > 0) reasons.push("Hiện còn bàn trống cho nhu cầu đặt bàn.");
   if (Number(restaurant.averageRating || restaurant.rating || 0) >= 4.2) reasons.push("Điểm đánh giá đang ở mức tốt.");
 
   return reasons[0] || "Thông tin nhà hàng khớp khá tốt với mô tả bạn vừa nhập.";
@@ -73,7 +73,7 @@ const buildFallbackRecommendation = (prompt, restaurants) => {
       if (signals.hotFood && /(lau|pho|bun|sup|chao|nuoc)/.test(title)) score += 18;
       if (signals.budgetLow && restaurant.priceRange === "cheap") score += 22;
       if (signals.district1 && /quan 1|district 1/.test(address)) score += 18;
-      if (signals.tableNeed && Number(restaurant.availableCapacity || 0) >= 4) score += 20;
+      if (signals.tableNeed && Number(restaurant.availableCapacity || 0) > 0) score += 20;
       if (Number(restaurant.reviewCount || 0) > 0) score += Math.min(Number(restaurant.reviewCount || 0), 20);
 
       return {

@@ -8,7 +8,7 @@ import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
 import LoadingScreen from "../../components/LoadingScreen";
 import { restaurantService } from "../../services/restaurantService";
-import { formatCurrency, formatOpenHours, getPriceRangeLabel, getRestaurantStatusLabel } from "../../utils/helpers";
+import { formatCurrency, formatOpenHours, getPriceRangeLabel, getRestaurantStatusLabel, getTableAvailabilityLabel } from "../../utils/helpers";
 
 function OwnerRestaurantDetailPage() {
   const { restaurantId } = useParams();
@@ -113,9 +113,9 @@ function OwnerRestaurantDetailPage() {
                   <Typography fontWeight={800}>{formatOpenHours(restaurant.openHours)}</Typography>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Typography color="text.secondary">Chỗ ngồi</Typography>
+                  <Typography color="text.secondary">Bàn trống</Typography>
                   <Typography fontWeight={800}>
-                    {restaurant.availableCapacity}/{restaurant.maxCapacity}
+                    {getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>

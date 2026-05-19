@@ -19,6 +19,7 @@ const navByRole = {
   admin: [
     { label: "Tổng quan", to: "/admin/dashboard", icon: <DashboardRoundedIcon /> },
     { label: "Duyệt nhà hàng", to: "/admin/nha-hang", icon: <ApprovalRoundedIcon /> },
+    { label: "Người dùng", to: "/admin/nguoi-dung" },
   ],
 };
 

@@ -1,160 +1,598 @@
 import csv
+import json
 import os
 import uuid
-from datetime import time
+from datetime import date, datetime, time
+from decimal import Decimal
+from typing import Any, Callable
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
 from core.security import get_password_hash
-from models.capacity import Capacity
+from models.ai_chat import AIChatMessage, AIChatSession, RecommendationLog
+from models.booking import Reservation
+from models.capacity import Capacity, CapacityOverride
+from models.checkin import CheckIn
 from models.customer_profile import CustomerProfile
+from models.dish import MenuItem
+from models.favorite import Favorite
+from models.moderation_log import ModerationLog
+from models.notification import Notification
 from models.owner_profile import OwnerProfile
 from models.restaurant import Restaurant
+from models.restaurant_taxonomy import CuisineCategory, RestaurantCuisine, RestaurantImage
+from models.review import Review
+from models.search_history import SearchHistory
 from models.user import User
+from services.opening_hours_service import normalize_opening_hours
 
 
-def _create_default_accounts(db: Session, password_hash: str) -> tuple[User, User]:
-    admin = User(
-        user_id=uuid.uuid4(),
-        full_name="Super Admin",
-        email="admin@what2eat.com",
-        password_hash=password_hash,
-        role="ADMIN",
-    )
-    owner = User(
-        user_id=uuid.uuid4(),
-        full_name="Tran Chu Quan",
-        email="owner@what2eat.com",
-        password_hash=password_hash,
-        role="OWNER",
-    )
-    customer = User(
-        user_id=uuid.uuid4(),
-        full_name="Nguyen Thuc Khach",
-        email="customer@what2eat.com",
-        password_hash=password_hash,
-        role="CUSTOMER",
-    )
+RowBuilder = Callable[[dict[str, str]], Any]
 
-    db.add_all([admin, owner, customer])
+
+def _clean(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text if text else None
+
+
+def _uuid(value: Any) -> uuid.UUID | None:
+    text = _clean(value)
+    return uuid.UUID(text) if text else None
+
+
+def _str(value: Any, default: str | None = None) -> str | None:
+    text = _clean(value)
+    return text if text is not None else default
+
+
+def _int(value: Any, default: int | None = None) -> int | None:
+    text = _clean(value)
+    return int(text) if text is not None else default
+
+
+def _decimal(value: Any, default: str | None = None) -> Decimal | None:
+    text = _clean(value)
+    if text is None:
+        text = default
+    return Decimal(text) if text is not None else None
+
+
+def _bool(value: Any, default: bool | None = None) -> bool | None:
+    text = _clean(value)
+    if text is None:
+        return default
+    return text.lower() in {"1", "true", "yes", "y", "active", "available"}
+
+
+def _json(value: Any) -> Any:
+    text = _clean(value)
+    if text is None:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return text
+
+
+def _datetime(value: Any) -> datetime | None:
+    text = _clean(value)
+    if text is None:
+        return None
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def _date(value: Any) -> date | None:
+    text = _clean(value)
+    return date.fromisoformat(text) if text else None
+
+
+def _time(value: Any) -> time | None:
+    text = _clean(value)
+    return time.fromisoformat(text) if text else None
+
+
+def _csv_rows(data_dir: str, filename: str) -> list[dict[str, str]]:
+    path = os.path.join(data_dir, filename)
+    if not os.path.exists(path):
+        print(f"Seed file missing, skipped: {filename}")
+        return []
+
+    with open(path, newline="", encoding="utf-8-sig") as csv_file:
+        return list(csv.DictReader(csv_file))
+
+
+def _add_by_primary_key(
+    db: Session,
+    data_dir: str,
+    filename: str,
+    model: type,
+    primary_key: str,
+    build: RowBuilder,
+) -> int:
+    added = 0
+    for row in _csv_rows(data_dir, filename):
+        item = build(row)
+        key_value = getattr(item, primary_key)
+        if key_value is not None and db.get(model, key_value):
+            continue
+        db.add(item)
+        added += 1
+
     db.commit()
+    print(f"Imported {added} rows from {filename}.")
+    return added
+
+
+def _import_restaurant_cuisines(db: Session, data_dir: str) -> int:
+    added = 0
+    for row in _csv_rows(data_dir, "restaurant_cuisines.csv"):
+        restaurant_id = _uuid(row.get("restaurant_id"))
+        category_id = _uuid(row.get("category_id"))
+        if restaurant_id is None or category_id is None:
+            continue
+        existing = db.get(
+            RestaurantCuisine,
+            {"restaurant_id": restaurant_id, "category_id": category_id},
+        )
+        if existing:
+            continue
+        db.add(RestaurantCuisine(restaurant_id=restaurant_id, category_id=category_id))
+        added += 1
+
+    db.commit()
+    print("Imported " + str(added) + " rows from restaurant_cuisines.csv.")
+    return added
+
+
+def _create_minimal_seed(db: Session) -> None:
+    password_hash = get_password_hash("123456")
+    admin_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
+    customer_id = uuid.uuid4()
+
     db.add_all(
         [
-            OwnerProfile(owner_id=owner.user_id),
-            CustomerProfile(customer_id=customer.user_id),
+            User(
+                user_id=admin_id,
+                full_name="Super Admin",
+                email="admin@what2eat.com",
+                password_hash=password_hash,
+                role="ADMIN",
+                status="ACTIVE",
+            ),
+            User(
+                user_id=owner_id,
+                full_name="Default Owner",
+                email="owner@what2eat.com",
+                password_hash=password_hash,
+                role="OWNER",
+                status="ACTIVE",
+            ),
+            User(
+                user_id=customer_id,
+                full_name="Default Customer",
+                email="customer@what2eat.com",
+                password_hash=password_hash,
+                role="CUSTOMER",
+                status="ACTIVE",
+            ),
+            OwnerProfile(owner_id=owner_id),
+            CustomerProfile(customer_id=customer_id),
         ]
     )
     db.commit()
-    return owner, customer
+    print("Minimal seed data initialized because users.csv was not found.")
 
 
-def _import_owner_accounts(db: Session, data_dir: str, password_hash: str) -> int:
-    owners_csv = os.path.join(data_dir, "generated_owners.csv")
-    if not os.path.exists(owners_csv):
-        return 0
+def _sync_seed_user_passwords(db: Session, data_dir: str) -> int:
+    updated = 0
+    for row in _csv_rows(data_dir, "users.csv"):
+        email = _str(row.get("email"))
+        password_hash = _str(row.get("password_hash"))
+        if not email or not password_hash:
+            continue
 
-    owners_added = 0
-    with open(owners_csv, newline="", encoding="utf-8") as csv_file:
-        for row in csv.DictReader(csv_file):
-            owner_id = uuid.UUID(str(row["user_id"]))
-            if db.get(User, owner_id):
-                continue
+        user = db.query(User).filter(User.email == email).first()
+        if user and user.password_hash != password_hash:
+            user.password_hash = password_hash
+            updated += 1
 
+    if updated:
+        db.commit()
+        print(f"Synchronized password hashes for {updated} seeded users.")
+    return updated
+
+
+def _sync_seed_restaurant_images(db: Session, data_dir: str) -> int:
+    changed = 0
+    for row in _csv_rows(data_dir, "restaurant_images.csv"):
+        image_id = _uuid(row.get("image_id"))
+        restaurant_id = _uuid(row.get("restaurant_id"))
+        image_url = _str(row.get("image_url"))
+        if not image_id or not restaurant_id or not image_url:
+            continue
+
+        image = db.get(RestaurantImage, image_id)
+        if image:
+            if image.image_url != image_url:
+                image.image_url = image_url
+                image.image_type = _str(row.get("image_type"), image.image_type)
+                changed += 1
+            continue
+
+        if db.get(Restaurant, restaurant_id):
             db.add(
-                User(
-                    user_id=owner_id,
-                    full_name=row["full_name"],
-                    email=row["email"],
-                    password_hash=password_hash,
-                    role="OWNER",
-                    status="ACTIVE",
+                RestaurantImage(
+                    image_id=image_id,
+                    restaurant_id=restaurant_id,
+                    image_url=image_url,
+                    image_type=_str(row.get("image_type"), "general"),
+                    uploaded_at=_datetime(row.get("uploaded_at")),
                 )
             )
-            db.add(OwnerProfile(owner_id=owner_id))
-            owners_added += 1
+            changed += 1
 
-    db.commit()
-    return owners_added
+    if changed:
+        db.commit()
+        print(f"Synchronized {changed} seeded restaurant images.")
+    return changed
 
 
-def _create_sample_restaurants(db: Session, owner_id: uuid.UUID) -> None:
-    restaurants = [
-        Restaurant(
-            owner_id=owner_id,
-            name="Pho Bat Dan Gia Truyen",
-            address="49 Bat Dan, Hoan Kiem, Ha Noi",
-            latitude=10.762622,
-            longitude=106.660172,
-            phone="0123456789",
-            description="Pho bo chuan vi Bac.",
-            open_hours="06:00 - 10:00",
-            images=["https://images.unsplash.com/photo-1628294895950-9805252327bc"],
-            cuisine_type="Pho",
-            price_range="mid",
-            status="APPROVED",
+def _import_csv_seed(db: Session, data_dir: str) -> None:
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "users.csv",
+        User,
+        "user_id",
+        lambda row: User(
+            user_id=_uuid(row.get("user_id")),
+            full_name=_str(row.get("full_name"), ""),
+            email=_str(row.get("email"), ""),
+            password_hash=_str(row.get("password_hash")),
+            oauth_provider=_str(row.get("oauth_provider")),
+            oauth_id=_str(row.get("oauth_id")),
+            role=_str(row.get("role"), "CUSTOMER"),
+            avatar_url=_str(row.get("avatar_url")),
+            status=_str(row.get("status"), "ACTIVE"),
+            created_at=_datetime(row.get("created_at")),
         ),
-        Restaurant(
-            owner_id=owner_id,
-            name="Com Tam Ba Ghien",
-            address="84 Dang Van Ngu, Phu Nhuan, TP.HCM",
-            latitude=10.793836,
-            longitude=106.664875,
-            phone="0987654321",
-            description="Suon nuong than hoa.",
-            open_hours="07:00 - 21:00",
-            images=["https://images.unsplash.com/photo-1626804475297-41609ea004eb"],
-            cuisine_type="Com",
-            price_range="mid",
-            status="APPROVED",
-        ),
-    ]
-    db.add_all(restaurants)
-    db.commit()
-
-    for restaurant in restaurants:
-        db.refresh(restaurant)
-
-    db.add_all(
-        [
-            Capacity(
-                restaurant_id=restaurants[0].restaurant_id,
-                day_of_week=1,
-                start_time=time(6, 0),
-                end_time=time(10, 0),
-                max_capacity=40,
-            ),
-            Capacity(
-                restaurant_id=restaurants[1].restaurant_id,
-                day_of_week=1,
-                start_time=time(7, 0),
-                end_time=time(21, 0),
-                max_capacity=60,
-            ),
-        ]
     )
-    db.commit()
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "customer_profiles.csv",
+        CustomerProfile,
+        "customer_id",
+        lambda row: CustomerProfile(
+            customer_id=_uuid(row.get("customer_id")),
+            dietary_preferences=_json(row.get("dietary_preferences")),
+            preferred_cuisines=_json(row.get("preferred_cuisines")),
+            preferred_price_range=_str(row.get("preferred_price_range")),
+            preferred_locations=_json(row.get("preferred_locations")),
+            loyalty_points=_int(row.get("loyalty_points"), 0),
+            personalization_enabled=_bool(row.get("personalization_enabled"), True),
+            created_at=_datetime(row.get("created_at")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "owner_profiles.csv",
+        OwnerProfile,
+        "owner_id",
+        lambda row: OwnerProfile(
+            owner_id=_uuid(row.get("owner_id")),
+            tax_id=_str(row.get("tax_id")),
+            business_license=_str(row.get("business_license")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "cuisine_categories.csv",
+        CuisineCategory,
+        "category_id",
+        lambda row: CuisineCategory(
+            category_id=_uuid(row.get("category_id")),
+            name=_str(row.get("name"), ""),
+            description=_str(row.get("description")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "restaurants.csv",
+        Restaurant,
+        "restaurant_id",
+        lambda row: Restaurant(
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            owner_id=_uuid(row.get("owner_id")),
+            name=_str(row.get("name"), ""),
+            description=_str(row.get("description")),
+            address=_str(row.get("address"), ""),
+            latitude=_decimal(row.get("latitude")),
+            longitude=_decimal(row.get("longitude")),
+            phone=_str(row.get("phone")),
+            opening_hours=normalize_opening_hours(_json(row.get("opening_hours"))),
+            price_range=_str(row.get("price_range")),
+            rating_avg=_decimal(row.get("rating_avg"), "0"),
+            approval_status=_str(row.get("approval_status"), "PENDING"),
+            is_active=_bool(row.get("is_active"), True),
+            created_at=_datetime(row.get("created_at")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "restaurant_images.csv",
+        RestaurantImage,
+        "image_id",
+        lambda row: RestaurantImage(
+            image_id=_uuid(row.get("image_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            image_url=_str(row.get("image_url"), ""),
+            image_type=_str(row.get("image_type"), "general"),
+            uploaded_at=_datetime(row.get("uploaded_at")),
+        ),
+    )
+    _import_restaurant_cuisines(db, data_dir)
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "menu_items.csv",
+        MenuItem,
+        "item_id",
+        lambda row: MenuItem(
+            item_id=_uuid(row.get("item_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            name=_str(row.get("name"), ""),
+            description=_str(row.get("description")),
+            price=_decimal(row.get("price"), "0"),
+            category=_str(row.get("category")),
+            image_url=_str(row.get("image_url")),
+            availability_status=_str(row.get("availability_status"), "AVAILABLE"),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "capacities.csv",
+        Capacity,
+        "capacity_id",
+        lambda row: Capacity(
+            capacity_id=_uuid(row.get("capacity_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            day_of_week=_int(row.get("day_of_week"), 0),
+            start_time=_time(row.get("start_time")),
+            end_time=_time(row.get("end_time")),
+            max_capacity=_int(row.get("max_capacity"), 0),
+            created_at=_datetime(row.get("created_at")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "capacity_overrides.csv",
+        CapacityOverride,
+        "override_id",
+        lambda row: CapacityOverride(
+            override_id=_uuid(row.get("override_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            override_date=_date(row.get("override_date")),
+            start_time=_time(row.get("start_time")),
+            end_time=_time(row.get("end_time")),
+            max_capacity=_int(row.get("max_capacity"), 0),
+            note=_str(row.get("note")),
+            created_at=_datetime(row.get("created_at")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "reservations.csv",
+        Reservation,
+        "reservation_id",
+        lambda row: Reservation(
+            reservation_id=_uuid(row.get("reservation_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            reservation_time=_datetime(row.get("reservation_time")),
+            guest_count=_int(row.get("guest_count"), 1),
+            notes=_str(row.get("notes")),
+            status=_str(row.get("status"), "PENDING"),
+            rejection_reason=_str(row.get("rejection_reason")),
+            created_at=_datetime(row.get("created_at")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "reviews.csv",
+        Review,
+        "review_id",
+        lambda row: Review(
+            review_id=_uuid(row.get("review_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            reservation_id=_uuid(row.get("reservation_id")),
+            rating=_int(row.get("rating"), 5),
+            comment=_str(row.get("comment")),
+            status=_str(row.get("status"), "PENDING"),
+            rejection_reason=_str(row.get("rejection_reason")),
+            created_at=_datetime(row.get("created_at")),
+            updated_at=_datetime(row.get("updated_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "favorites.csv",
+        Favorite,
+        "favorite_id",
+        lambda row: Favorite(
+            favorite_id=_uuid(row.get("favorite_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            created_at=_datetime(row.get("created_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "search_history.csv",
+        SearchHistory,
+        "search_id",
+        lambda row: SearchHistory(
+            search_id=_uuid(row.get("search_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            query_text=_str(row.get("query_text"), ""),
+            search_type=_str(row.get("search_type"), "NORMAL"),
+            filters_applied=_json(row.get("filters_applied")),
+            extracted_entities=_json(row.get("extracted_entities")),
+            result_restaurant_ids=_json(row.get("result_restaurant_ids")),
+            created_at=_datetime(row.get("created_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "checkins.csv",
+        CheckIn,
+        "checkin_id",
+        lambda row: CheckIn(
+            checkin_id=_uuid(row.get("checkin_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            reservation_id=_uuid(row.get("reservation_id")),
+            menu_item_id=_uuid(row.get("menu_item_id")),
+            checkin_at=_datetime(row.get("checkin_at")),
+            crowd_status=_str(row.get("crowd_status")),
+            note=_str(row.get("note")),
+            is_verified=_bool(row.get("is_verified"), False),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "notifications.csv",
+        Notification,
+        "notification_id",
+        lambda row: Notification(
+            notification_id=_uuid(row.get("notification_id")),
+            user_id=_uuid(row.get("user_id")),
+            type=_str(row.get("type"), ""),
+            title=_str(row.get("title"), ""),
+            content=_str(row.get("content"), ""),
+            reference_id=_uuid(row.get("reference_id")),
+            is_read=_bool(row.get("is_read"), False),
+            created_at=_datetime(row.get("created_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "ai_chat_sessions.csv",
+        AIChatSession,
+        "session_id",
+        lambda row: AIChatSession(
+            session_id=_uuid(row.get("session_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            title=_str(row.get("title")),
+            context_summary=_str(row.get("context_summary")),
+            status=_str(row.get("status"), "ACTIVE"),
+            started_at=_datetime(row.get("started_at")),
+            ended_at=_datetime(row.get("ended_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "ai_chat_messages.csv",
+        AIChatMessage,
+        "message_id",
+        lambda row: AIChatMessage(
+            message_id=_uuid(row.get("message_id")),
+            session_id=_uuid(row.get("session_id")),
+            role=_str(row.get("role"), "USER"),
+            content=_str(row.get("content"), ""),
+            extracted_intent=_json(row.get("extracted_intent")),
+            processing_status=_str(row.get("processing_status"), "SUCCESS"),
+            created_at=_datetime(row.get("created_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "recommendation_logs.csv",
+        RecommendationLog,
+        "log_id",
+        lambda row: RecommendationLog(
+            log_id=_uuid(row.get("log_id")),
+            session_id=_uuid(row.get("session_id")),
+            customer_id=_uuid(row.get("customer_id")),
+            restaurant_id=_uuid(row.get("restaurant_id")),
+            score=_decimal(row.get("score")),
+            reason=_str(row.get("reason")),
+            source=_str(row.get("source")),
+            rank_position=_int(row.get("rank_position")),
+            prompt_summary=_str(row.get("prompt_summary")),
+            model_version=_str(row.get("model_version")),
+            created_at=_datetime(row.get("created_at")),
+        ),
+    )
+    _add_by_primary_key(
+        db,
+        data_dir,
+        "moderation_logs.csv",
+        ModerationLog,
+        "log_id",
+        lambda row: ModerationLog(
+            log_id=_uuid(row.get("log_id")),
+            admin_id=_uuid(row.get("admin_id")),
+            target_type=_str(row.get("target_type"), ""),
+            target_id=_uuid(row.get("target_id")),
+            action=_str(row.get("action"), ""),
+            reason=_str(row.get("reason")),
+            created_at=_datetime(row.get("created_at")),
+        ),
+    )
 
 
-def seed_data():
+def seed_data() -> None:
     db: Session = SessionLocal()
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_dir = os.path.join(base_dir, "data")
 
     try:
         if db.query(User).first() or db.query(Restaurant).first():
+            if os.path.exists(os.path.join(data_dir, "users.csv")):
+                _sync_seed_user_passwords(db, data_dir)
+            if os.path.exists(os.path.join(data_dir, "restaurant_images.csv")):
+                _sync_seed_restaurant_images(db, data_dir)
             print("Database already has seed data. Skipping initialization.")
             return
 
-        print("Initializing seed data...")
-        password_hash = get_password_hash("123456")
-        owner, _ = _create_default_accounts(db, password_hash)
-        owners_added = _import_owner_accounts(db, data_dir, password_hash)
-        _create_sample_restaurants(db, owner.user_id)
+        if not os.path.exists(os.path.join(data_dir, "users.csv")):
+            _create_minimal_seed(db)
+            return
 
-        print(f"Seed data initialized successfully. Imported owners: {owners_added}.")
-    except Exception as error:
+        print("Initializing database from backend/data CSV files...")
+        _import_csv_seed(db, data_dir)
+        print("CSV seed data initialized successfully.")
+    except (IntegrityError, ValueError, TypeError) as error:
         db.rollback()
         print(f"Seed initialization error: {error}")
+        raise
     finally:
         db.close()

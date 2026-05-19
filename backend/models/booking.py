@@ -17,7 +17,7 @@ class Reservation(Base):
     guest_count = Column(Integer, nullable=False)
     notes = Column(Text, nullable=True)
     
-    status = Column(String(50), default="PENDING")  # PENDING, CONFIRMED, REJECTED, CANCELLED
+    status = Column(String(50), default="PENDING")  # PENDING, CONFIRMED, REJECTED, CANCELLED, COMPLETED
     rejection_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

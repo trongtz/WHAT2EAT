@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from models.booking import Reservation
 from schemas.booking import ReservationCreate, ReservationUpdate
 
@@ -113,11 +113,11 @@ def count_available_seats(
     """
     # Count confirmed + pending reservations for this time slot
     # Simplified: count all non-rejected reservations
-    booked_seats = db.query(Reservation).filter(
+    booked_seats = db.query(func.sum(Reservation.guest_count)).filter(
         Reservation.restaurant_id == restaurant_id,
         Reservation.reservation_time == reservation_time,
         Reservation.status.in_(["CONFIRMED", "PENDING"])
-    ).with_entities(db.func.sum(Reservation.guest_count)).scalar() or 0
+    ).scalar() or 0
     
     available = max_capacity - int(booked_seats)
     return max(0, available)

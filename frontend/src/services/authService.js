@@ -2,12 +2,14 @@ import apiClient from "./apiClient";
 
 const normalizeAuthUser = (user) => {
   if (!user) return user;
+  const status = typeof user.status === "string" ? user.status.toLowerCase() : user.status;
 
   return {
     ...user,
     id: user.id ?? user.user_id,
     fullName: user.fullName ?? user.full_name,
     avatarUrl: user.avatarUrl ?? user.avatar_url ?? null,
+    status,
   };
 };
 
@@ -37,7 +39,11 @@ export const authService = {
     return normalizeAuthResponse(response.data);
   },
   updateProfile: async (payload) => {
-    const response = await apiClient.post("/profile/update", payload);
-    return response.data;
+    const response = await apiClient.put("/profile/me", {
+      full_name: payload.fullName?.trim(),
+      email: payload.email?.trim(),
+      avatar_url: payload.avatarUrl ?? payload.avatar_url,
+    });
+    return normalizeAuthUser(response.data);
   },
 };

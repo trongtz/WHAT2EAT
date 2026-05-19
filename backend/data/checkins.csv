@@ -1,0 +1,25 @@
+checkin_id,customer_id,restaurant_id,reservation_id,menu_item_id,checkin_at,crowd_status,note,is_verified
+eaa71b50-f416-4b9c-87fd-8df6d5a1b9f2,4f3f5855-b07e-4539-b9a7-49ce5234ed52,e909f7b6-ceaf-4ee3-b082-c4fc1714f851,dae6945d-4591-4927-894d-03ca641779a1,,2026-05-18T07:16:53Z,NORMAL,Check-in tại quán,True
+abc57ad6-f6b2-4dd8-b5af-f7a296465258,7fe35935-f20b-456c-9efa-2d43f6c2cfae,3e839ac1-1046-4fc7-b957-e42cdb1021ae,ad205d4d-a8f0-4e8a-85b4-4fde327ee65e,,2026-05-06T11:16:53Z,NORMAL,Check-in tại quán,True
+a3f14005-045b-4590-b75c-723c2d18b761,3d6e7710-5dc6-4ffd-b487-3462ecb614ed,8fea7445-4c7f-48be-b69e-309f1bdcc4c5,f3e2bb49-17ff-4762-972e-f49f93c745be,,2026-04-29T19:16:53Z,NORMAL,Check-in tại quán,True
+f2d295bd-7246-4913-b2e2-0be9614b0dce,7fe35935-f20b-456c-9efa-2d43f6c2cfae,e4f6ff36-34f5-4ec5-a08a-69c56e9ac9b0,7606e9d9-53ab-46cb-b776-6e421aca02dc,,2026-05-02T07:16:53Z,NORMAL,Check-in tại quán,True
+0bd0c5dd-75d5-4290-8080-ebb456a62d16,4e0fc09d-945c-4177-82ce-fcf412b4abb1,3e839ac1-1046-4fc7-b957-e42cdb1021ae,55877494-b56d-462b-9691-bec08e706a02,,2026-04-27T17:16:53Z,NORMAL,Check-in tại quán,True
+244fde8a-1399-40bd-9234-02fef0477d04,3947d80d-072d-418e-bfab-ecc9901bd829,2149d9f0-510d-4901-a12d-e4df87498d9d,579c319a-3459-43c8-965e-8c8bcd4304b0,,2026-04-24T01:16:53Z,NORMAL,Check-in tại quán,True
+d81a1124-7d0e-4afd-b735-d6db4c37d69e,523c44ae-3d9c-46e9-9313-781c724cd5c1,d5c3c6fc-29bb-4560-8073-93a28098387c,c26ac7b2-0ca2-4612-a664-8b061c608f63,,2026-05-12T15:16:53Z,NORMAL,Check-in tại quán,True
+ec175ffc-895f-4835-8fae-4b26e99ed987,17c08498-8e05-492e-b2e4-003ad1cbe1c2,3a789878-7e85-4636-8f48-12fddf52f71f,b30b27a9-c114-4f4b-b35d-2911cadd6f79,,2026-04-22T21:16:53Z,NORMAL,Check-in tại quán,True
+5366e8d7-bd86-4a8f-861c-de5520c70d56,3afff1c3-8ba9-43c7-be2d-8f7ce1f023ed,e4f6ff36-34f5-4ec5-a08a-69c56e9ac9b0,0951704e-db99-421d-902f-baae8f7b38ff,,2026-04-30T11:16:53Z,NORMAL,Check-in tại quán,True
+6b18d414-c3b5-4a63-be9e-0d9a162f318f,e696043d-d0e4-4e80-ba62-71422c07024f,50c82fd4-a6f2-4766-bf35-0537c77c3d2a,015cc299-7498-463b-a204-abba6608da08,,2026-04-29T10:16:53Z,NORMAL,Check-in tại quán,True
+25ac3b7f-e10c-4566-a2db-738b70150897,b30217cc-e24a-4292-ac75-f8c9c729d8d3,7eaf537d-cead-41f3-b19f-26b9cd04eeba,92cf45e3-4c85-4c28-b2a9-29597d3458c7,,2026-04-20T22:16:53Z,NORMAL,Check-in tại quán,True
+ad5f2d0f-ac60-4e19-b903-f37e613d5c90,3947d80d-072d-418e-bfab-ecc9901bd829,0437c85a-ea0e-4bfb-a34a-acf718ac0025,38ab3b5f-c979-4637-b914-0b1b4bf2de01,,2026-05-03T13:16:53Z,NORMAL,Check-in tại quán,True
+12709c53-2fc8-490d-9577-a6fc4be97dcc,d924362f-a1ef-42f5-96f9-a2749643b9b5,fbfcce1d-4268-4e87-86a5-1aef5ce65d2e,5cdf4be9-4470-4568-b0f8-a8b2aa1bf43c,,2026-05-10T16:16:53Z,NORMAL,Check-in tại quán,True
+e0099357-c2aa-400c-a95e-b5f5cdb86941,d924362f-a1ef-42f5-96f9-a2749643b9b5,9115f685-f7cb-4e1f-b3a5-8d8323d8d162,b0bdbdef-fdab-49e1-bb80-ec4dc00da9db,,2026-04-20T20:16:53Z,NORMAL,Check-in tại quán,True
+c183d0a1-864d-4fde-b571-919436a4e2e1,1a4bd911-3dff-4273-b053-271e8dfa7bfb,11dd8d6c-4a3f-42b8-83ce-05f182f5f5bf,7f4ed644-ea52-467f-8f0d-2097c94377a9,,2026-05-02T17:16:53Z,NORMAL,Check-in tại quán,True
+5c2f0446-5639-41df-b242-5821bd9940f7,1a4bd911-3dff-4273-b053-271e8dfa7bfb,fbfcce1d-4268-4e87-86a5-1aef5ce65d2e,1ab784b7-291c-4722-bbf6-d38b348c6042,,2026-04-21T14:16:53Z,NORMAL,Check-in tại quán,True
+e270f0f7-245e-4cb4-843e-594dcdc5d6d9,523c44ae-3d9c-46e9-9313-781c724cd5c1,34ddebe3-700c-4f44-8fb5-13a9e4db0c77,dd0a19e0-b536-43c9-8789-ba6e3aaed78c,,2026-05-13T00:16:53Z,NORMAL,Check-in tại quán,True
+d6066904-4c3c-4226-a1c9-47394f06b108,230066f2-08c0-4049-97f0-4caa938c51f6,11dd8d6c-4a3f-42b8-83ce-05f182f5f5bf,bf88a72e-6c94-4776-904a-d3c97537a1b1,,2026-05-10T01:16:53Z,NORMAL,Check-in tại quán,True
+ecc3bda2-859b-4641-8adc-9126cea54a24,1a4bd911-3dff-4273-b053-271e8dfa7bfb,6eff06ca-c52d-4482-bf85-d5370a998d33,021e21bb-4715-4b4a-a6a3-465c06fdfeeb,,2026-05-17T23:16:53Z,NORMAL,Check-in tại quán,True
+61f61be3-df46-44db-bbb0-f9a720c1aa55,d7ac1293-a3d4-4162-8c5c-5a6f3f51dbd0,3a789878-7e85-4636-8f48-12fddf52f71f,cfeba5aa-2801-4ec8-8475-07ba1a11a6e1,,2026-05-03T06:16:53Z,NORMAL,Check-in tại quán,True
+5a5983a7-a7f5-4053-99db-8049c4dc0a19,a906664d-680c-45e7-8a06-741b48fe4f16,2149d9f0-510d-4901-a12d-e4df87498d9d,05598721-4de1-47b5-80bf-c8a884691235,,2026-05-14T21:16:53Z,NORMAL,Check-in tại quán,True
+96bb8f5e-9a0d-46e9-bb71-84c7546ef905,b30217cc-e24a-4292-ac75-f8c9c729d8d3,fbfcce1d-4268-4e87-86a5-1aef5ce65d2e,e6b2b278-ccbf-4db5-b99c-3aa61712cc8f,,2026-05-13T19:16:53Z,NORMAL,Check-in tại quán,True
+fb432923-c8ab-4cc5-a3e2-1ed209abd4de,85d2faff-3df5-4cc2-872a-f7837b1b7ee2,782d34b8-a6de-4def-baa1-1178a252ede8,b8b9dcef-ead4-4805-b2b6-abcd8321eed2,,2026-05-07T04:16:53Z,NORMAL,Check-in tại quán,True
+608691e4-cfe9-4ced-a259-e89d870cd6ab,3d6e7710-5dc6-4ffd-b487-3462ecb614ed,1b06312a-1520-48c7-b968-a0b82d2dc847,b2eed616-39dd-488c-93d5-aefe8ed0435f,,2026-05-12T21:16:53Z,NORMAL,Check-in tại quán,True

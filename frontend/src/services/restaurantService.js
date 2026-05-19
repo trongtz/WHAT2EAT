@@ -1,6 +1,6 @@
 import apiClient from "./apiClient";
 import { getCachedResource, invalidateCachePrefix } from "./requestCache";
-import { getPriceRangeLabel } from "../utils/helpers";
+import { getPriceRangeLabel, getPrimaryOpenHoursValue } from "../utils/helpers";
 
 const RESTAURANT_LIST_TTL_MS = 5 * 60 * 1000;
 const RESTAURANT_DETAIL_TTL_MS = 5 * 60 * 1000;
@@ -40,7 +40,8 @@ const normalizeMenuItem = (item) => ({
   restaurantId: item.restaurant_id ?? item.restaurantId,
   price: Number(item.price || 0),
   imageUrl: item.image_url ?? item.imageUrl ?? "",
-  isAvailable: item.is_available ?? item.isAvailable ?? true,
+  availabilityStatus: item.availability_status ?? item.availabilityStatus ?? (item.is_available === false ? "UNAVAILABLE" : "AVAILABLE"),
+  isAvailable: item.is_available ?? item.isAvailable ?? item.availability_status !== "UNAVAILABLE",
 });
 
 const normalizeReview = (review) => ({
@@ -55,9 +56,22 @@ const normalizeReview = (review) => ({
   createdAt: review.created_at ?? review.createdAt,
 });
 
+const normalizeOpenHoursValue = (restaurant) =>
+  getPrimaryOpenHoursValue(restaurant.open_hours ?? restaurant.opening_hours ?? restaurant.openHours);
+
+const mapOpeningHoursPayload = (payload) => {
+  const value = payload.open_hours?.trim() || payload.opening_hours || null;
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  return {
+    regular: value,
+    special_days: payload.special_days ?? payload.specialDays ?? [],
+  };
+};
+
 export const normalizeRestaurant = (restaurant) => {
   const images = Array.isArray(restaurant.images) ? restaurant.images.filter(Boolean) : [];
-  const status = restaurant.status ?? "PENDING";
+  const status = restaurant.approval_status ?? restaurant.status ?? "PENDING";
   const priceRange = restaurant.price_range ?? restaurant.priceRange ?? "";
   const cuisineType = restaurant.cuisine_type ?? restaurant.cuisineType ?? "";
   const cuisineTags = String(cuisineType)
@@ -79,11 +93,14 @@ export const normalizeRestaurant = (restaurant) => {
     ownerId: restaurant.owner_id ?? restaurant.ownerId,
     ownerName: restaurant.owner_name ?? restaurant.ownerName ?? "",
     ownerEmail: restaurant.owner_email ?? restaurant.ownerEmail ?? "",
-    averageRating: Number(restaurant.average_rating ?? restaurant.averageRating ?? 0),
-    rating: Number(restaurant.average_rating ?? restaurant.averageRating ?? 0),
+    averageRating: Number(restaurant.rating_avg ?? restaurant.average_rating ?? restaurant.averageRating ?? 0),
+    rating: Number(restaurant.rating_avg ?? restaurant.average_rating ?? restaurant.averageRating ?? 0),
     reviewCount,
+    menuCount: Number(restaurant.menu_count ?? restaurant.menuCount ?? menu.length),
     approved: status === "APPROVED",
     status,
+    approvalStatus: status,
+    isActive: restaurant.is_active ?? restaurant.isActive ?? true,
     category: cuisineTags[0] || cuisineType,
     cuisineType,
     priceRange,
@@ -96,9 +113,11 @@ export const normalizeRestaurant = (restaurant) => {
       restaurant.longitude === null || restaurant.longitude === undefined || restaurant.longitude === ""
         ? null
         : Number(restaurant.longitude),
-    openHours: restaurant.open_hours ?? restaurant.openHours ?? "",
-    maxCapacity: Number(restaurant.max_capacity ?? restaurant.maxCapacity ?? 0),
-    availableCapacity: Number(restaurant.available_capacity ?? restaurant.availableCapacity ?? 0),
+    openHours: normalizeOpenHoursValue(restaurant),
+    maxCapacity: Number(restaurant.max_tables ?? restaurant.max_capacity ?? restaurant.maxCapacity ?? 0),
+    availableCapacity: Number(
+      restaurant.available_tables ?? restaurant.available_capacity ?? restaurant.availableCapacity ?? 0
+    ),
     description: restaurant.description ?? "",
     images,
     image: images[0] || "",
@@ -120,7 +139,7 @@ const mapRestaurantPayload = (payload) => ({
   description: payload.description?.trim() || null,
   latitude: payload.latitude === "" || payload.latitude == null ? null : Number(payload.latitude),
   longitude: payload.longitude === "" || payload.longitude == null ? null : Number(payload.longitude),
-  open_hours: payload.open_hours?.trim() || null,
+  opening_hours: mapOpeningHoursPayload(payload),
   max_capacity: Number(payload.max_capacity),
   images: payload.images ?? [],
   cuisine_type: payload.cuisine_type?.trim() || null,
@@ -238,6 +257,7 @@ export const restaurantService = {
       category: payload.category?.trim() || null,
       image_url: payload.image_url?.trim() || null,
       is_available: Boolean(payload.is_available),
+      availability_status: payload.is_available ? "AVAILABLE" : "UNAVAILABLE",
     });
     invalidateRestaurantCaches(restaurantId);
     return normalizeMenuItem(response.data);
@@ -251,6 +271,7 @@ export const restaurantService = {
       category: payload.category?.trim() || null,
       image_url: payload.image_url?.trim() || null,
       is_available: Boolean(payload.is_available),
+      availability_status: payload.is_available ? "AVAILABLE" : "UNAVAILABLE",
     });
     invalidateRestaurantCaches(payload.restaurantId ?? payload.restaurant_id);
     return normalizeMenuItem(response.data);
@@ -275,7 +296,7 @@ export const restaurantService = {
   },
 
   updateAdminRestaurantStatus: async (restaurantId, status) => {
-    const response = await apiClient.put(`/admin/restaurants/${restaurantId}/status`, { status });
+    const response = await apiClient.put(`/admin/restaurants/${restaurantId}/status`, { approval_status: status });
     const restaurant = normalizeRestaurant(response.data);
     invalidateRestaurantCaches(restaurantId, restaurant.ownerId);
     return restaurant;

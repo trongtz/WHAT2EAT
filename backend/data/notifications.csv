@@ -1,0 +1,26 @@
+notification_id,user_id,type,title,content,reference_id,is_read,created_at
+cde6bff9-c44b-4387-a8ec-072e0b5f6d3f,bab3ed76-9710-4417-bea5-6a6d7aebd16f,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-24T10:16:53Z
+e27bf939-c36c-4b2d-b9d5-4308a8015dfc,b30217cc-e24a-4292-ac75-f8c9c729d8d3,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-21T03:16:53Z
+38403457-dbe2-429d-9bb3-b2df0b25234d,0370a9ca-d12d-45ff-b8c5-2635fa6315ad,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-18T18:16:53Z
+b3981fb5-0f70-4017-8a16-cdb14d36b3bf,17c08498-8e05-492e-b2e4-003ad1cbe1c2,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-12T20:16:53Z
+982148a8-6650-4494-bc8e-f3e776166f46,4f3f5855-b07e-4539-b9a7-49ce5234ed52,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-11T01:16:53Z
+26653ecf-9c5a-464b-8dd5-fb172d50cb1f,ad093831-7a88-4752-94c4-ecf9e428cd7d,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-17T06:16:53Z
+f5187ca0-bf45-40d7-b9cd-e2074943cc02,d924362f-a1ef-42f5-96f9-a2749643b9b5,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-18T05:16:53Z
+66295578-da06-4797-a9fe-cb58a477daea,4e0fc09d-945c-4177-82ce-fcf412b4abb1,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-21T16:16:53Z
+6d51d6b7-fe15-4aea-bcc5-c76e77d56be8,0370a9ca-d12d-45ff-b8c5-2635fa6315ad,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-26T05:16:53Z
+564fb94f-ab45-4b49-856d-a0938513f0f0,a906664d-680c-45e7-8a06-741b48fe4f16,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-04T15:16:53Z
+610fb71c-668d-46e3-894f-b7d48cded7d1,230066f2-08c0-4049-97f0-4caa938c51f6,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-04T10:16:53Z
+03af53d9-df6b-4724-84db-7419327c9f3d,bab3ed76-9710-4417-bea5-6a6d7aebd16f,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-29T08:16:53Z
+da1d421b-2d8b-4c5c-8848-9073e59db789,8e0b13e8-25c3-413c-98ce-00524e1550f4,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-15T05:16:53Z
+405556c5-f84a-48b7-bdd8-99f799af043d,d7ac1293-a3d4-4162-8c5c-5a6f3f51dbd0,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-24T06:16:53Z
+8f948402-e7b1-43d5-8c59-6b4374f29e7e,a906664d-680c-45e7-8a06-741b48fe4f16,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-25T06:16:53Z
+4da2322e-a4d2-4e9d-aae4-539e9e11de4f,79110d36-d940-40a0-9a64-3874c7ee9a3e,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-30T06:16:53Z
+c3e975f8-bd3e-481b-b9b6-a53ca1d739ef,ad093831-7a88-4752-94c4-ecf9e428cd7d,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-11T17:16:53Z
+d0aad3e6-a9bc-4491-94a0-f17bf18dc2b5,1a4bd911-3dff-4273-b053-271e8dfa7bfb,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-01T10:16:53Z
+f89e8b95-21a5-455e-b0bf-28a992ac51d2,d7ac1293-a3d4-4162-8c5c-5a6f3f51dbd0,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-08T00:16:53Z
+e7313df2-855b-44f1-a6d8-a2ee88dfe175,e696043d-d0e4-4e80-ba62-71422c07024f,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-16T00:16:53Z
+7e20a132-13c3-4c41-b4fa-3f9ad3a4204b,3d6e7710-5dc6-4ffd-b487-3462ecb614ed,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-04-20T06:16:53Z
+793a48d8-b27b-46b8-825f-c51b38c1c50a,e696043d-d0e4-4e80-ba62-71422c07024f,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-06T02:16:53Z
+2e17fe58-86f8-4a47-af8a-7ca8b9ed9ae7,3afff1c3-8ba9-43c7-be2d-8f7ce1f023ed,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-13T12:16:53Z
+149cd915-66a7-4de8-939f-d0eea6d39158,b30217cc-e24a-4292-ac75-f8c9c729d8d3,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-09T03:16:53Z
+e6b937ff-9795-4601-be5f-106673087606,8e0b13e8-25c3-413c-98ce-00524e1550f4,RESERVATION_CONFIRMED,Đặt bàn thành công,Đơn của bạn đã được xác nhận,,False,2026-05-16T16:16:53Z

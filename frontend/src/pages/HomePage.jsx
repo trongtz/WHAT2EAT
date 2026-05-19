@@ -18,7 +18,7 @@ import { useAuth } from "../hooks/useAuth";
 import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
 import { getGuestFavoriteIds, toggleGuestFavorite } from "../utils/guestSession";
-import { formatCurrency, formatDate, formatOpenHours, getPriceRangeLabel } from "../utils/helpers";
+import { formatCurrency, formatDate, formatOpenHours, getPriceRangeLabel, getTableAvailabilityLabel } from "../utils/helpers";
 
 const DEFAULT_MAP_CENTER = [10.7769, 106.7009];
 const DEFAULT_MAP_ZOOM = 14;
@@ -174,6 +174,8 @@ const buildRestaurantPreviewDetail = (restaurant, distanceLabel = "Chưa xác đ
   reviewCount: Number(restaurant.reviewCount || restaurant.reviews || 0),
   averageRating: Number(restaurant.averageRating || restaurant.rating || 0),
   openHours: restaurant.openHours || "",
+  availableCapacity: Number(restaurant.availableCapacity || 0),
+  maxCapacity: Number(restaurant.maxCapacity || 0),
   phone: restaurant.phone || "",
   address: restaurant.address || "",
   priceRange: restaurant.priceRange || "",
@@ -665,6 +667,9 @@ function HomePage() {
                           <Typography color="text.secondary" sx={{ fontSize: "0.9rem", mt: 0.15 }}>
                             {restaurant.address}
                           </Typography>
+                          <Typography color="text.secondary" sx={{ fontSize: "0.86rem", mt: 0.25 }}>
+                            Bàn trống: {getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}
+                          </Typography>
                         </Stack>
 
                         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
@@ -933,6 +938,9 @@ function HomePage() {
                     </Typography>
                     <Typography color="text.secondary">
                       Giờ mở cửa: {formatOpenHours(activeRestaurantDetail.openHours)}
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Bàn trống: {getTableAvailabilityLabel(activeRestaurantDetail.availableCapacity, activeRestaurantDetail.maxCapacity)}
                     </Typography>
                     <Typography color="text.secondary">
                       Khoảng giá: {getPriceRangeLabel(activeRestaurantDetail.priceRange)}

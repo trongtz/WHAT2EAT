@@ -1,42 +1,61 @@
-# File: schemas/dish.py
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
-from decimal import Decimal
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 
 class MenuItemBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
+    name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     price: Decimal = Field(..., gt=0)
     category: Optional[str] = None
-    is_available: bool = True
     image_url: Optional[str] = None
+    availability_status: str = "AVAILABLE"
+    is_available: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def normalize_availability(self):
+        if self.is_available is not None:
+            self.availability_status = "AVAILABLE" if self.is_available else "UNAVAILABLE"
+        return self
+
 
 class MenuItemCreate(MenuItemBase):
-    """Schema để tạo món ăn - restaurant_id sẽ lấy từ URL params"""
     pass
 
+
 class MenuItemUpdate(BaseModel):
-    """Schema để update món ăn"""
     name: Optional[str] = None
     description: Optional[str] = None
     price: Optional[Decimal] = None
     category: Optional[str] = None
     image_url: Optional[str] = None
+    availability_status: Optional[str] = None
     is_available: Optional[bool] = None
 
-class MenuItemResponse(MenuItemBase):
-    """Schema trả về danh sách món ăn"""
+    @model_validator(mode="after")
+    def normalize_availability(self):
+        if self.is_available is not None:
+            self.availability_status = "AVAILABLE" if self.is_available else "UNAVAILABLE"
+        return self
+
+
+class MenuItemResponse(BaseModel):
     id: Optional[UUID] = None
     item_id: Optional[UUID] = None
     restaurant_id: UUID
+    name: str
+    description: Optional[str] = None
+    price: Decimal
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    availability_status: str
+    is_available: bool
 
     model_config = ConfigDict(from_attributes=True)
 
-# ---------------------------------------------------------
-# BACKWARD COMPATIBILITY
-# Giữ lại các tên cũ để không làm gãy các file router khác (như dishes.py)
-# ---------------------------------------------------------
+
 DishBase = MenuItemBase
 DishCreate = MenuItemCreate
 DishUpdate = MenuItemUpdate

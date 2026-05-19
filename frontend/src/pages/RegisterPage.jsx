@@ -16,7 +16,6 @@ function RegisterPage() {
   const [values, setValues] = useState({
     fullName: "",
     email: "",
-    phone: "",
     role: "customer",
     password: "",
     confirmPassword: "",
@@ -84,7 +83,6 @@ function RegisterPage() {
             {message ? <Alert severity="error">{message}</Alert> : null}
             <FormInput label="Họ và tên" name="fullName" value={values.fullName} onChange={handleChange} error={!!errors.fullName} helperText={errors.fullName} />
             <FormInput label="Email" name="email" value={values.email} onChange={handleChange} error={!!errors.email} helperText={errors.email} />
-            <FormInput label="Số điện thoại" name="phone" value={values.phone} onChange={handleChange} error={!!errors.phone} helperText={errors.phone} />
             <FormInput select label="Vai trò" name="role" value={values.role} onChange={handleChange} error={!!errors.role} helperText={errors.role}>
               <MenuItem value="customer">Khách hàng</MenuItem>
               <MenuItem value="owner">Chủ nhà hàng</MenuItem>

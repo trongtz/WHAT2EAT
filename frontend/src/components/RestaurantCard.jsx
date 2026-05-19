@@ -6,7 +6,7 @@ import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import CustomCard from "./CustomCard";
-import { formatCurrency, formatPriceRangeDisplay, getPriceRangeLabel } from "../utils/helpers";
+import { formatCurrency, formatPriceRangeDisplay, getPriceRangeLabel, getTableAvailabilityLabel } from "../utils/helpers";
 
 function RestaurantCard({
   restaurant,
@@ -140,6 +140,10 @@ function RestaurantCard({
             {restaurant.address}
           </Typography>
         </Stack>
+
+        <Typography color="text.secondary" sx={{ fontSize: "0.95rem" }}>
+          Bàn trống: {getTableAvailabilityLabel(restaurant.availableCapacity, restaurant.maxCapacity)}
+        </Typography>
 
         <Typography color="text.secondary">{restaurant.description}</Typography>
 

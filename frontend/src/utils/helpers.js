@@ -90,26 +90,57 @@ export const formatCoordinates = (latitude, longitude) => {
   return `${latitude}, ${longitude}`;
 };
 
-export const formatOpenHours = (openHours) => {
-  if (!openHours) return "Chưa khai báo";
-  if (typeof openHours === "string") return openHours;
-  if (typeof openHours !== "object") return "Chưa khai báo";
+const normalizeTimeRange = (value) => {
+  if (!value) return "";
+  const text = String(value).trim();
+  if (!text || text.toLowerCase() === "closed") return "";
+  if (!text.includes("-")) return text;
 
-  const dayLabels = {
-    mon: "Thứ 2",
-    tue: "Thứ 3",
-    wed: "Thứ 4",
-    thu: "Thứ 5",
-    fri: "Thứ 6",
-    sat: "Thứ 7",
-    sun: "Chủ nhật",
-  };
+  const [start, end] = text.split("-", 2).map((item) => item.trim());
+  if (!start || !end) return text;
+  return `${start} - ${end}`;
+};
 
-  return Object.entries(openHours)
-    .map(([day, value]) => {
-      if (!value?.open || !value?.close) return null;
-      return `${dayLabels[day] || day}: ${value.open} - ${value.close}`;
+export const getPrimaryOpenHoursValue = (openHours) => {
+  if (!openHours) return "";
+  if (typeof openHours === "string") return normalizeTimeRange(openHours);
+  if (typeof openHours !== "object") return "";
+
+  for (const key of ["regular", "main", "default", "primary"]) {
+    const value = openHours[key];
+    const normalized = typeof value === "object" && value?.open && value?.close
+      ? normalizeTimeRange(`${value.open} - ${value.close}`)
+      : normalizeTimeRange(value);
+    if (normalized) return normalized;
+  }
+
+  const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  const ranges = dayKeys
+    .map((dayKey) => {
+      const value = openHours[dayKey];
+      return typeof value === "object" && value?.open && value?.close
+        ? normalizeTimeRange(`${value.open} - ${value.close}`)
+        : normalizeTimeRange(value);
     })
-    .filter(Boolean)
-    .join(" | ");
+    .filter(Boolean);
+
+  if (!ranges.length) return "";
+
+  const countByRange = ranges.reduce((accumulator, range) => {
+    accumulator[range] = (accumulator[range] || 0) + 1;
+    return accumulator;
+  }, {});
+  return Object.entries(countByRange).sort((first, second) => second[1] - first[1])[0][0];
+};
+
+export const getPrimaryOpenHours = (openHours) => getPrimaryOpenHoursValue(openHours) || "Chưa khai báo";
+
+export const formatOpenHours = getPrimaryOpenHours;
+
+export const getTableAvailabilityLabel = (availableTables, maxTables) => {
+  const available = Number(availableTables);
+  const max = Number(maxTables);
+  if (!Number.isFinite(max) || max <= 0) return "Chưa cập nhật";
+  if (!Number.isFinite(available)) return `0/${max} bàn`;
+  return `${Math.max(available, 0)}/${max} bàn`;
 };

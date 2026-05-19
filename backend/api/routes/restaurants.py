@@ -103,6 +103,7 @@ def get_owner_restaurants(
     for restaurant in restaurants:
         attach_capacity_summary(db, restaurant)
         attach_restaurant_review_summary(db, restaurant)
+        setattr(restaurant, "menu_count", len(restaurant.menu_items or []))
     return restaurants
 
 
@@ -180,7 +181,7 @@ def create_restaurant(
     replace_restaurant_capacities(
         db,
         created_restaurant.restaurant_id,
-        restaurant.open_hours,
+        restaurant.opening_hours,
         restaurant.max_capacity,
     )
     db.refresh(created_restaurant)
@@ -217,11 +218,11 @@ def update_restaurant(
     if not updated_restaurant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nhà hàng không tồn tại")
 
-    if max_capacity is not None or restaurant_in.open_hours is not None:
+    if max_capacity is not None or restaurant_in.opening_hours is not None:
         replace_restaurant_capacities(
             db,
             updated_restaurant.restaurant_id,
-            updated_restaurant.open_hours,
+            updated_restaurant.opening_hours,
             max_capacity if max_capacity is not None else get_restaurant_max_capacity(db, updated_restaurant.restaurant_id),
         )
         db.refresh(updated_restaurant)

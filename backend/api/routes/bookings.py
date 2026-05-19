@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,8 +10,16 @@ from api.deps import get_current_user
 from core.database import get_db
 from models.user import User
 from schemas.booking import ReservationCreate, ReservationResponse
+from services.capacity_service import get_restaurant_capacity_for_date
 
 router = APIRouter()
+MIN_BOOKING_NOTICE = timedelta(minutes=30)
+
+
+def _to_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _serialize_reservation(reservation):
@@ -36,13 +44,45 @@ def create_booking(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role != "CUSTOMER":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ khách hàng mới được đặt bàn")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can create bookings")
+
+    reservation_time = _to_utc_naive(booking_in.reservation_time)
+    minimum_time = datetime.now(timezone.utc).replace(tzinfo=None) + MIN_BOOKING_NOTICE
+    if reservation_time <= minimum_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reservation time must be at least 30 minutes in the future",
+        )
 
     restaurant = crud_restaurant.get_restaurant_by_id(db, booking_in.restaurant_id)
     if not restaurant or restaurant.status != "APPROVED":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy nhà hàng này")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant not found")
 
-    created_booking = crud_reservation.create_reservation(db, booking_in, current_user.user_id)
+    max_capacity = get_restaurant_capacity_for_date(db, booking_in.restaurant_id, reservation_time.date())
+    if max_capacity <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Restaurant capacity is not available for this date",
+        )
+    if booking_in.guest_count > max_capacity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Guest count exceeds restaurant capacity",
+        )
+    if not crud_reservation.check_overbooking(
+        db,
+        booking_in.restaurant_id,
+        reservation_time,
+        booking_in.guest_count,
+        max_capacity,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Not enough capacity for this time slot",
+        )
+
+    booking_to_create = booking_in.model_copy(update={"reservation_time": reservation_time})
+    created_booking = crud_reservation.create_reservation(db, booking_to_create, current_user.user_id)
     return _serialize_reservation(created_booking)
 
 
@@ -63,7 +103,7 @@ def cancel_my_booking(
 ):
     booking = crud_reservation.get_reservation_by_id(db, booking_id)
     if not booking or booking.customer_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đơn đặt bàn")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
     updated_booking = crud_reservation.cancel_reservation(db, booking_id)
     return _serialize_reservation(updated_booking)

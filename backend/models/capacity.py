@@ -1,5 +1,5 @@
 # File: models/capacity.py
-from sqlalchemy import Column, Integer, Time, Date, ForeignKey, UniqueConstraint, DateTime, func
+from sqlalchemy import Column, Integer, Time, Date, ForeignKey, UniqueConstraint, DateTime, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -40,9 +40,13 @@ class CapacityOverride(Base):
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
     max_capacity = Column(Integer, nullable=False)
+    note = Column(Text, nullable=True)
     
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    # Relationships
     restaurant = relationship("Restaurant", back_populates="capacity_overrides")
+
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'override_date', 'start_time', 'end_time', name='unique_capacity_override'),
+    )

@@ -55,7 +55,7 @@ export const createGuestBooking = (payload) => {
   const nextBooking = {
     id: Date.now(),
     userId: "guest",
-    restaurantId: Number(payload.restaurantId),
+    restaurantId: String(payload.restaurantId),
     date: payload.date,
     time: payload.time,
     guests: Number(payload.guests),
@@ -72,12 +72,12 @@ export const createGuestBooking = (payload) => {
 export const getGuestReviews = () => readSessionArray(guestSessionKeys.reviews);
 
 export const getGuestReviewsByRestaurant = (restaurantId) =>
-  getGuestReviews().filter((review) => review.restaurantId === Number(restaurantId));
+  getGuestReviews().filter((review) => String(review.restaurantId) === String(restaurantId));
 
 export const createGuestReview = (payload) => {
   const nextReview = {
     id: Date.now(),
-    restaurantId: Number(payload.restaurantId),
+    restaurantId: String(payload.restaurantId),
     rating: Number(payload.rating),
     comment: payload.comment,
     userName: payload.userName,
