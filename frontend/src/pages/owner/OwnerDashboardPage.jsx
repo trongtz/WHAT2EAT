@@ -1,15 +1,43 @@
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
-import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
-import { Box, Chip, Grid, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
+import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import { Alert, Box, Chip, Grid, Stack, Typography } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
+import EmptyState from "../../components/EmptyState";
 import LoadingScreen from "../../components/LoadingScreen";
-import SectionHeader from "../../components/SectionHeader";
 import StatsCard from "../../components/StatsCard";
 import { useAuth } from "../../hooks/useAuth";
 import { dashboardService } from "../../services/dashboardService";
+
+const staticNotifications = [
+  {
+    id: 1,
+    customer: "Trà Hương",
+    title: "đã đánh giá 5 sao cho món Jolibee",
+    body: '"tôi đã ăn món này 1 tuần liên tục"',
+    tone: "rgba(245,158,11,0.10)",
+  },
+  {
+    id: 2,
+    customer: "Minh Anh",
+    title: "đã đánh giá 4 sao cho món Gà rán sốt cay",
+    body: '"vỏ giòn, sốt ngon nhưng mình muốn phần salad nhiều hơn một chút"',
+    tone: "rgba(96,165,250,0.12)",
+  },
+];
+
+const getStatusConfig = (status) => {
+  if (status === "APPROVED") {
+    return { label: "Đã duyệt", color: "success" };
+  }
+  if (status === "REJECTED") {
+    return { label: "Từ chối", color: "error" };
+  }
+  return { label: "Chờ duyệt", color: "warning" };
+};
 
 function OwnerDashboardPage() {
   const { user } = useAuth();
@@ -19,138 +47,261 @@ function OwnerDashboardPage() {
     reviews: [],
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
-      const [restaurants, bookings, reviews] = await Promise.all([
-        dashboardService.getOwnerRestaurants(user.id),
-        dashboardService.getOwnerBookings(user.id),
-        dashboardService.getOwnerReviews(user.id),
-      ]);
-      setData({ restaurants, bookings, reviews });
-      setLoading(false);
+      try {
+        const [restaurants, bookings, reviews] = await Promise.all([
+          dashboardService.getOwnerRestaurants(user.id),
+          dashboardService.getOwnerBookings(),
+          dashboardService.getOwnerReviews(),
+        ]);
+        setData({ restaurants, bookings, reviews });
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
+
     loadData();
   }, [user.id]);
 
-  if (loading) return <LoadingScreen message="Dang tai tong quan van hanh..." />;
+  const stats = useMemo(() => {
+    const approvedRestaurants = data.restaurants.filter((item) => item.status === "APPROVED");
+    const pendingRestaurants = data.restaurants.filter((item) => item.status === "PENDING");
+    const totalMenuItems = approvedRestaurants.reduce((sum, item) => sum + item.menu.length, 0);
 
-  const confirmedBookings = data.bookings.filter((item) => item.status === "Đã xác nhận").length;
-  const averageRating =
-    data.reviews.length > 0
-      ? (data.reviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / data.reviews.length).toFixed(1)
-      : "0.0";
+    return {
+      totalRestaurants: data.restaurants.length,
+      approvedRestaurants: approvedRestaurants.length,
+      pendingRestaurants: pendingRestaurants.length,
+      totalMenuItems,
+    };
+  }, [data.restaurants]);
+
+  if (loading) return <LoadingScreen message="Đang tải tổng quan..." />;
 
   return (
     <Stack spacing={3}>
-      <SectionHeader
-        eyebrow="Owner workspace"
-        title="Tong quan kinh doanh"
-        description="Theo doi doanh thu tiem nang, chat luong phuc vu va tinh trang van hanh cac co so."
-      />
+      <SectionTitle />
+      {error ? <Alert severity="error">{error}</Alert> : null}
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Co so dang quan ly" value={data.restaurants.length} color="rgba(255,159,28,0.22)" />
+          <StatsCard label="Tổng chi nhánh" value={stats.totalRestaurants} color="rgba(255,159,28,0.18)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Luot dat ban" value={data.bookings.length} color="rgba(47,107,255,0.18)" />
+          <StatsCard label="Đã duyệt" value={stats.approvedRestaurants} color="rgba(45,212,191,0.18)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Da xac nhan" value={confirmedBookings} color="rgba(32,180,134,0.18)" />
+          <StatsCard label="Chờ duyệt" value={stats.pendingRestaurants} color="rgba(245,158,11,0.18)" />
         </Grid>
         <Grid size={{ xs: 12, md: 3 }}>
-          <StatsCard label="Diem danh gia TB" value={averageRating} color="rgba(232,93,117,0.18)" />
+          <StatsCard label="Số món ăn" value={stats.totalMenuItems} color="rgba(96,165,250,0.18)" />
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <CustomCard>
-            <Stack spacing={2.5}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="h4">Suc khoe hoat dong hom nay</Typography>
-                <Chip label="Cap nhat luc 10:30" color="primary" variant="outlined" />
-              </Stack>
+      {data.restaurants.length ? (
+        <Grid container spacing={3} alignItems="stretch">
+          <Grid size={{ xs: 12, lg: 8 }}>
+            <CustomCard sx={{ height: "100%" }}>
+              <Stack spacing={2}>
+                <Typography variant="h4">Chi nhánh nổi bật</Typography>
 
-              <Grid container spacing={2}>
-                {[
-                  {
-                    icon: <StorefrontRoundedIcon color="warning" />,
-                    title: "Ty le duyet nha hang",
-                    value: `${data.restaurants.filter((item) => item.approved).length}/${data.restaurants.length}`,
-                    text: "Co so da duyet san sang nhan dat ban.",
-                  },
-                  {
-                    icon: <CalendarMonthRoundedIcon color="primary" />,
-                    title: "Lich hen can xu ly",
-                    value: data.bookings.filter((item) => item.status === "Chờ duyệt").length,
-                    text: "Dat ban moi can xac nhan trong ca hien tai.",
-                  },
-                  {
-                    icon: <RateReviewRoundedIcon color="error" />,
-                    title: "Danh gia moi",
-                    value: data.reviews.length,
-                    text: "Can theo doi phan hoi de cai thien trai nghiem.",
-                  },
-                  {
-                    icon: <InsightsRoundedIcon color="success" />,
-                    title: "Menu dang hien thi",
-                    value: data.restaurants.reduce((sum, item) => sum + item.menu.length, 0),
-                    text: "Tong so mon dang hien thi tren ung dung.",
-                  },
-                ].map((item) => (
-                  <Grid key={item.title} size={{ xs: 12, md: 6 }}>
+                <Stack spacing={1.5}>
+                  {data.restaurants.map((restaurant) => {
+                    const statusConfig = getStatusConfig(restaurant.status);
+
+                    return (
+                      <Box
+                        key={restaurant.id}
+                        sx={{
+                          p: 1.6,
+                          borderRadius: 2.25,
+                          border: "1px solid rgba(15,23,42,0.08)",
+                          bgcolor: "rgba(255,255,255,0.84)",
+                        }}
+                      >
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.6}>
+                          <Box
+                            sx={{
+                              width: { xs: "100%", md: 156 },
+                              minWidth: { xs: "100%", md: 156 },
+                              height: 132,
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              background: restaurant.image
+                                ? `linear-gradient(180deg, rgba(18,22,44,0.05), rgba(18,22,44,0.18)), url(${restaurant.image})`
+                                : "linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 18%, white), color-mix(in srgb, var(--app-secondary) 14%, white))",
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              flexShrink: 0,
+                            }}
+                          />
+
+                          <Stack spacing={1.1} sx={{ minWidth: 0, flex: 1 }}>
+                            <Stack spacing={0.55}>
+                              <Typography
+                                sx={{
+                                  fontSize: "1.15rem",
+                                  fontWeight: 800,
+                                  lineHeight: 1.3,
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {restaurant.name}
+                              </Typography>
+
+                              <Stack direction="row" spacing={0.75} alignItems="flex-start">
+                                <PlaceRoundedIcon
+                                  sx={{
+                                    mt: "2px",
+                                    fontSize: 17,
+                                    color: "var(--app-secondary)",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <Typography
+                                  color="text.secondary"
+                                  sx={{
+                                    fontSize: "0.95rem",
+                                    lineHeight: 1.55,
+                                    wordBreak: "break-word",
+                                  }}
+                                >
+                                  {restaurant.address}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+
+                            <Stack direction="row" spacing={0.85} flexWrap="wrap" useFlexGap>
+                              <Chip
+                                size="small"
+                                icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
+                                label={
+                                  restaurant.averageRating > 0
+                                    ? `${restaurant.averageRating.toFixed(1)} sao`
+                                    : "Không có đánh giá"
+                                }
+                                sx={{
+                                  bgcolor: "rgba(15,23,42,0.05)",
+                                  "& .MuiChip-label": {
+                                    fontWeight: 700,
+                                  },
+                                }}
+                              />
+                              <Chip
+                                size="small"
+                                label={statusConfig.label}
+                                color={statusConfig.color}
+                                sx={{
+                                  "& .MuiChip-label": {
+                                    fontWeight: 700,
+                                  },
+                                }}
+                              />
+                            </Stack>
+
+                            <Typography
+                              color="text.secondary"
+                              sx={{
+                                fontSize: "0.95rem",
+                                lineHeight: 1.65,
+                                display: "-webkit-box",
+                                WebkitBoxOrient: "vertical",
+                                WebkitLineClamp: 2,
+                                overflow: "hidden",
+                              }}
+                            >
+                              {restaurant.description || "Chưa có mô tả ngắn cho chi nhánh này."}
+                            </Typography>
+
+                            <CustomButton
+                              component={RouterLink}
+                              to={`/chu-nha-hang/nha-hang/${restaurant.id}`}
+                              sx={{ alignSelf: "flex-start", minWidth: 150 }}
+                            >
+                              Xem chi tiết
+                            </CustomButton>
+                          </Stack>
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+            </CustomCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, lg: 4 }}>
+            <CustomCard sx={{ height: "100%" }}>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <NotificationsRoundedIcon sx={{ color: "var(--app-primary)", fontSize: 24 }} />
+                  <Typography variant="h4">Thông báo</Typography>
+                </Stack>
+
+                <Stack spacing={1.1}>
+                  {staticNotifications.map((item) => (
                     <Box
+                      key={item.id}
                       sx={{
-                        p: 2,
+                        p: 1.25,
                         borderRadius: 2,
-                        border: "1px solid rgba(15,23,42,0.06)",
-                        bgcolor: "rgba(248,250,255,0.92)",
+                        bgcolor: item.tone,
+                        border: "1px solid rgba(15,23,42,0.08)",
                       }}
                     >
-                      <Stack spacing={1.25}>
-                        {item.icon}
-                        <Typography color="text.secondary">{item.title}</Typography>
-                        <Typography variant="h3">{item.value}</Typography>
-                        <Typography color="text.secondary">{item.text}</Typography>
+                      <Stack spacing={0.45} sx={{ minWidth: 0 }}>
+                        <Typography
+                          sx={{
+                            fontSize: "0.98rem",
+                            fontWeight: 800,
+                            lineHeight: 1.45,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {item.customer} {item.title}
+                        </Typography>
+                        <Typography
+                          color="text.secondary"
+                          sx={{
+                            fontSize: "0.94rem",
+                            lineHeight: 1.6,
+                            display: "-webkit-box",
+                            WebkitBoxOrient: "vertical",
+                            WebkitLineClamp: 3,
+                            overflow: "hidden",
+                          }}
+                        >
+                          {item.body}
+                        </Typography>
                       </Stack>
                     </Box>
-                  </Grid>
-                ))}
-              </Grid>
-            </Stack>
-          </CustomCard>
-        </Grid>
+                  ))}
+                </Stack>
 
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <CustomCard>
-            <Stack spacing={2}>
-              <Typography variant="h4">Can uu tien</Typography>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(255,159,28,0.12)" }}>
-                <Typography fontWeight={700}>1 nha hang dang cho duyet</Typography>
-                <Typography color="text.secondary">
-                  Hoan thien ho so va menu de duoc admin duyet nhanh hon.
-                </Typography>
-              </Box>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(47,107,255,0.1)" }}>
-                <Typography fontWeight={700}>
-                  {data.bookings.filter((item) => item.status === "Chờ duyệt").length} dat ban can xac nhan
-                </Typography>
-                <Typography color="text.secondary">
-                  Xac nhan som de khong bo lo khach hang co nhu cau cao.
-                </Typography>
-              </Box>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(232,93,117,0.1)" }}>
-                <Typography fontWeight={700}>Theo doi phan hoi moi nhat</Typography>
-                <Typography color="text.secondary">
-                  Danh gia khach hang anh huong truc tiep den kha nang duoc de xuat.
-                </Typography>
-              </Box>
-            </Stack>
-          </CustomCard>
+                <CustomButton sx={{ alignSelf: "flex-start", minWidth: 140 }}>Xem thêm</CustomButton>
+              </Stack>
+            </CustomCard>
+          </Grid>
         </Grid>
-      </Grid>
+      ) : (
+        <EmptyState title="Chưa có chi nhánh nào" description="" />
+      )}
+    </Stack>
+  );
+}
+
+function SectionTitle() {
+  return (
+    <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap>
+      <Typography variant="h2">Tổng quan</Typography>
+      <CustomButton component={RouterLink} to="/chu-nha-hang/nha-hang">
+        Quản lý chi nhánh
+      </CustomButton>
     </Stack>
   );
 }

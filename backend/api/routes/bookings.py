@@ -1,92 +1,69 @@
+from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
 
+import crud.reservation as crud_reservation
+import crud.restaurant as crud_restaurant
+from api.deps import get_current_user
 from core.database import get_db
 from models.user import User
-from models.restaurant import Restaurant
-from models.booking import Booking
-from schemas.booking import BookingCreate, BookingResponse
-from api.deps import get_current_user
-import crud.booking as crud_booking
+from schemas.booking import ReservationCreate, ReservationResponse
 
 router = APIRouter()
 
-# ==========================================
-# LUỒNG KHÁCH HÀNG (CUSTOMER)
-# ==========================================
 
-@router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
+def _serialize_reservation(reservation):
+    return {
+        "reservation_id": reservation.reservation_id,
+        "restaurant_id": reservation.restaurant_id,
+        "customer_id": reservation.customer_id,
+        "reservation_time": reservation.reservation_time,
+        "guest_count": reservation.guest_count,
+        "notes": reservation.notes,
+        "status": reservation.status,
+        "rejection_reason": reservation.rejection_reason,
+        "created_at": reservation.created_at,
+        "updated_at": reservation.updated_at,
+    }
+
+
+@router.post("/", response_model=ReservationResponse, status_code=status.HTTP_201_CREATED)
 def create_booking(
-    booking_in: BookingCreate, 
+    booking_in: ReservationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) # Yêu cầu đăng nhập
+    current_user: User = Depends(get_current_user),
 ):
-    """API Đặt bàn mới (Chỉ dành cho Khách hàng)"""
-    
-    # 1. Kiểm tra Nhà hàng có tồn tại không
-    restaurant = db.query(Restaurant).filter(Restaurant.id == booking_in.restaurant_id).first()
-    if not restaurant:
-        raise HTTPException(status_code=404, detail="Không tìm thấy nhà hàng này")
-        
-    # 2. Tạo đơn đặt bàn, tự động gán ID của người đang đăng nhập
-    return crud_booking.create_booking(db=db, booking=booking_in, customer_id=current_user.id)
+    if current_user.role != "CUSTOMER":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ khách hàng mới được đặt bàn")
 
-@router.get("/my-bookings", response_model=List[BookingResponse])
+    restaurant = crud_restaurant.get_restaurant_by_id(db, booking_in.restaurant_id)
+    if not restaurant or restaurant.status != "APPROVED":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy nhà hàng này")
+
+    created_booking = crud_reservation.create_reservation(db, booking_in, current_user.user_id)
+    return _serialize_reservation(created_booking)
+
+
+@router.get("/my-bookings", response_model=list[ReservationResponse])
 def get_my_bookings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """API Xem lịch sử đặt bàn của Khách hàng"""
-    return crud_booking.get_bookings_by_customer(db, customer_id=current_user.id)
+    bookings = crud_reservation.get_reservations_by_customer(db, current_user.user_id)
+    return [_serialize_reservation(booking) for booking in bookings]
 
-# ==========================================
-# LUỒNG CHỦ QUÁN (OWNER)
-# ==========================================
 
-@router.get("/restaurant/{restaurant_id}", response_model=List[BookingResponse])
-def get_restaurant_bookings(
-    restaurant_id: int,
+@router.put("/{booking_id}/cancel", response_model=ReservationResponse)
+def cancel_my_booking(
+    booking_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """API Xem danh sách đặt bàn (Chỉ Chủ quán của nhà hàng đó mới xem được)"""
-    
-    # 1. Kiểm tra nhà hàng
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
-    if not restaurant:
-        raise HTTPException(status_code=404, detail="Không tìm thấy nhà hàng")
-        
-    # 2. BẢO MẬT: Kiểm tra xem người đang đăng nhập có đúng là Chủ của nhà hàng này không?
-    if restaurant.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Bạn không có quyền xem dữ liệu của nhà hàng này")
-        
-    return crud_booking.get_bookings_by_restaurant(db, restaurant_id=restaurant_id)
+    booking = crud_reservation.get_reservation_by_id(db, booking_id)
+    if not booking or booking.customer_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đơn đặt bàn")
 
-@router.put("/{booking_id}/status", response_model=BookingResponse)
-def update_booking_status(
-    booking_id: int,
-    new_status: str, # Trạng thái mới: "confirmed" hoặc "cancelled"
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """API Cập nhật trạng thái đơn đặt bàn (Xác nhận/Từ chối)"""
-    
-    # 1. Tìm đơn đặt bàn
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
-    if not booking:
-        raise HTTPException(status_code=404, detail="Không tìm thấy đơn đặt bàn")
-        
-    # 2. Tìm nhà hàng của đơn đặt bàn đó
-    restaurant = db.query(Restaurant).filter(Restaurant.id == booking.restaurant_id).first()
-    
-    # 3. BẢO MẬT: Phải là Chủ của nhà hàng đó mới được duyệt đơn
-    if restaurant.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Bạn không có quyền thay đổi trạng thái đơn này")
-        
-    # 4. Kiểm tra trạng thái hợp lệ
-    valid_statuses = ["pending", "confirmed", "cancelled"]
-    if new_status not in valid_statuses:
-        raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ")
-        
-    return crud_booking.update_booking_status(db, booking_id=booking_id, status=new_status)
+    updated_booking = crud_reservation.cancel_reservation(db, booking_id)
+    return _serialize_reservation(updated_booking)

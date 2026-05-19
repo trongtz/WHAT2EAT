@@ -1,5 +1,6 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { authService } from "../services/authService";
+import { clearAllCachedResources } from "../services/requestCache";
 import { clearGuestSessionData, createGuestUser } from "../utils/guestSession";
 import {
   GUEST_AUTH_TOKEN,
@@ -30,6 +31,7 @@ export const AuthProvider = ({ children }) => {
         ...response,
         user: normalizeStoredUser(response.user),
       };
+      clearAllCachedResources();
       clearGuestSessionData();
       setStoredAuth(normalizedResponse);
       setUser(normalizedResponse.user);
@@ -54,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const guestUser = createGuestUser();
+      clearAllCachedResources();
       clearStoredAuth();
       clearGuestSessionData();
       setStoredAuth({ token: GUEST_AUTH_TOKEN, user: guestUser });
@@ -66,6 +69,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    clearAllCachedResources();
     clearStoredAuth();
     clearGuestSessionData();
     setUser(null);

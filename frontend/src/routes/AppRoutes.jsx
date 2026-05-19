@@ -14,13 +14,12 @@ import RegisterPage from "../pages/RegisterPage";
 import RestaurantDetailPage from "../pages/RestaurantDetailPage";
 import ReviewPage from "../pages/ReviewPage";
 import SearchPage from "../pages/SearchPage";
-import AdminAnalyticsPage from "../pages/admin/AdminAnalyticsPage";
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
 import AdminRestaurantsPage from "../pages/admin/AdminRestaurantsPage";
-import AdminUsersPage from "../pages/admin/AdminUsersPage";
 import OwnerBookingsPage from "../pages/owner/OwnerBookingsPage";
 import OwnerDashboardPage from "../pages/owner/OwnerDashboardPage";
 import OwnerMenuPage from "../pages/owner/OwnerMenuPage";
+import OwnerRestaurantDetailPage from "../pages/owner/OwnerRestaurantDetailPage";
 import OwnerRestaurantsPage from "../pages/owner/OwnerRestaurantsPage";
 import OwnerReviewsPage from "../pages/owner/OwnerReviewsPage";
 
@@ -111,6 +110,7 @@ function AppRoutes() {
           </ProtectedRoute>
         )}
       />
+
       <Route
         path="/chu-nha-hang/dashboard"
         element={withBackofficeLayout(
@@ -126,6 +126,15 @@ function AppRoutes() {
           "owner",
           <ProtectedRoute roles={["owner"]}>
             <OwnerRestaurantsPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/chu-nha-hang/nha-hang/:restaurantId"
+        element={withBackofficeLayout(
+          "owner",
+          <ProtectedRoute roles={["owner"]}>
+            <OwnerRestaurantDetailPage />
           </ProtectedRoute>
         )}
       />
@@ -156,30 +165,13 @@ function AppRoutes() {
           </ProtectedRoute>
         )}
       />
+
       <Route
         path="/admin/dashboard"
         element={withBackofficeLayout(
           "admin",
           <ProtectedRoute roles={["admin"]}>
             <AdminDashboardPage />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/admin/phan-tich"
-        element={withBackofficeLayout(
-          "admin",
-          <ProtectedRoute roles={["admin"]}>
-            <AdminAnalyticsPage />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/admin/nguoi-dung"
-        element={withBackofficeLayout(
-          "admin",
-          <ProtectedRoute roles={["admin"]}>
-            <AdminUsersPage />
           </ProtectedRoute>
         )}
       />
@@ -192,6 +184,7 @@ function AppRoutes() {
           </ProtectedRoute>
         )}
       />
+
       <Route path="*" element={withLayout(<NotFoundPage />)} />
     </Routes>
   );

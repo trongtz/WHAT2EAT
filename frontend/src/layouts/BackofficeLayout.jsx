@@ -1,14 +1,10 @@
-import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ApprovalRoundedIcon from "@mui/icons-material/ApprovalRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
-import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
-import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
-import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
-import { Avatar, Box, Button, Chip, Container, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Button, Container, Stack, Typography } from "@mui/material";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
@@ -16,32 +12,25 @@ const navByRole = {
   owner: [
     { label: "Tổng quan", to: "/chu-nha-hang/dashboard", icon: <DashboardRoundedIcon /> },
     { label: "Nhà hàng", to: "/chu-nha-hang/nha-hang", icon: <StorefrontRoundedIcon /> },
-    { label: "Menu", to: "/chu-nha-hang/menu", icon: <MenuBookRoundedIcon /> },
     { label: "Đặt bàn", to: "/chu-nha-hang/dat-ban", icon: <TableRestaurantRoundedIcon /> },
     { label: "Đánh giá", to: "/chu-nha-hang/danh-gia", icon: <RateReviewRoundedIcon /> },
   ],
   admin: [
     { label: "Tổng quan", to: "/admin/dashboard", icon: <DashboardRoundedIcon /> },
-    { label: "Phân tích", to: "/admin/phan-tich", icon: <AnalyticsRoundedIcon /> },
-    { label: "Người dùng", to: "/admin/nguoi-dung", icon: <PeopleRoundedIcon /> },
     { label: "Duyệt nhà hàng", to: "/admin/nha-hang", icon: <ApprovalRoundedIcon /> },
   ],
 };
 
 const roleMeta = {
   owner: {
-    title: "Trung tâm vận hành nhà hàng",
-    subtitle: "Quản lý bàn, menu, đánh giá và hiệu suất theo thời gian thực.",
+    subtitle: "Chủ nhà hàng",
     accent: "var(--app-primary-gradient)",
     avatarColor: "var(--app-primary)",
-    chip: "Chủ nhà hàng",
   },
   admin: {
-    title: "Bảng điều khiển quản trị",
-    subtitle: "Kiểm soát duyệt nhà hàng, tài khoản và sức khỏe hệ thống.",
+    subtitle: "Admin",
     accent: "var(--app-secondary-gradient)",
     avatarColor: "var(--app-secondary-dark)",
-    chip: "Admin",
   },
 };
 
@@ -57,12 +46,7 @@ function BackofficeLayout({ role, children }) {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        background: "var(--app-shell-gradient)",
-      }}
-    >
+    <Box sx={{ minHeight: "100vh", background: "var(--app-shell-gradient)" }}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Box
           sx={{
@@ -97,36 +81,17 @@ function BackofficeLayout({ role, children }) {
                     boxShadow: "0 18px 36px color-mix(in srgb, var(--app-text-primary) 16%, transparent)",
                   }}
                 >
-                  {role === "admin" ? <RestaurantRoundedIcon /> : <StorefrontRoundedIcon />}
+                  <StorefrontRoundedIcon />
                 </Box>
                 <Box>
                   <Typography variant="h4" sx={{ fontSize: "1.2rem" }}>
                     WHAT2EAT
                   </Typography>
                   <Typography color="text.secondary" sx={{ fontSize: "0.92rem" }}>
-                    {meta.chip}
+                    {meta.subtitle}
                   </Typography>
                 </Box>
               </Stack>
-
-              <Box
-                sx={{
-                  borderRadius: 2,
-                  p: 2,
-                  color: "white",
-                  background: meta.accent,
-                }}
-              >
-                <Chip
-                  label={meta.chip}
-                  size="small"
-                  sx={{ mb: 1.5, bgcolor: "rgba(255,255,255,0.16)", color: "white" }}
-                />
-                <Typography variant="h4" sx={{ fontSize: "1.15rem", mb: 0.75 }}>
-                  {meta.title}
-                </Typography>
-                <Typography sx={{ opacity: 0.9, fontSize: "0.92rem" }}>{meta.subtitle}</Typography>
-              </Box>
 
               <Stack spacing={1}>
                 {navItems.map((item) => (
@@ -174,11 +139,7 @@ function BackofficeLayout({ role, children }) {
                 </Stack>
               </Box>
 
-              <Button
-                onClick={handleLogout}
-                startIcon={<LogoutRoundedIcon />}
-                sx={{ justifyContent: "flex-start", borderRadius: 2 }}
-              >
+              <Button onClick={handleLogout} startIcon={<LogoutRoundedIcon />} sx={{ justifyContent: "flex-start", borderRadius: 2 }}>
                 Đăng xuất
               </Button>
             </Stack>

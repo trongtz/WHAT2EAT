@@ -1,13 +1,31 @@
 import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import CustomCard from "./CustomCard";
-import { formatCurrency, getStatusColor } from "../utils/helpers";
+import { formatCurrency, formatPriceRangeDisplay, getPriceRangeLabel } from "../utils/helpers";
 
-function RestaurantCard({ restaurant, action, compact = false }) {
+function RestaurantCard({
+  restaurant,
+  action,
+  compact = false,
+  isFavorite = false,
+  onToggleFavorite,
+  hideFavoriteButton = false,
+}) {
+  const ratingValue = Number(restaurant.rating || restaurant.averageRating || 0);
+  const ratingLabel = ratingValue > 0 ? ratingValue.toFixed(1) : "Mới";
+  const topLabel = restaurant.category || getPriceRangeLabel(restaurant.priceRange);
+
+  const handleToggleFavorite = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggleFavorite?.(restaurant);
+  };
+
   return (
     <CustomCard
       sx={{
@@ -46,14 +64,23 @@ function RestaurantCard({ restaurant, action, compact = false }) {
               transition: "transform 0.35s ease",
             }}
           />
-          <Chip
-            label={restaurant.status}
-            color={getStatusColor(restaurant.status)}
-            sx={{ position: "absolute", top: 16, left: 16, fontWeight: 700, zIndex: 1 }}
-          />
+          {topLabel ? (
+            <Chip
+              label={topLabel}
+              sx={{
+                position: "absolute",
+                top: 16,
+                left: 16,
+                fontWeight: 700,
+                zIndex: 1,
+                bgcolor: "rgba(255,255,255,0.92)",
+                color: "var(--app-primary)",
+              }}
+            />
+          ) : null}
           <Chip
             icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
-            label={`${restaurant.rating} (${restaurant.reviews})`}
+            label={ratingLabel}
             sx={{
               position: "absolute",
               right: 16,
@@ -63,18 +90,24 @@ function RestaurantCard({ restaurant, action, compact = false }) {
               color: "#18212F",
             }}
           />
-          <IconButton
-            sx={{
-              position: "absolute",
-              top: 14,
-              right: 14,
-              zIndex: 1,
-              bgcolor: "rgba(255,255,255,0.9)",
-              "&:hover": { bgcolor: "white" },
-            }}
-          >
-            <FavoriteBorderRoundedIcon />
-          </IconButton>
+          {!hideFavoriteButton ? (
+            <IconButton
+              onClick={handleToggleFavorite}
+              sx={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                zIndex: 1,
+                bgcolor: isFavorite ? "rgba(255,236,240,0.96)" : "rgba(255,255,255,0.9)",
+                color: isFavorite ? "#E85D75" : "rgba(15,23,42,0.72)",
+                "&:hover": {
+                  bgcolor: isFavorite ? "rgba(255,228,235,1)" : "white",
+                },
+              }}
+            >
+              {isFavorite ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+            </IconButton>
+          ) : null}
         </Box>
 
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
@@ -89,14 +122,16 @@ function RestaurantCard({ restaurant, action, compact = false }) {
             </Typography>
             <Typography color="text.secondary">{restaurant.category}</Typography>
           </Box>
-          <Chip
-            label={restaurant.distance}
-            sx={{
-              bgcolor: "rgba(74,144,226,0.12)",
-              color: "#4A90E2",
-              flexShrink: 0,
-            }}
-          />
+          {restaurant.distance ? (
+            <Chip
+              label={restaurant.distance}
+              sx={{
+                bgcolor: "color-mix(in srgb, var(--app-secondary) 12%, white)",
+                color: "var(--app-secondary)",
+                flexShrink: 0,
+              }}
+            />
+          ) : null}
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center">
@@ -112,7 +147,9 @@ function RestaurantCard({ restaurant, action, compact = false }) {
           <Box>
             <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>Mức giá tham khảo</Typography>
             <Typography fontWeight={800} color="primary.main">
-              {restaurant.averagePrice ? `Từ ${formatCurrency(restaurant.averagePrice)}` : restaurant.priceRange}
+              {restaurant.averagePrice
+                ? `Từ ${formatCurrency(restaurant.averagePrice)}`
+                : formatPriceRangeDisplay(restaurant.priceRange)}
             </Typography>
           </Box>
 
@@ -125,8 +162,8 @@ function RestaurantCard({ restaurant, action, compact = false }) {
               label="Xem chi tiết"
               sx={{
                 px: 1,
-                bgcolor: "rgba(255, 138, 42, 0.12)",
-                color: "primary.main",
+                bgcolor: "color-mix(in srgb, var(--app-primary) 12%, white)",
+                color: "var(--app-primary)",
               }}
             />
           )}

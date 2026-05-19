@@ -39,7 +39,7 @@ export const clearGuestSessionData = () => {
 export const getGuestFavoriteIds = () => readSessionArray(guestSessionKeys.favorites);
 
 export const toggleGuestFavorite = (restaurantId) => {
-  const normalizedRestaurantId = Number(restaurantId);
+  const normalizedRestaurantId = String(restaurantId);
   const favoriteIds = getGuestFavoriteIds();
   const nextFavoriteIds = favoriteIds.includes(normalizedRestaurantId)
     ? favoriteIds.filter((id) => id !== normalizedRestaurantId)
