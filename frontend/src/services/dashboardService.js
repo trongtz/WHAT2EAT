@@ -58,14 +58,14 @@ export const dashboardService = {
     return normalizeOwnerBooking(response.data);
   },
 
-  getAdminOverview: async () => {
+  getAdminOverview: async (options = {}) => {
     return getCachedResource(
       "admin:overview",
       async () => {
         const response = await apiClient.get("/admin/overview");
         return response.data;
       },
-      { ttlMs: ADMIN_OVERVIEW_TTL_MS }
+      { ttlMs: ADMIN_OVERVIEW_TTL_MS, forceRefresh: options.forceRefresh }
     );
   },
 

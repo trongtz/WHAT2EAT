@@ -1,8 +1,8 @@
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
-import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, Container, Grid, Stack, Typography } from "@mui/material";
+import AppLogoImage from "../components/AppLogoImage";
 
 const authHighlights = [
   { label: "Gợi ý hợp gu", value: "AI picks", icon: AutoAwesomeRoundedIcon, color: "var(--app-primary)" },
@@ -69,12 +69,7 @@ function AuthLayout({ title, subtitle, children }) {
                   }}
                 >
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <RestaurantRoundedIcon sx={{ color: "white", fontSize: 20 }} />
-                    <Typography
-                      sx={{ color: "white", fontWeight: 800, letterSpacing: "0.05em", fontSize: "0.92rem" }}
-                    >
-                      WHAT2EAT
-                    </Typography>
+                    <AppLogoImage size={38} />
                   </Stack>
                 </Box>
 

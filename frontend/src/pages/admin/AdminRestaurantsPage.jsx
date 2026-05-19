@@ -11,16 +11,23 @@ import { restaurantService } from "../../services/restaurantService";
 import { getPriceRangeLabel } from "../../utils/helpers";
 
 function AdminRestaurantsPage() {
-  const [items, setItems] = useState(null);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const loadData = async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      const data = await restaurantService.getAdminRestaurants();
+      const data = await restaurantService.getAdminRestaurants(undefined, { forceRefresh: true });
       setItems(data);
     } catch (err) {
       setError(err.message);
+      setItems([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,15 +35,21 @@ function AdminRestaurantsPage() {
     loadData();
   }, []);
 
-  const pendingItems = useMemo(() => (items || []).filter((item) => item.status === "PENDING"), [items]);
+  const pendingItems = useMemo(() => items.filter((item) => item.status === "PENDING"), [items]);
 
   const handleStatus = async (restaurantId, status) => {
-    await restaurantService.updateAdminRestaurantStatus(restaurantId, status);
-    setMessage(status === "APPROVED" ? "Đã duyệt chi nhánh." : "Đã từ chối chi nhánh.");
-    await loadData();
+    setError("");
+
+    try {
+      await restaurantService.updateAdminRestaurantStatus(restaurantId, status);
+      setMessage(status === "APPROVED" ? "Đã duyệt chi nhánh." : "Đã từ chối chi nhánh.");
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
-  if (!items) return <LoadingScreen message="Đang tải danh sách chi nhánh..." />;
+  if (loading) return <LoadingScreen message="Đang tải danh sách chi nhánh..." />;
 
   return (
     <Stack spacing={3}>
@@ -53,7 +66,9 @@ function AdminRestaurantsPage() {
                   <Stack spacing={1.25}>
                     <Typography variant="h4">{item.name}</Typography>
                     <Typography color="text.secondary">{item.address}</Typography>
-                    <Typography color="text.secondary">Owner: {item.ownerName || item.ownerEmail || "Chưa rõ"}</Typography>
+                    <Typography color="text.secondary">
+                      Owner: {item.ownerName || item.ownerEmail || "Chưa rõ"}
+                    </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       {item.cuisineType
                         ?.split(",")

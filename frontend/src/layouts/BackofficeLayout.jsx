@@ -6,6 +6,7 @@ import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import TableRestaurantRoundedIcon from "@mui/icons-material/TableRestaurantRounded";
 import { Avatar, Box, Button, Container, Stack, Typography } from "@mui/material";
 import { NavLink, useNavigate } from "react-router-dom";
+import AppLogoImage from "../components/AppLogoImage";
 import { useAuth } from "../hooks/useAuth";
 
 const navByRole = {
@@ -76,12 +77,11 @@ function BackofficeLayout({ role, children }) {
                     borderRadius: 2,
                     display: "grid",
                     placeItems: "center",
-                    color: "white",
-                    background: meta.accent,
+                    bgcolor: "#050505",
                     boxShadow: "0 18px 36px color-mix(in srgb, var(--app-text-primary) 16%, transparent)",
                   }}
                 >
-                  <StorefrontRoundedIcon />
+                  <AppLogoImage size={40} />
                 </Box>
                 <Box>
                   <Typography variant="h4" sx={{ fontSize: "1.2rem" }}>
@@ -127,7 +127,9 @@ function BackofficeLayout({ role, children }) {
                 }}
               >
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar sx={{ bgcolor: meta.avatarColor }}>{user?.fullName?.charAt(0)}</Avatar>
+                  <Avatar sx={{ bgcolor: "#050505" }}>
+                    <AppLogoImage size={26} />
+                  </Avatar>
                   <Box minWidth={0}>
                     <Typography fontWeight={700} noWrap>
                       {user?.fullName}

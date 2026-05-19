@@ -7,21 +7,38 @@ import { dashboardService } from "../../services/dashboardService";
 
 function AdminDashboardPage() {
   const [overview, setOverview] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
+      setError("");
+
       try {
-        const data = await dashboardService.getAdminOverview();
+        const data = await dashboardService.getAdminOverview({ forceRefresh: true });
         setOverview(data);
       } catch (err) {
         setError(err.message);
+        setOverview({
+          totalRestaurants: 0,
+          pendingRestaurants: 0,
+          activeRestaurants: 0,
+          totalOwners: 0,
+          totalUsers: 0,
+          totalCustomers: 0,
+          totalBookings: 0,
+          averageRating: 0,
+        });
+      } finally {
+        setLoading(false);
       }
     };
+
     loadData();
   }, []);
 
-  if (!overview) return <LoadingScreen message="Đang tải tổng quan..." />;
+  if (loading) return <LoadingScreen message="Đang tải tổng quan..." />;
 
   return (
     <Stack spacing={3}>
