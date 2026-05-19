@@ -1,6 +1,5 @@
-import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import { Alert, Box, Chip, Grid, Stack, Typography } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
 import EmptyState from "../../components/EmptyState";
@@ -16,6 +15,7 @@ const BOOKING_STATUS_LABELS = {
   CONFIRMED: "Đã xác nhận",
   REJECTED: "Từ chối",
   CANCELLED: "Đã hủy",
+  COMPLETED: "Hoàn thành",
 };
 
 function OwnerBookingsPage() {
@@ -26,25 +26,37 @@ function OwnerBookingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [restaurantData, bookingData] = await Promise.all([
-        restaurantService.getOwnerRestaurants(user.id),
-        dashboardService.getOwnerBookings(),
-      ]);
-      setRestaurants(restaurantData);
-      setBookings(bookingData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadData = useCallback(
+    async ({ showLoading = true } = {}) => {
+      if (showLoading) setLoading(true);
+      try {
+        const [restaurantData, bookingData] = await Promise.all([
+          restaurantService.getOwnerRestaurants(user.id),
+          dashboardService.getOwnerBookings(),
+        ]);
+        setRestaurants(restaurantData);
+        setBookings(bookingData);
+        setError("");
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        if (showLoading) setLoading(false);
+      }
+    },
+    [user.id]
+  );
 
   useEffect(() => {
     loadData();
-  }, [user.id]);
+  }, [loadData]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      loadData({ showLoading: false });
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadData]);
 
   const groupedBookings = useMemo(() => {
     return restaurants
@@ -56,9 +68,14 @@ function OwnerBookingsPage() {
   }, [bookings, restaurants]);
 
   const handleStatus = async (bookingId, status) => {
-    await dashboardService.updateBookingStatus({ bookingId, status });
-    setMessage("Đã cập nhật trạng thái đặt bàn.");
-    await loadData();
+    try {
+      await dashboardService.updateBookingStatus({ bookingId, status });
+      setMessage("Đã cập nhật trạng thái đặt bàn.");
+      setError("");
+      await loadData({ showLoading: false });
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   if (loading) return <LoadingScreen message="Đang tải lịch đặt bàn..." />;
@@ -100,7 +117,7 @@ function OwnerBookingsPage() {
                         <Typography color="text.secondary">{restaurant.address}</Typography>
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                           <Chip label={restaurant.status === "APPROVED" ? "Đã duyệt" : "Chờ duyệt"} color={restaurant.status === "APPROVED" ? "success" : "warning"} />
-                          <Chip label={`${restaurant.averageRating > 0 ? restaurant.averageRating.toFixed(1) : "Không có"} sao`} />
+                          <Chip label={`${restaurant.averageRating > 0 ? restaurant.averageRating.toFixed(1) : "Chưa có"} sao`} />
                         </Stack>
 
                         <Grid container spacing={2}>
@@ -121,56 +138,51 @@ function OwnerBookingsPage() {
                     </Stack>
 
                     <Grid container spacing={1.5}>
-                      {restaurantBookings.map((booking) => (
-                        <Grid key={booking.id} size={{ xs: 12, xl: 6 }}>
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 2,
-                              bgcolor: "rgba(248,250,255,0.92)",
-                              border: "1px solid rgba(15,23,42,0.06)",
-                            }}
-                          >
-                            <Stack spacing={1}>
-                              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Typography fontWeight={800}>{booking.customerName}</Typography>
-                                <Chip
-                                  label={BOOKING_STATUS_LABELS[booking.status] || booking.status}
-                                  color={getStatusColor(BOOKING_STATUS_LABELS[booking.status] || booking.status)}
-                                />
+                      {restaurantBookings.map((booking) => {
+                        const statusLabel = booking.statusLabel || BOOKING_STATUS_LABELS[booking.status] || booking.status;
+
+                        return (
+                          <Grid key={booking.id} size={{ xs: 12, xl: 6 }}>
+                            <Box
+                              sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                bgcolor: "rgba(248,250,255,0.92)",
+                                border: "1px solid rgba(15,23,42,0.06)",
+                              }}
+                            >
+                              <Stack spacing={1}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                  <Typography fontWeight={800}>{booking.customerName}</Typography>
+                                  <Chip label={statusLabel} color={getStatusColor(statusLabel)} />
+                                </Stack>
+                                <Typography color="text.secondary">
+                                  {formatDateTime(booking.reservationTime)} - {booking.guestCount} khách
+                                </Typography>
+                                <Typography color="text.secondary">Ghi chú: {booking.notes || "Không có"}</Typography>
+                                <Chip label={booking.status === "CONFIRMED" ? "Đã sẵn sàng phục vụ" : "Cần xử lý"} sx={{ alignSelf: "flex-start" }} />
+                                <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
+                                  <CustomButton onClick={() => handleStatus(booking.id, "CONFIRMED")}>
+                                    Xác nhận
+                                  </CustomButton>
+                                  <CustomButton
+                                    onClick={() => handleStatus(booking.id, "REJECTED")}
+                                    sx={{ background: "linear-gradient(135deg, #E85D75 0%, #FB7185 100%)" }}
+                                  >
+                                    Từ chối
+                                  </CustomButton>
+                                  <CustomButton
+                                    onClick={() => handleStatus(booking.id, "PENDING")}
+                                    sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
+                                  >
+                                    Chờ duyệt lại
+                                  </CustomButton>
+                                </Stack>
                               </Stack>
-                              <Typography color="text.secondary">
-                                {formatDateTime(booking.reservationTime)} • {booking.guestCount} khách
-                              </Typography>
-                              <Typography color="text.secondary">
-                                Ghi chú: {booking.notes || "Không có"}
-                              </Typography>
-                              <Chip
-                                icon={<EventAvailableRoundedIcon />}
-                                label={booking.status === "CONFIRMED" ? "Đã sẵn sàng phục vụ" : "Cần xử lý"}
-                                sx={{ alignSelf: "flex-start" }}
-                              />
-                              <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
-                                <CustomButton onClick={() => handleStatus(booking.id, "Đã xác nhận")}>
-                                  Xác nhận
-                                </CustomButton>
-                                <CustomButton
-                                  onClick={() => handleStatus(booking.id, "Đã hủy")}
-                                  sx={{ background: "linear-gradient(135deg, #E85D75 0%, #FB7185 100%)" }}
-                                >
-                                  Hủy lịch
-                                </CustomButton>
-                                <CustomButton
-                                  onClick={() => handleStatus(booking.id, "Chờ duyệt")}
-                                  sx={{ background: "linear-gradient(135deg, #64748B 0%, #94A3B8 100%)" }}
-                                >
-                                  Chờ duyệt lại
-                                </CustomButton>
-                              </Stack>
-                            </Stack>
-                          </Box>
-                        </Grid>
-                      ))}
+                            </Box>
+                          </Grid>
+                        );
+                      })}
                     </Grid>
                   </Stack>
                 </CustomCard>

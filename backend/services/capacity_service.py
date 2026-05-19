@@ -104,8 +104,8 @@ def count_booked_tables_for_date(
     target_date = target_date or date.today()
     start_datetime = datetime.combine(target_date, time.min)
     end_datetime = start_datetime + timedelta(days=1)
-    return int(
-        db.query(func.count(Reservation.reservation_id))
+    booked_capacity = (
+        db.query(func.sum(Reservation.guest_count))
         .filter(
             Reservation.restaurant_id == restaurant_id,
             Reservation.reservation_time >= start_datetime,
@@ -115,12 +115,13 @@ def count_booked_tables_for_date(
         .scalar()
         or 0
     )
+    return int(booked_capacity)
 
 
 def attach_capacity_summary(db: Session, restaurant: Restaurant) -> Restaurant:
     max_capacity = get_restaurant_capacity_for_date(db, restaurant.restaurant_id)
-    booked_tables = count_booked_tables_for_date(db, restaurant.restaurant_id)
-    available_capacity = max(max_capacity - booked_tables, 0)
+    booked_capacity = count_booked_tables_for_date(db, restaurant.restaurant_id)
+    available_capacity = max(max_capacity - booked_capacity, 0)
 
     setattr(restaurant, "max_capacity", max_capacity)
     setattr(restaurant, "available_capacity", available_capacity)

@@ -1,7 +1,13 @@
 import apiClient from "./apiClient";
-import { getCachedResource, invalidateCachePrefix } from "./requestCache";
+import { invalidateCachePrefix } from "./requestCache";
 
-const BOOKING_HISTORY_TTL_MS = 30 * 1000;
+const BOOKING_STATUS_LABELS = {
+  PENDING: "Chờ duyệt",
+  CONFIRMED: "Đã xác nhận",
+  REJECTED: "Từ chối",
+  CANCELLED: "Đã hủy",
+  COMPLETED: "Hoàn thành",
+};
 
 const toDateInputValue = (value) => {
   if (!value) return "";
@@ -33,20 +39,16 @@ const normalizeBooking = (booking) => {
     time: booking.time ?? toTimeInputValue(reservationTime),
     notes,
     note: notes,
+    statusLabel: BOOKING_STATUS_LABELS[booking.status] || booking.status || "",
+    rejectionReason: booking.rejection_reason ?? booking.rejectionReason ?? "",
     createdAt: booking.created_at ?? booking.createdAt,
   };
 };
 
 export const bookingService = {
   getHistory: async () => {
-    return getCachedResource(
-      "booking:history",
-      async () => {
-        const response = await apiClient.get("/bookings/my-bookings");
-        return response.data.map(normalizeBooking);
-      },
-      { ttlMs: BOOKING_HISTORY_TTL_MS }
-    );
+    const response = await apiClient.get("/bookings/my-bookings");
+    return response.data.map(normalizeBooking);
   },
   create: async (payload) => {
     const reservationTime = new Date(`${payload.date}T${payload.time}`);

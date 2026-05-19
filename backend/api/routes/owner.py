@@ -13,6 +13,8 @@ from models.user import User
 
 router = APIRouter()
 
+VALID_BOOKING_STATUSES = {"PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED"}
+
 
 class OwnerBookingStatusUpdate(BaseModel):
     bookingId: UUID
@@ -42,8 +44,35 @@ def normalize_booking_status(status_value: str) -> str:
         "TỪ CHỐI": "REJECTED",
         "TU CHOI": "REJECTED",
         "REJECTED": "REJECTED",
+        "COMPLETED": "COMPLETED",
     }
     return mapping.get(raw, raw)
+
+
+def get_owner_restaurant_ids(db: Session, owner_id: UUID) -> list[UUID]:
+    rows = (
+        db.query(Restaurant.restaurant_id)
+        .filter(Restaurant.owner_id == owner_id)
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def serialize_owner_booking(reservation: Reservation) -> dict:
+    return {
+        "id": reservation.reservation_id,
+        "reservation_id": reservation.reservation_id,
+        "restaurant_id": reservation.restaurant_id,
+        "customer_id": reservation.customer_id,
+        "reservation_time": reservation.reservation_time,
+        "guest_count": reservation.guest_count,
+        "notes": reservation.notes,
+        "status": reservation.status,
+        "rejection_reason": reservation.rejection_reason,
+        "created_at": reservation.created_at,
+        "updated_at": reservation.updated_at,
+        "customerName": reservation.customer.full_name if reservation.customer else "Khách hàng",
+    }
 
 
 @router.get("/reviews")
@@ -53,13 +82,7 @@ def get_owner_reviews(
 ):
     require_owner(current_user)
 
-    owner_restaurant_ids = (
-        db.query(Restaurant.restaurant_id)
-        .filter(Restaurant.owner_id == current_user.user_id)
-        .all()
-    )
-    restaurant_ids = [row[0] for row in owner_restaurant_ids]
-
+    restaurant_ids = get_owner_restaurant_ids(db, current_user.user_id)
     if not restaurant_ids:
         return []
 
@@ -97,13 +120,7 @@ def get_owner_bookings(
 ):
     require_owner(current_user)
 
-    owner_restaurant_ids = (
-        db.query(Restaurant.restaurant_id)
-        .filter(Restaurant.owner_id == current_user.user_id)
-        .all()
-    )
-    restaurant_ids = [row[0] for row in owner_restaurant_ids]
-
+    restaurant_ids = get_owner_restaurant_ids(db, current_user.user_id)
     if not restaurant_ids:
         return []
 
@@ -114,19 +131,7 @@ def get_owner_bookings(
         .all()
     )
 
-    return [
-        {
-            "id": reservation.reservation_id,
-            "reservation_id": reservation.reservation_id,
-            "restaurant_id": reservation.restaurant_id,
-            "reservation_time": reservation.reservation_time,
-            "guest_count": reservation.guest_count,
-            "notes": reservation.notes,
-            "status": reservation.status,
-            "customerName": reservation.customer.full_name if reservation.customer else "Khách hàng",
-        }
-        for reservation in reservations
-    ]
+    return [serialize_owner_booking(reservation) for reservation in reservations]
 
 
 @router.post("/bookings/update-status")
@@ -149,18 +154,16 @@ def update_owner_booking_status(
     if not reservation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đơn đặt bàn")
 
-    reservation.status = normalize_booking_status(payload.status)
+    next_status = normalize_booking_status(payload.status)
+    if next_status not in VALID_BOOKING_STATUSES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Trạng thái đặt bàn không hợp lệ")
+
+    reservation.status = next_status
+    if next_status != "REJECTED":
+        reservation.rejection_reason = None
+
     db.add(reservation)
     db.commit()
     db.refresh(reservation)
 
-    return {
-        "id": reservation.reservation_id,
-        "reservation_id": reservation.reservation_id,
-        "restaurant_id": reservation.restaurant_id,
-        "reservation_time": reservation.reservation_time,
-        "guest_count": reservation.guest_count,
-        "notes": reservation.notes,
-        "status": reservation.status,
-        "customerName": reservation.customer.full_name if reservation.customer else "Khách hàng",
-    }
+    return serialize_owner_booking(reservation)

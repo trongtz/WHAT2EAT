@@ -1,4 +1,3 @@
-import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
 import { Alert, Grid, MenuItem, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -89,7 +88,7 @@ function BookingPage() {
                 </Grid>
               </Grid>
               <FormInput multiline rows={4} label="Ghi chú" name="note" value={values.note} onChange={handleChange} />
-              <CustomButton type="submit" startIcon={<EventSeatRoundedIcon />}>
+              <CustomButton type="submit">
                 Xác nhận đặt bàn
               </CustomButton>
             </Stack>
