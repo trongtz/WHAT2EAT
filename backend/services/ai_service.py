@@ -1,38 +1,33 @@
-# File: services/ai_service.py
-from sqlalchemy.orm import Session
-import crud.restaurant as crud_restaurant
+from __future__ import annotations
 
-def generate_recommendation(query: str, db: Session) -> dict:
-    """
-    ===================================================================
-    KHU VỰC DÀNH CHO AI ENGINEER 
-    Nhiệm vụ: Phân tích 'query', gọi OpenAI/LangChain, truy vấn Database.
-    ===================================================================
-    
-    Input:
-    - query: Câu hỏi của người dùng (VD: "Tìm quán lẩu cay Quận 1")
-    - db: Session kết nối CSDL (để query lấy nhà hàng)
-    
-    Output (BẮT BUỘC trả về dict chứa 2 key này):
-    - message (str): Câu trả lời giao tiếp tự nhiên của AI
-    - restaurants (List[Restaurant]): Danh sách object nhà hàng phù hợp
-    """
-    
-    # -------------------------------------------------------------
-    # TODO: VIẾT LOGIC LANGCHAIN / OPENAI TẠI ĐÂY
-    # 1. Gắn OPENAI_API_KEY
-    # 2. Phân tích intent (ý định) của user từ biến `query`
-    # 3. Dùng db.query(Restaurant) để tìm quán phù hợp
-    # -------------------------------------------------------------
-    
-    # DƯỚI ĐÂY LÀ DỮ LIỆU MẪU ĐỂ BACKEND TEST (Xóa đi khi tích hợp code thật)
-    print(f"[AI Service] Đang phân tích câu hỏi: {query}")
-    
-    # Tạm thời lấy 3 nhà hàng đầu tiên làm kết quả
-    mock_restaurants = crud_restaurant.get_restaurants(db, skip=0, limit=3)
-    mock_message = f"Dạ, hệ thống AI đang được hoàn thiện. Tạm thời em gợi ý cho anh/chị các quán sau dựa trên từ khóa '{query}' nhé!"
-    
-    return {
-        "message": mock_message,
-        "restaurants": mock_restaurants
-    }
+from typing import Any
+
+from sqlalchemy.orm import Session
+
+import models.registry  # noqa: F401
+from models.user import User
+from services.ai_assistant.service import AIAssistantService
+
+
+_assistant_service = AIAssistantService()
+
+
+def generate_recommendation(
+    query: str,
+    db: Session,
+    *,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    current_user: User | None = None,
+    session_id=None,
+    limit: int = 5,
+) -> dict[str, Any]:
+    return _assistant_service.generate_recommendation(
+        query,
+        db,
+        latitude=latitude,
+        longitude=longitude,
+        current_user=current_user,
+        session_id=session_id,
+        limit=limit,
+    )

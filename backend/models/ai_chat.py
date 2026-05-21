@@ -1,10 +1,11 @@
 import uuid
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from core.database import Base
+from core.db_types import json_column_type
 
 
 class AIChatSession(Base):
@@ -29,7 +30,7 @@ class AIChatMessage(Base):
     session_id = Column(UUID(as_uuid=True), ForeignKey("ai_chat_sessions.session_id"), nullable=False)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    extracted_intent = Column(JSONB, nullable=True)
+    extracted_intent = Column(json_column_type(), nullable=True)
     processing_status = Column(String(20), nullable=False, default="SUCCESS")
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 

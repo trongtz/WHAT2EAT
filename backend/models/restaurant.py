@@ -1,10 +1,11 @@
 import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, synonym
 
 from core.database import Base
+from core.db_types import json_column_type
 
 
 class Restaurant(Base):
@@ -19,7 +20,7 @@ class Restaurant(Base):
     latitude = Column(Numeric(10, 8), nullable=True)
     longitude = Column(Numeric(11, 8), nullable=True)
     phone = Column(String(20), nullable=True)
-    opening_hours = Column(JSONB, nullable=True)
+    opening_hours = Column(json_column_type(), nullable=True)
     price_range = Column(String(20), nullable=True)
     rating_avg = Column(Numeric(3, 2), nullable=False, default=0.0)
     approval_status = Column(String(20), nullable=False, default="PENDING")

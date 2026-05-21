@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
 
@@ -16,7 +18,28 @@ def create_session(db: Session, payload: AIChatSessionCreate, customer_id: UUID 
 
 
 def get_session(db: Session, session_id: UUID) -> AIChatSession | None:
-    return db.query(AIChatSession).filter(AIChatSession.session_id == session_id).first()
+    return (
+        db.query(AIChatSession)
+        .filter(AIChatSession.session_id == session_id)
+        .first()
+    )
+
+
+def get_or_create_session(
+    db: Session,
+    session_id: UUID,
+    customer_id: UUID | None,
+    title: str | None = None,
+) -> AIChatSession:
+    session = get_session(db, session_id)
+    if session:
+        return session
+
+    session = AIChatSession(session_id=session_id, customer_id=customer_id, title=title)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
 
 
 def get_sessions_by_customer(db: Session, customer_id: UUID, skip: int = 0, limit: int = 50) -> list[AIChatSession]:

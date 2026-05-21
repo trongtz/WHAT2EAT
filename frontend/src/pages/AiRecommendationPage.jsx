@@ -6,7 +6,7 @@ import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Alert, Avatar, Box, Chip, CircularProgress, Grid, Stack, Typography } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
 import CustomCard from "../components/CustomCard";
@@ -24,7 +24,9 @@ const fallbackMessage =
 const noResultMessage =
   "Không tìm thấy nhà hàng phù hợp với yêu cầu hiện tại. Bạn có thể thử mở rộng khu vực, tăng ngân sách hoặc thay đổi loại món ăn.";
 
-const createSessionId = () => `ai-chat-${Date.now()}`;
+const AI_CHAT_STORAGE_KEY = "what2eat:ai-recommendation-chat";
+
+const createSessionId = () => crypto.randomUUID();
 
 const getPromptSignals = (prompt) => {
   const normalizedPrompt = String(prompt || "").toLowerCase();
@@ -105,6 +107,30 @@ const createUserMessage = (text) => ({
   role: "user",
   text,
 });
+
+const createInitialMessages = (text = "Chào bạn, hãy mô tả nhu cầu của bạn để mình gợi ý nhà hàng phù hợp.") => [
+  createAssistantMessage({ text }),
+];
+
+const getStoredChat = () => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawValue = window.sessionStorage.getItem(AI_CHAT_STORAGE_KEY);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue);
+    if (!parsed?.sessionId || !Array.isArray(parsed?.messages)) return null;
+
+    return {
+      sessionId: parsed.sessionId,
+      messages: parsed.messages,
+    };
+  } catch {
+    window.sessionStorage.removeItem(AI_CHAT_STORAGE_KEY);
+    return null;
+  }
+};
 
 const getRatingLabel = (restaurant) => {
   const rating = Number(restaurant.averageRating || restaurant.rating || 0);
@@ -284,15 +310,21 @@ function MessageBubble({ message }) {
 
 function AiRecommendationPage() {
   const { user } = useAuth();
-  const [sessionId, setSessionId] = useState(createSessionId);
+  const [sessionId, setSessionId] = useState(() => getStoredChat()?.sessionId || createSessionId());
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState([
-    createAssistantMessage({
-      text: "Chào bạn, hãy mô tả nhu cầu của bạn để mình gợi ý nhà hàng phù hợp.",
-    }),
-  ]);
+  const [messages, setMessages] = useState(() => getStoredChat()?.messages || createInitialMessages());
+
+  useEffect(() => {
+    window.sessionStorage.setItem(
+      AI_CHAT_STORAGE_KEY,
+      JSON.stringify({
+        sessionId,
+        messages,
+      })
+    );
+  }, [messages, sessionId]);
 
   const latestRecommendationMessage = [...messages]
     .reverse()
@@ -305,11 +337,7 @@ function AiRecommendationPage() {
     setPrompt("");
     setError("");
     setLoading(false);
-    setMessages([
-      createAssistantMessage({
-        text: "Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?",
-      }),
-    ]);
+    setMessages(createInitialMessages("Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?"));
   };
 
   const handleSubmit = async (event) => {
@@ -336,7 +364,7 @@ function AiRecommendationPage() {
             const normalized = normalizeRestaurant(restaurant);
             return {
               ...normalized,
-              aiReason: getRecommendationReason(normalized, userPrompt),
+              aiReason: restaurant.reason || restaurant.aiReason || getRecommendationReason(normalized, userPrompt),
             };
           })
         : [];
@@ -346,6 +374,7 @@ function AiRecommendationPage() {
         createAssistantMessage({
           text: data.message || "Mình đã tìm được một vài gợi ý phù hợp cho bạn.",
           restaurants,
+          isFallback: data.source === "FALLBACK",
           isEmpty: restaurants.length === 0,
         }),
       ]);

@@ -1,0 +1,1 @@
+"""AI Assistant backend module."""
