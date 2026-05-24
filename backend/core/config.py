@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080 # 7 ngày
     OPENAI_API_KEY: str
+    AUTO_CREATE_TABLES: bool = False
+    AUTO_SEED: bool = False
 
     class Config:
         env_file = ".env" # Tự động load từ file .env

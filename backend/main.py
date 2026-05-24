@@ -7,8 +7,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from core.config import settings
 from core.database import Base, engine
-from core.init_db import seed_data
 
 # Import models so SQLAlchemy can register metadata before startup initialization.
 import models.ai_chat
@@ -36,8 +36,12 @@ app = FastAPI(title="WHAT2EAT API")
 @app.on_event("startup")
 def initialize_database() -> None:
     try:
-        Base.metadata.create_all(bind=engine)
-        seed_data()
+        if settings.AUTO_CREATE_TABLES:
+            Base.metadata.create_all(bind=engine)
+        if settings.AUTO_SEED:
+            from core.init_db import seed_data
+
+            seed_data()
     except SQLAlchemyError as exc:
         logger.warning("Database initialization skipped: %s", exc)
 
