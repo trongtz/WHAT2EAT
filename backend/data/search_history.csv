@@ -1,1 +1,5 @@
 search_id,customer_id,query_text,search_type,filters_applied,extracted_entities,result_restaurant_ids,created_at
+74891887-9645-5f85-8ef2-0f9e8773eaf3,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,quán cafe yên tĩnh có ổ cắm gần ký túc xá,AI,{},{},"[""c8801b93-c5f3-46bd-8cc6-0e5904f9f770"", ""f49260c9-5224-483c-b2fd-a782da22dc1a"", ""c11dd987-86fe-41bd-93e9-e4563457db53""]",2026-05-18T12:00:00Z
+8c56b024-bf8a-5709-829b-5a363699a176,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,món hàn giá sinh viên gần làng đại học,AI,{},{},"[""71f345ca-d2e6-4beb-8cae-123d742f38b3"", ""4cc6062b-dbe2-42f7-be9c-0db7dd01706a"", ""d5f485f5-3e57-4634-8ae1-677a8fec737c"", ""8c57cd55-f497-4e8b-bcda-933995219b1f""]",2026-05-17T12:00:00Z
+ea5617e6-5373-50d3-b487-e8db1c70a9ba,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,ăn trưa rẻ quanh đại học khoa học tự nhiên,AI,{},{},"[""e4c442c9-3926-4a41-bc12-b8c2c03681d0"", ""87956db4-c63c-473a-93a5-07e32b2d0258"", ""a37fe77f-166d-4bb2-aeba-7ac4e2220745""]",2026-05-16T12:00:00Z
+5ae7e103-25d1-59ec-a3fe-4dd1fdbb3504,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,quán chay nhẹ bụng gần linh trung,AI,{},{},"[""9adb3e44-f86f-419c-a769-114634191c0c""]",2026-05-15T12:00:00Z

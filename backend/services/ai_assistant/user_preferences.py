@@ -83,7 +83,9 @@ def user_behavior_score(restaurant: Restaurant, user_profile: dict[str, Any], se
         score += 3
         reasons.append("Khớp xu hướng tìm kiếm gần đây của bạn")
 
-    explicit_text = normalize_text(f"{restaurant.name} {getattr(restaurant, 'cuisine_type', '')} {restaurant.address}")
+    explicit_text = normalize_text(
+        f"{restaurant.name} {restaurant.description or ''} {getattr(restaurant, 'cuisine_type', '')} {restaurant.address}"
+    )
     if user_profile.get("preferred_cuisines") and any(item in explicit_text for item in user_profile["preferred_cuisines"]):
         score += 3
         reasons.append("Khớp sở thích ẩm thực trong hồ sơ")

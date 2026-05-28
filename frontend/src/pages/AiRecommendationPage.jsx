@@ -256,19 +256,17 @@ function RecommendationListCard({ restaurant, index }) {
             />
           </Stack>
 
-          <Typography
+          <Chip
+            size="small"
+            label={`Gợi ý ${index + 1}`}
             sx={{
-              fontSize: "0.82rem",
-              color: "var(--app-primary)",
-              lineHeight: 1.35,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              alignSelf: "flex-start",
+              height: 26,
+              bgcolor: "color-mix(in srgb, var(--app-secondary) 12%, white)",
+              color: "var(--app-secondary)",
+              fontWeight: 800,
             }}
-          >
-            {restaurant.aiReason || `Gợi ý ${index + 1}`}
-          </Typography>
+          />
         </Stack>
       </Stack>
     </Box>
@@ -425,24 +423,36 @@ function AiRecommendationPage() {
           isEmpty: restaurants.length === 0,
         }),
       ]);
-    } catch {
-      const restaurants = await restaurantService.getRestaurants();
-      const fallbackResult = buildFallbackRecommendation(userPrompt, restaurants);
+    } catch (requestError) {
+      try {
+        const restaurants = await restaurantService.getRestaurants();
+        const fallbackResult = buildFallbackRecommendation(userPrompt, restaurants);
 
-      setMessages((current) => [
-        ...current,
-        createAssistantMessage({
-          text: buildRecommendationReply(
-            fallbackResult.restaurants.length
-              ? "Mình vẫn tìm được một vài lựa chọn gần với nội dung bạn nhập."
-              : noResultMessage,
-            fallbackResult.restaurants
-          ),
-          restaurants: fallbackResult.restaurants,
-          isFallback: true,
-          isEmpty: fallbackResult.isEmpty,
-        }),
-      ]);
+        setMessages((current) => [
+          ...current,
+          createAssistantMessage({
+            text: buildRecommendationReply(
+              fallbackResult.restaurants.length
+                ? "Mình vẫn tìm được một vài lựa chọn gần với nội dung bạn nhập."
+                : noResultMessage,
+              fallbackResult.restaurants
+            ),
+            restaurants: fallbackResult.restaurants,
+            isFallback: true,
+            isEmpty: fallbackResult.isEmpty,
+          }),
+        ]);
+      } catch {
+        setMessages((current) => [
+          ...current,
+          createAssistantMessage({
+            text: `Mình chưa gọi được backend recommend. Bạn kiểm tra backend có đang chạy ở http://localhost:8000 không nhé.\n\nChi tiết lỗi: ${requestError.message || "Không rõ lỗi"}`,
+            restaurants: [],
+            isFallback: true,
+            isEmpty: true,
+          }),
+        ]);
+      }
     } finally {
       setLoading(false);
     }

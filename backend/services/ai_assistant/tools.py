@@ -19,7 +19,7 @@ CUISINE_HARD_ALIASES = {
     "lau": ["lau", "hotpot"],
     "bbq nuong": ["bbq", "nuong", "grill"],
     "mon nhat": ["nhat", "sushi", "ramen", "udon", "japanese"],
-    "mon han": ["han", "korean", "kimchi", "tokbokki"],
+    "mon han": ["han", "han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "seoul", "daegu"],
     "hai san": ["hai san", "seafood", "oc"],
     "chay healthy": ["chay", "healthy", "salad", "vegan", "vegetarian"],
     "mon thai": ["thai", "tomyum", "pad thai"],
@@ -27,7 +27,7 @@ CUISINE_HARD_ALIASES = {
 }
 
 
-def search_restaurants_tool(db: Session, limit: int = 500) -> list[Restaurant]:
+def search_restaurants_tool(db: Session, limit: int = 10_000) -> list[Restaurant]:
     return crud_restaurant.get_restaurants(db, skip=0, limit=limit)
 
 
@@ -72,9 +72,18 @@ def _matches_requested_cuisine(restaurant: Restaurant, requested_cuisines: list[
     for cuisine in requested_cuisines:
         normalized_cuisine = normalize_text(cuisine)
         aliases = CUISINE_HARD_ALIASES.get(normalized_cuisine, [normalized_cuisine])
-        if any(alias in normalized_text for alias in aliases):
+        if any(_contains_alias(normalized_text, alias) for alias in aliases):
             return True
     return False
+
+
+def _contains_alias(normalized_text: str, alias: str) -> bool:
+    normalized_alias = normalize_text(alias)
+    if not normalized_alias:
+        return False
+    if " " in normalized_alias:
+        return normalized_alias in normalized_text
+    return re.search(rf"\b{re.escape(normalized_alias)}\b", normalized_text) is not None
 
 
 def parse_radius_km_from_query(query: str, *, default_radius_km: float = DEFAULT_RADIUS_KM) -> float:

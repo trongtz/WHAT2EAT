@@ -6,6 +6,7 @@ import uuid
 import os
 from datetime import time
 from pathlib import Path
+from types import SimpleNamespace
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
@@ -28,6 +29,7 @@ from models.user import User  # noqa: E402
 from schemas.ai import AIRecommendationResponse, AIRestaurantMatch  # noqa: E402
 from schemas.ai_chat import AIChatMessageCreate, RecommendationLogCreate  # noqa: E402
 from services.ai_service import generate_recommendation  # noqa: E402
+from services.ai_assistant.tools import passes_hard_constraints  # noqa: E402
 
 
 class AIAssistantRecommendationTests(unittest.TestCase):
@@ -138,6 +140,26 @@ class AIAssistantRecommendationTests(unittest.TestCase):
         first_ids = {item["id"] for item in first_response["recommended_restaurants"]}
         follow_up_ids = {item["id"] for item in follow_up["recommended_restaurants"]}
         self.assertFalse(first_ids & follow_up_ids)
+
+    def test_korean_cuisine_does_not_match_generic_nha_hang(self) -> None:
+        generic_restaurant = SimpleNamespace(
+            name="Nhà hàng Mimosa",
+            description="Nhà hàng món Việt gần trường, phù hợp ăn trưa.",
+            address="Thủ Đức, TP. HCM",
+            price_range="50000 - 100000",
+            cuisine_type="Nhà hàng",
+        )
+        korean_restaurant = SimpleNamespace(
+            name="Seoul",
+            description="Quán món Hàn Quốc có tokbokki, kimbap và mì cay.",
+            address="Thủ Đức, TP. HCM",
+            price_range="50000 - 100000",
+            cuisine_type="Món Hàn",
+        )
+        intent = {"cuisines": ["món hàn"]}
+
+        self.assertFalse(passes_hard_constraints(generic_restaurant, intent))
+        self.assertTrue(passes_hard_constraints(korean_restaurant, intent))
 
 
 def _seed_test_data() -> None:

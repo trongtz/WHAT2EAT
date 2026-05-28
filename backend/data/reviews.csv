@@ -1,6 +1,6 @@
 review_id,customer_id,restaurant_id,reservation_id,rating,comment,status,rejection_reason,created_at,updated_at
-,,,,,,,,,
-,,,,,,,,,
-,,,,,,,,,
-,,,,,,,,,
-,,,,,,,,,
+48b05ce3-c67d-5230-9d1d-15f867f10d34,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,c8801b93-c5f3-46bd-8cc6-0e5904f9f770,,5,"Gần KTX, yên tĩnh, có ổ cắm và wifi nên rất hợp học bài trước giờ lên lớp.",APPROVED,,2026-05-18T12:00:00Z,2026-05-18T12:00:00Z
+4948ab03-4d91-54d2-af24-2924c40e8359,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,71f345ca-d2e6-4beb-8cae-123d742f38b3,,5,"Món Hàn giá sinh viên, mì cay và tokbokki ổn, đi nhóm bạn sau giờ học rất tiện.",APPROVED,,2026-05-18T12:00:00Z,2026-05-18T12:00:00Z
+fabc7fec-f534-52a8-a155-07af98302da1,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,e4c442c9-3926-4a41-bc12-b8c2c03681d0,,4,"Cơm trưa bình dân, gần trường, phần ăn ổn cho sinh viên.",APPROVED,,2026-05-18T12:00:00Z,2026-05-18T12:00:00Z
+3467ce12-b687-5da3-8d02-099bf0abc13c,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,9adb3e44-f86f-419c-a769-114634191c0c,,5,"Rẻ, nhẹ bụng, hợp những hôm muốn ăn chay gần Linh Trung.",APPROVED,,2026-05-18T12:00:00Z,2026-05-18T12:00:00Z
+d0da99d5-5a1b-51d1-9c63-4982f2caf709,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,5d214773-e10b-4ac3-8c42-4ccf339d1e11,,4,"Trà sữa gần khu ĐHQG, giá ổn, hợp ngồi nhanh với bạn bè.",APPROVED,,2026-05-18T12:00:00Z,2026-05-18T12:00:00Z

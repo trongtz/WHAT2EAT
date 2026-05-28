@@ -42,7 +42,7 @@ def build_message(query: str, matches: list[ScoredRestaurant], intent: Any) -> s
     if not matches:
         return "Mình chưa tìm thấy nhà hàng thật sự khớp. Bạn thử nói rõ hơn khu vực, món ăn hoặc ngân sách nhé."
 
-    cuisine_text = ", ".join(intent_value(intent, "cuisines", []) or [])
+    cuisine_text = _display_cuisine_text(intent_value(intent, "cuisines", []) or [])
     district_text = ", ".join(intent_value(intent, "districts", []) or [])
     context = " theo mô tả của bạn"
     if cuisine_text and district_text:
@@ -53,3 +53,15 @@ def build_message(query: str, matches: list[ScoredRestaurant], intent: Any) -> s
         context = f" gần {district_text}"
 
     return f"Mình tìm được {len(matches)} gợi ý{context}. Kết quả được xếp hạng bằng recommend system dựa trên intent, từ khóa, giá, vị trí, chất lượng quán và tình trạng còn chỗ."
+
+
+def _display_cuisine_text(cuisines: list[str]) -> str:
+    labels = {
+        "món hàn": "món Hàn",
+        "món nhật": "món Nhật",
+        "món thái": "món Thái",
+        "món ý": "món Ý",
+        "món việt": "món Việt",
+        "cà phê / brunch": "cà phê / brunch",
+    }
+    return ", ".join(labels.get(cuisine, cuisine) for cuisine in cuisines)

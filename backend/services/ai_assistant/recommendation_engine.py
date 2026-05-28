@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -83,14 +84,15 @@ class RecommendationEngine:
         score = 0.0
 
         lexical_score = _overlap_score(query_tokens, restaurant_tokens)
+        lexical_reason = ""
         if lexical_score:
             score += 32 * lexical_score
-            explanations.append("Khớp từ khóa trong mô tả nhà hàng")
+            lexical_reason = _keyword_reason(query_tokens, restaurant_tokens)
 
         cuisine_score = _cuisine_score(intent, restaurant, search_text)
         if cuisine_score:
             score += cuisine_score
-            explanations.append("Đúng nhóm món bạn đang tìm")
+            explanations.append(_cuisine_reason(intent, restaurant, search_text))
         elif intent_value(intent, "cuisines", []) or []:
             score -= 18
 
@@ -98,6 +100,9 @@ class RecommendationEngine:
         if semantic_score:
             score += semantic_score
             explanations.append(semantic_reason)
+
+        if lexical_reason:
+            explanations.append(lexical_reason)
 
         district_score = _district_score(intent, restaurant.address)
         if district_score:
@@ -107,18 +112,18 @@ class RecommendationEngine:
         budget_score = _budget_score(intent, restaurant.price_range)
         if budget_score:
             score += budget_score
-            explanations.append("Mức giá hợp với ngân sách")
+            explanations.append(_budget_reason(restaurant.price_range))
 
         distance_km = _distance_from_user(latitude, longitude, restaurant)
         if distance_km is not None:
             score += max(0.0, 16 - min(distance_km, 16))
-            explanations.append(f"Cách bạn khoảng {distance_km:.1f} km")
+            explanations.append(_distance_reason(distance_km))
 
         rating = float(restaurant.rating_avg or 0)
         if rating > 0:
             score += min(rating, 5) * 3
             if rating >= 4.3:
-                explanations.append("Điểm đánh giá đang tốt")
+                explanations.append(f"Điểm đánh giá nổi bật {rating:.1f}/5")
 
         quality_signals = get_restaurant_signals(db, restaurant)
         if quality_signals.quality_score:
@@ -128,7 +133,7 @@ class RecommendationEngine:
         behavior_score, behavior_reason = user_behavior_score(restaurant, user_profile, search_text)
         if behavior_score:
             score += behavior_score
-            explanations.append(behavior_reason)
+            explanations.insert(0, behavior_reason)
 
         available_capacity = check_available_slots_tool(db, restaurant)
         group_size = intent_value(intent, "group_size")
@@ -181,24 +186,122 @@ def _overlap_score(query_tokens: set[str], restaurant_tokens: set[str]) -> float
     return overlap / math.sqrt(len(query_tokens) * len(restaurant_tokens))
 
 
+def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
+    useful_tokens = [
+        token
+        for token in query_tokens & restaurant_tokens
+        if token
+        not in {
+            "mon",
+            "quan",
+            "ca",
+            "cafe",
+            "coffee",
+            "nha",
+            "hang",
+            "han",
+            "ban",
+            "nghi",
+            "nen",
+            "an",
+            "gi",
+            "ky",
+            "tuc",
+            "xa",
+            "ktx",
+            "lang",
+            "linh",
+            "trung",
+            "khu",
+            "gan",
+            "trong",
+            "duoi",
+            "hoc",
+            "dai",
+            "khoa",
+            "tu",
+            "nhien",
+            "yen",
+            "tinh",
+            "cam",
+            "wifi",
+        }
+        and not re.fullmatch(r"\d+(?:km|m|k)?", token)
+    ]
+    if not useful_tokens:
+        return ""
+    return "Khớp các chi tiết: " + ", ".join(sorted(useful_tokens)[:4])
+
+
 def _cuisine_score(intent: Any, restaurant: Restaurant, search_text: str) -> float:
     requested_cuisines = intent_value(intent, "cuisines", []) or []
     if not requested_cuisines:
-        requested_cuisines = infer_cuisines(search_text) if infer_cuisines else []
+        requested_cuisines = _safe_infer_cuisines(search_text)
         return 0.0 if not requested_cuisines else 4.0
 
     explicit_text = normalize_text(f"{restaurant.name} {getattr(restaurant, 'cuisine_type', '')}")
     normalized = normalize_text(search_text)
     for cuisine in requested_cuisines:
         normalized_cuisine = normalize_text(cuisine)
-        if normalized_cuisine in explicit_text:
+        if _contains_alias(explicit_text, normalized_cuisine):
             return 36.0
-        if any(token in explicit_text for token in _cuisine_aliases(normalized_cuisine)):
+        if any(_contains_alias(explicit_text, token) for token in _cuisine_aliases(normalized_cuisine)):
             return 34.0
-        if normalized_cuisine in normalized:
+        if _contains_alias(normalized, normalized_cuisine):
             return 10.0
-    inferred = infer_cuisines(search_text) if infer_cuisines else []
+    inferred = _safe_infer_cuisines(search_text)
     return 8.0 if set(map(normalize_text, requested_cuisines)) & set(map(normalize_text, inferred)) else 0.0
+
+
+def _cuisine_reason(intent: Any, restaurant: Restaurant, search_text: str) -> str:
+    requested_cuisines = intent_value(intent, "cuisines", []) or []
+    if requested_cuisines:
+        return f"Đúng nhóm {_display_cuisine_list(requested_cuisines)}"
+    inferred = _safe_infer_cuisines(search_text)
+    if inferred:
+        return f"Phù hợp nhóm {_display_cuisine_list(inferred)}"
+    return "Đúng nhóm món bạn đang tìm"
+
+
+def _display_cuisine_list(cuisines: list[str]) -> str:
+    labels = {
+        "món hàn": "món Hàn",
+        "món nhật": "món Nhật",
+        "món thái": "món Thái",
+        "món ý": "món Ý",
+        "món việt": "món Việt",
+        "món trung hoa": "món Trung Hoa",
+        "chay / healthy": "chay / healthy",
+        "cà phê / brunch": "cà phê / brunch",
+    }
+    return ", ".join(labels.get(cuisine, cuisine) for cuisine in cuisines[:2])
+
+
+def _safe_infer_cuisines(search_text: str) -> list[str]:
+    if not infer_cuisines:
+        return []
+    inferred = infer_cuisines(search_text)
+    normalized = normalize_text(search_text)
+    filtered: list[str] = []
+    for cuisine in inferred:
+        if cuisine == "món việt" and not _has_real_vietnamese_signal(normalized):
+            continue
+        if cuisine == "món trung hoa" and not _has_real_chinese_signal(normalized):
+            continue
+        filtered.append(cuisine)
+    return filtered
+
+
+def _has_real_vietnamese_signal(normalized_text: str) -> bool:
+    strong_patterns = ["viet", "com nha", "quan com", "bun", "hu tieu", "banh cuon", "banh xeo"]
+    if any(_contains_alias(normalized_text, pattern) for pattern in strong_patterns):
+        return True
+    return re.search(r"(?<!thanh )\bpho\b", normalized_text) is not None
+
+
+def _has_real_chinese_signal(normalized_text: str) -> bool:
+    strong_patterns = ["trung hoa", "dim sum", "sieu cay trung", "lau trung", "chinese"]
+    return any(_contains_alias(normalized_text, pattern) for pattern in strong_patterns)
 
 
 def _cuisine_aliases(normalized_cuisine: str) -> list[str]:
@@ -207,11 +310,20 @@ def _cuisine_aliases(normalized_cuisine: str) -> list[str]:
         "lau": ["lau", "hotpot"],
         "bbq nuong": ["bbq", "nuong", "grill"],
         "mon nhat": ["nhat", "sushi", "ramen", "udon"],
-        "mon han": ["han", "korean", "kimchi", "tokbokki"],
+        "mon han": ["han", "han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "seoul", "daegu"],
         "hai san": ["hai san", "seafood", "oc"],
         "chay healthy": ["chay", "healthy", "salad"],
     }
     return aliases.get(normalized_cuisine, [])
+
+
+def _contains_alias(normalized_text: str, alias: str) -> bool:
+    normalized_alias = normalize_text(alias)
+    if not normalized_alias:
+        return False
+    if " " in normalized_alias:
+        return normalized_alias in normalized_text
+    return re.search(rf"\b{re.escape(normalized_alias)}\b", normalized_text) is not None
 
 
 def _semantic_score(intent: Any, search_text: str) -> tuple[float, str]:
@@ -227,7 +339,23 @@ def _semantic_score(intent: Any, search_text: str) -> tuple[float, str]:
     overlap = set(requested_tags) & set(infer_semantic_tags(search_text))
     if not overlap:
         return 0.0, ""
-    return min(18.0, 8.0 + len(overlap) * 5.0), "Hợp vibe/nhu cầu bạn mô tả"
+    return min(18.0, 8.0 + len(overlap) * 5.0), _semantic_reason(overlap)
+
+
+def _semantic_reason(tags: set[str]) -> str:
+    reason_by_tag = {
+        "yen_tinh": "Không gian yên tĩnh, hợp học bài/làm việc",
+        "o_cam": "Có ổ cắm cho laptop/điện thoại",
+        "wifi": "Có wifi, tiện ngồi học hoặc làm việc",
+        "lam_viec": "Phù hợp ngồi làm việc laptop",
+        "hen_ho": "Không gian hợp hẹn hò/nói chuyện riêng tư",
+        "nhom_dong": "Phù hợp đi nhóm",
+        "view_dep": "Có không gian/view dễ chịu",
+        "do_xe": "Có yếu tố thuận tiện gửi xe",
+        "troi_mua": "Hợp ngồi lại khi trời mưa",
+    }
+    reasons = [reason_by_tag[tag] for tag in sorted(tags) if tag in reason_by_tag]
+    return ". ".join(reasons[:2]) if reasons else "Hợp vibe/nhu cầu bạn mô tả"
 
 
 def _district_score(intent: Any, address: str) -> float:
@@ -254,6 +382,23 @@ def _budget_score(intent: Any, price_range: str | None) -> float:
     if budget_label and budget_label == price_budget_label(price_min, price_max):
         return 12.0
     return 0.0
+
+
+def _budget_reason(price_range: str | None) -> str:
+    price_min, price_max = parse_price_range(price_range)
+    if price_min is not None and price_max is not None:
+        return f"Khoảng giá khoảng {price_min // 1000}k-{price_max // 1000}k"
+    if price_max is not None:
+        return f"Giá khoảng {price_max // 1000}k"
+    return "Mức giá hợp với ngân sách"
+
+
+def _distance_reason(distance_km: float) -> str:
+    if distance_km < 0.2:
+        return f"Rất gần điểm demo, khoảng {distance_km:.1f} km"
+    if distance_km < 1:
+        return f"Đi bộ/di chuyển ngắn, khoảng {distance_km:.1f} km"
+    return f"Cách điểm tìm kiếm khoảng {distance_km:.1f} km"
 
 
 def _distance_from_user(latitude: float | None, longitude: float | None, restaurant: Restaurant) -> float | None:

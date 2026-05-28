@@ -1,1 +1,6 @@
 checkin_id,customer_id,restaurant_id,reservation_id,menu_item_id,checkin_at,crowd_status,note,is_verified
+5ca2b94b-61cb-5e3d-8852-7a5d6a7d89db,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,c11dd987-86fe-41bd-93e9-e4563457db53,,,2026-05-18T12:00:00Z,VUA_PHAI,"Ngồi học bài buổi chiều, quán có ổ cắm và khá yên tĩnh.",true
+635b07f6-79d9-5e0d-95c7-102935d833bd,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,71f345ca-d2e6-4beb-8cae-123d742f38b3,,,2026-05-17T12:00:00Z,VUA_PHAI,Đi ăn món Hàn với nhóm bạn sau giờ học.,true
+7808b2d8-17be-5e35-8f9d-8429ab428c3d,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,e4c442c9-3926-4a41-bc12-b8c2c03681d0,,,2026-05-16T12:00:00Z,VUA_PHAI,"Ăn trưa nhanh, giá sinh viên.",true
+dcad92bf-3788-5c64-b398-e0bdec322124,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,5d214773-e10b-4ac3-8c42-4ccf339d1e11,,,2026-05-15T12:00:00Z,VUA_PHAI,Mua trà sữa gần KTX.,true
+3e20bf9d-2615-52a3-8c64-e95180e815d2,a18f6ad2-2b43-4df6-9dc6-02f744f49a01,87956db4-c63c-473a-93a5-07e32b2d0258,,,2026-05-14T12:00:00Z,VUA_PHAI,Ăn trưa quanh khu đại học.,true

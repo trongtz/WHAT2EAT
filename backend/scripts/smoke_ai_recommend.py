@@ -29,6 +29,7 @@ os.environ.setdefault("OPENAI_API_KEY", "")
 import models.registry  # noqa: E402,F401
 from core.database import Base, SessionLocal, engine  # noqa: E402
 from core.init_db import seed_data  # noqa: E402
+from models.user import User  # noqa: E402
 from services.ai_service import generate_recommendation  # noqa: E402
 
 
@@ -41,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lng", type=float, default=None, help="User longitude.")
     parser.add_argument("--limit", type=int, default=5, help="Number of recommendations.")
     parser.add_argument("--session-id", type=UUID, default=None, help="Existing chat session UUID.")
+    parser.add_argument("--user-email", default=None, help="Seeded customer email for personalized smoke tests.")
     return parser.parse_args()
 
 
@@ -50,11 +52,17 @@ def main() -> None:
     seed_data()
     db = SessionLocal()
     try:
+        current_user = None
+        if args.user_email:
+            current_user = db.query(User).filter(User.email == args.user_email).first()
+            if not current_user:
+                raise SystemExit(f"User not found: {args.user_email}")
         response = generate_recommendation(
             args.query,
             db,
             latitude=args.lat,
             longitude=args.lng,
+            current_user=current_user,
             session_id=args.session_id,
             limit=args.limit,
         )

@@ -3,7 +3,8 @@ import axios from "axios";
 import { getStoredToken, isGuestToken } from "../utils/storage";
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:8000/api"
+  baseURL: "http://localhost:8000/api",
+  timeout: 20000
   // baseURL: "/api",
   // adapter: mockAdapter,
 });
