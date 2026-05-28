@@ -18,7 +18,7 @@ DEMO_LATITUDE = 10.875
 DEMO_LONGITUDE = 106.8
 
 # Same seeded hash used by the demo owners. This keeps CSV seeding deterministic.
-DEMO_PASSWORD_HASH = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6L6.S3Y3/5fKjX.W"
+DEMO_PASSWORD_HASH = "$2b$12$Q62h76DAHaf9ZfqfzFdst.9wftP3KZjwo04D4QAgp150DKaiv0Xxm"
 
 DEMO_RESTAURANT_NAMES = [
     "Student Station Coffee",
