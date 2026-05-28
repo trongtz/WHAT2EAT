@@ -28,6 +28,9 @@ def compose_recommendation_response(
                 "match_score": round(min(match.score / 100, 1.0), 4),
                 "reason": match.reason,
                 "available_capacity": match.available_capacity,
+                "quality_score": match.quality_score,
+                "availability_score": match.availability_score,
+                "quality_signals": match.quality_signals,
             }
             for match in matches
         ],
@@ -49,4 +52,4 @@ def build_message(query: str, matches: list[ScoredRestaurant], intent: Any) -> s
     elif district_text:
         context = f" gần {district_text}"
 
-    return f"Mình tìm được {len(matches)} gợi ý{context}. Kết quả được xếp hạng bằng recommend system dựa trên intent, từ khóa, giá, vị trí và điểm đánh giá."
+    return f"Mình tìm được {len(matches)} gợi ý{context}. Kết quả được xếp hạng bằng recommend system dựa trên intent, từ khóa, giá, vị trí, chất lượng quán và tình trạng còn chỗ."

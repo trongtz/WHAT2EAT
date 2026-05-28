@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -18,6 +18,10 @@ class AIRestaurantMatch(BaseModel):
     distance_km: Optional[float] = None
     match_score: Optional[float] = None
     reason: Optional[str] = None
+    available_capacity: Optional[int] = None
+    quality_score: Optional[float] = None
+    availability_score: Optional[float] = None
+    quality_signals: Optional[dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -137,6 +137,26 @@ const getRatingLabel = (restaurant) => {
   return rating > 0 ? rating.toFixed(1) : "Mới";
 };
 
+const buildRecommendationReply = (message, restaurants) => {
+  if (!restaurants.length) return message || noResultMessage;
+
+  const reasonText = restaurants
+    .flatMap((restaurant) => String(restaurant.aiReason || restaurant.reason || "").split("."))
+    .map((reason) => reason.trim())
+    .filter(Boolean);
+  const uniqueReasons = [...new Set(reasonText)].slice(0, 3);
+  const names = restaurants
+    .slice(0, 3)
+    .map((restaurant) => restaurant.name)
+    .filter(Boolean)
+    .join(", ");
+  const reasonSentence = uniqueReasons.length
+    ? uniqueReasons.join(". ") + "."
+    : "các quán này phù hợp với mô tả bạn vừa nhập.";
+
+  return `Mình recommend bạn các quán như trong danh sách bên phải vì: ${reasonSentence}`;
+};
+
 function RecommendationListCard({ restaurant, index }) {
   return (
     <Box
@@ -315,6 +335,8 @@ function AiRecommendationPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState(() => getStoredChat()?.messages || createInitialMessages());
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState("checking");
 
   useEffect(() => {
     window.sessionStorage.setItem(
@@ -325,6 +347,29 @@ function AiRecommendationPage() {
       })
     );
   }, [messages, sessionId]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus("unavailable");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setLocationStatus("ready");
+      },
+      () => setLocationStatus("denied"),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5 * 60 * 1000,
+        timeout: 7000,
+      }
+    );
+  }, []);
 
   const latestRecommendationMessage = [...messages]
     .reverse()
@@ -357,6 +402,8 @@ function AiRecommendationPage() {
         query: userPrompt,
         customer_id: user?.id ?? null,
         session_id: sessionId,
+        latitude: userLocation?.latitude,
+        longitude: userLocation?.longitude,
       });
 
       const restaurants = Array.isArray(data.restaurants)
@@ -372,7 +419,7 @@ function AiRecommendationPage() {
       setMessages((current) => [
         ...current,
         createAssistantMessage({
-          text: data.message || "Mình đã tìm được một vài gợi ý phù hợp cho bạn.",
+          text: buildRecommendationReply(data.message, restaurants),
           restaurants,
           isFallback: data.source === "FALLBACK",
           isEmpty: restaurants.length === 0,
@@ -385,9 +432,12 @@ function AiRecommendationPage() {
       setMessages((current) => [
         ...current,
         createAssistantMessage({
-          text: fallbackResult.restaurants.length
-            ? "Mình vẫn tìm được một vài lựa chọn gần với nội dung bạn nhập."
-            : noResultMessage,
+          text: buildRecommendationReply(
+            fallbackResult.restaurants.length
+              ? "Mình vẫn tìm được một vài lựa chọn gần với nội dung bạn nhập."
+              : noResultMessage,
+            fallbackResult.restaurants
+          ),
           restaurants: fallbackResult.restaurants,
           isFallback: true,
           isEmpty: fallbackResult.isEmpty,
@@ -452,6 +502,20 @@ function AiRecommendationPage() {
 
               <Stack component="form" spacing={1.4} onSubmit={handleSubmit}>
                 {error ? <Alert severity="error">{error}</Alert> : null}
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Chip
+                    size="small"
+                    icon={<LocationOnRoundedIcon />}
+                    color={locationStatus === "ready" ? "success" : "default"}
+                    label={
+                      locationStatus === "ready"
+                        ? "Đang dùng vị trí hiện tại để lọc bán kính"
+                        : locationStatus === "checking"
+                          ? "Đang xin quyền vị trí..."
+                          : "Chưa có vị trí, kết quả không lọc theo bán kính"
+                    }
+                  />
+                </Stack>
 
                 <Box
                   sx={{

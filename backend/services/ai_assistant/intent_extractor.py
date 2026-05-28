@@ -2,10 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.ai_assistant.openai_intent_parser import (
+    OpenAIIntentParserError,
+    parse_intent_with_openai,
+    should_use_openai_intent_parser,
+)
 from services.ai_assistant.recommend_imports import parse_query_heuristically, tokenize
 
 
 def extract_intent(query: str, previous_query: str | None = None) -> Any:
+    if should_use_openai_intent_parser():
+        try:
+            return parse_intent_with_openai(query, previous_query=previous_query)
+        except OpenAIIntentParserError:
+            pass
+
     intent = parse_query_heuristically(query) if parse_query_heuristically else _fallback_intent(query)
     if not previous_query:
         return intent

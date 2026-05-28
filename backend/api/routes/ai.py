@@ -42,6 +42,10 @@ async def get_ai_recommendation(
                     distance_km=restaurant.get("distance_km"),
                     match_score=restaurant.get("match_score"),
                     reason=restaurant.get("reason"),
+                    available_capacity=restaurant.get("available_capacity"),
+                    quality_score=restaurant.get("quality_score"),
+                    availability_score=restaurant.get("availability_score"),
+                    quality_signals=restaurant.get("quality_signals"),
                 )
                 for restaurant in ai_restaurants
             ],

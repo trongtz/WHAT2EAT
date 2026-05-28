@@ -18,6 +18,7 @@ from services.ai_assistant.recommend_imports import (
     tokenize,
 )
 from services.ai_assistant.tools import check_available_slots_tool, parse_price_range, price_budget_label
+from services.ai_assistant.restaurant_signals import availability_score, get_restaurant_signals
 from services.ai_assistant.user_preferences import user_behavior_score
 
 
@@ -28,6 +29,9 @@ class ScoredRestaurant:
     reason: str
     distance_km: float | None
     available_capacity: int | None
+    quality_score: float = 0.0
+    availability_score: float = 0.0
+    quality_signals: dict[str, Any] | None = None
 
 
 class RecommendationEngine:
@@ -116,6 +120,11 @@ class RecommendationEngine:
             if rating >= 4.3:
                 explanations.append("Điểm đánh giá đang tốt")
 
+        quality_signals = get_restaurant_signals(db, restaurant)
+        if quality_signals.quality_score:
+            score += quality_signals.quality_score * 8
+            explanations.extend(quality_signals.quality_reasons)
+
         behavior_score, behavior_reason = user_behavior_score(restaurant, user_profile, search_text)
         if behavior_score:
             score += behavior_score
@@ -123,12 +132,11 @@ class RecommendationEngine:
 
         available_capacity = check_available_slots_tool(db, restaurant)
         group_size = intent_value(intent, "group_size")
-        if available_capacity is not None and available_capacity > 0:
-            if group_size is None or available_capacity >= int(group_size):
-                score += 5
-                explanations.append("Hiện còn sức chứa phù hợp")
-            else:
-                score -= 12
+        normalized_group_size = int(group_size) if group_size is not None else None
+        availability_value, availability_reasons = availability_score(available_capacity, normalized_group_size)
+        if availability_value:
+            score += availability_value * 7
+            explanations.extend(availability_reasons)
 
         if not explanations and score == 0:
             score = rating
@@ -140,6 +148,15 @@ class RecommendationEngine:
             reason=_join_reason(explanations),
             distance_km=round(distance_km, 2) if distance_km is not None else None,
             available_capacity=available_capacity,
+            quality_score=quality_signals.quality_score,
+            availability_score=round(availability_value, 4),
+            quality_signals={
+                "rating_avg": quality_signals.rating_avg,
+                "rating_count": quality_signals.rating_count,
+                "checkin_count_30d": quality_signals.checkin_count_30d,
+                "favorite_count": quality_signals.favorite_count,
+                "booking_count_30d": quality_signals.booking_count_30d,
+            },
         )
 
 

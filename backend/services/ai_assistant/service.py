@@ -9,7 +9,12 @@ from services.ai_assistant.conversation_context import get_conversation_context
 from services.ai_assistant.intent_extractor import extract_intent, filters_from_intent, intent_to_dict
 from services.ai_assistant.recommendation_engine import RecommendationEngine
 from services.ai_assistant.response_composer import compose_recommendation_response
-from services.ai_assistant.tools import passes_hard_constraints, search_restaurants_tool
+from services.ai_assistant.tools import (
+    parse_radius_km_from_query,
+    passes_hard_constraints,
+    passes_location_constraint,
+    search_restaurants_tool,
+)
 from services.ai_assistant.user_preferences import get_user_preference_tool
 
 
@@ -30,17 +35,25 @@ class AIAssistantService:
     ) -> dict[str, Any]:
         base_intent = extract_intent(query)
         conversation_context = get_conversation_context(db, session_id, query, base_intent)
-        intent = extract_intent(
-            query,
-            previous_query=conversation_context["previous_query"] if conversation_context["use_previous_context"] else None,
-        )
+        if conversation_context["use_previous_context"]:
+            intent = extract_intent(query, previous_query=conversation_context["previous_query"])
+        else:
+            intent = base_intent
         filters_applied = filters_from_intent(intent)
+        radius_km = parse_radius_km_from_query(query) if latitude is not None and longitude is not None else None
+        filters_applied["radius_km"] = radius_km
         user_profile = get_user_preference_tool(db, current_user)
         previous_result_ids = set(conversation_context["previous_result_ids"])
         candidates = [
             restaurant
             for restaurant in search_restaurants_tool(db)
             if passes_hard_constraints(restaurant, intent)
+            and passes_location_constraint(
+                restaurant,
+                latitude=latitude,
+                longitude=longitude,
+                radius_km=radius_km,
+            )
             and (
                 not conversation_context["avoid_repeated_results"]
                 or str(restaurant.restaurant_id) not in previous_result_ids

@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080 # 7 ngày
     OPENAI_API_KEY: str
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_INTENT_PARSER: bool = False
+    OPENAI_TIMEOUT_SECONDS: float = 8.0
     AUTO_CREATE_TABLES: bool = False
     AUTO_SEED: bool = False
 

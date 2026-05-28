@@ -104,7 +104,11 @@ def _csv_rows(data_dir: str, filename: str) -> list[dict[str, str]]:
         return []
 
     with open(path, newline="", encoding="utf-8-sig") as csv_file:
-        return list(csv.DictReader(csv_file))
+        return [
+            row
+            for row in csv.DictReader(csv_file)
+            if any(str(value or "").strip() for value in row.values())
+        ]
 
 
 def _add_by_primary_key(
