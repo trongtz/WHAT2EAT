@@ -8,6 +8,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any, Callable
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -32,6 +33,7 @@ from services.opening_hours_service import normalize_opening_hours
 
 
 RowBuilder = Callable[[dict[str, str]], Any]
+BATCH_SIZE = 1000
 
 
 def _clean(value: Any) -> str | None:
@@ -111,6 +113,38 @@ def _csv_rows(data_dir: str, filename: str) -> list[dict[str, str]]:
         ]
 
 
+def _model_values(item: Any) -> dict[str, Any]:
+    values = {}
+    for column in item.__table__.columns:
+        value = getattr(item, column.name)
+        if value is not None:
+            values[column.name] = value
+    return values
+
+
+def _insert_ignore_conflicts(
+    db: Session,
+    model: type,
+    rows: list[dict[str, Any]],
+) -> int:
+    if not rows:
+        return 0
+
+    inserted = 0
+    table = model.__table__
+    grouped_rows: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped_rows.setdefault(tuple(row.keys()), []).append(row)
+
+    for grouped_chunk in grouped_rows.values():
+        for start in range(0, len(grouped_chunk), BATCH_SIZE):
+            chunk = grouped_chunk[start : start + BATCH_SIZE]
+            statement = pg_insert(table).values(chunk).on_conflict_do_nothing()
+            result = db.execute(statement)
+            inserted += result.rowcount or 0
+    return inserted
+
+
 def _add_by_primary_key(
     db: Session,
     data_dir: str,
@@ -119,36 +153,30 @@ def _add_by_primary_key(
     primary_key: str,
     build: RowBuilder,
 ) -> int:
-    added = 0
+    rows = []
     for row in _csv_rows(data_dir, filename):
         item = build(row)
         key_value = getattr(item, primary_key)
-        if key_value is not None and db.get(model, key_value):
+        if key_value is None:
             continue
-        db.add(item)
-        added += 1
+        rows.append(_model_values(item))
 
+    added = _insert_ignore_conflicts(db, model, rows)
     db.commit()
     print(f"Imported {added} rows from {filename}.")
     return added
 
 
 def _import_restaurant_cuisines(db: Session, data_dir: str) -> int:
-    added = 0
+    rows = []
     for row in _csv_rows(data_dir, "restaurant_cuisines.csv"):
         restaurant_id = _uuid(row.get("restaurant_id"))
         category_id = _uuid(row.get("category_id"))
         if restaurant_id is None or category_id is None:
             continue
-        existing = db.get(
-            RestaurantCuisine,
-            {"restaurant_id": restaurant_id, "category_id": category_id},
-        )
-        if existing:
-            continue
-        db.add(RestaurantCuisine(restaurant_id=restaurant_id, category_id=category_id))
-        added += 1
+        rows.append({"restaurant_id": restaurant_id, "category_id": category_id})
 
+    added = _insert_ignore_conflicts(db, RestaurantCuisine, rows)
     db.commit()
     print("Imported " + str(added) + " rows from restaurant_cuisines.csv.")
     return added
@@ -575,13 +603,19 @@ def _import_csv_seed(db: Session, data_dir: str) -> None:
     )
 
 
-def seed_data() -> None:
+def seed_data(force_import: bool = False) -> None:
     db: Session = SessionLocal()
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_dir = os.path.join(base_dir, "data")
+    force_import = force_import or os.getenv("WHAT2EAT_FORCE_SEED_IMPORT", "").lower() in {"1", "true", "yes"}
 
     try:
         if db.query(User).first() or db.query(Restaurant).first():
+            if force_import:
+                print("Database already has seed data. Importing missing CSV rows with conflict-safe batch inserts...")
+                _import_csv_seed(db, data_dir)
+                print("CSV seed import completed.")
+                return
             if os.path.exists(os.path.join(data_dir, "users.csv")):
                 _sync_seed_user_passwords(db, data_dir)
             if os.path.exists(os.path.join(data_dir, "restaurant_images.csv")):

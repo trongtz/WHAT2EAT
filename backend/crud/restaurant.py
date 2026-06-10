@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from models.restaurant import Restaurant
 from models.restaurant_taxonomy import CuisineCategory, RestaurantCuisine, RestaurantImage
@@ -87,7 +87,10 @@ def create_restaurant(db: Session, restaurant: RestaurantCreate, owner_id: UUID)
 
 
 def get_restaurants(db: Session, skip: int = 0, limit: int = 100, status: str | None = None) -> list:
-    query = db.query(Restaurant)
+    query = db.query(Restaurant).options(
+        selectinload(Restaurant.restaurant_images),
+        selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
+    )
     if status:
         query = query.filter(Restaurant.approval_status == status)
     else:
@@ -149,7 +152,10 @@ def search_restaurants(
     skip: int = 0,
     limit: int = 100,
 ) -> list:
-    base_query = db.query(Restaurant).filter(
+    base_query = db.query(Restaurant).options(
+        selectinload(Restaurant.restaurant_images),
+        selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
+    ).filter(
         Restaurant.approval_status == "APPROVED",
         Restaurant.is_active.is_(True),
     )
@@ -198,6 +204,10 @@ def search_by_location(
 
     return (
         db.query(Restaurant)
+        .options(
+            selectinload(Restaurant.restaurant_images),
+            selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
+        )
         .filter(
             Restaurant.approval_status == "APPROVED",
             Restaurant.is_active.is_(True),
@@ -217,6 +227,10 @@ def search_by_location(
 def get_popular_restaurants(db: Session, limit: int = 10) -> list:
     return (
         db.query(Restaurant)
+        .options(
+            selectinload(Restaurant.restaurant_images),
+            selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
+        )
         .filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
         .order_by(Restaurant.rating_avg.desc())
         .limit(limit)
@@ -227,6 +241,10 @@ def get_popular_restaurants(db: Session, limit: int = 10) -> list:
 def get_newly_added_restaurants(db: Session, limit: int = 10) -> list:
     return (
         db.query(Restaurant)
+        .options(
+            selectinload(Restaurant.restaurant_images),
+            selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
+        )
         .filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
         .order_by(Restaurant.created_at.desc())
         .limit(limit)

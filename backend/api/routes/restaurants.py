@@ -15,13 +15,20 @@ from schemas.dish import MenuItemResponse
 from schemas.restaurant import RestaurantCreate, RestaurantResponse, RestaurantUpdate
 from schemas.review import ReviewResponse
 from services.capacity_service import (
+    attach_capacity_summaries,
     attach_capacity_summary,
     get_restaurant_max_capacity,
     replace_restaurant_capacities,
 )
-from services.restaurant_service import attach_restaurant_review_summary
+from services.restaurant_service import attach_restaurant_review_summaries, attach_restaurant_review_summary
 
 router = APIRouter()
+
+
+def _attach_restaurant_list_summaries(db: Session, restaurants: list) -> list:
+    attach_capacity_summaries(db, restaurants)
+    attach_restaurant_review_summaries(db, restaurants)
+    return restaurants
 
 
 @router.get("/search", response_model=list[RestaurantResponse])
@@ -37,10 +44,7 @@ def search_restaurants(
     restaurants = crud_restaurant.search_restaurants(
         db, query, cuisine_type, price_range, min_rating, skip, limit
     )
-    for restaurant in restaurants:
-        attach_capacity_summary(db, restaurant)
-        attach_restaurant_review_summary(db, restaurant)
-    return restaurants
+    return _attach_restaurant_list_summaries(db, restaurants)
 
 
 @router.get("/nearby", response_model=list[RestaurantResponse])
@@ -53,37 +57,25 @@ def get_nearby_restaurants(
     db: Session = Depends(get_db),
 ):
     restaurants = crud_restaurant.search_by_location(db, latitude, longitude, radius_km, skip, limit)
-    for restaurant in restaurants:
-        attach_capacity_summary(db, restaurant)
-        attach_restaurant_review_summary(db, restaurant)
-    return restaurants
+    return _attach_restaurant_list_summaries(db, restaurants)
 
 
 @router.get("/popular", response_model=list[RestaurantResponse])
 def get_popular_restaurants(limit: int = 10, db: Session = Depends(get_db)):
     restaurants = crud_restaurant.get_popular_restaurants(db, limit)
-    for restaurant in restaurants:
-        attach_capacity_summary(db, restaurant)
-        attach_restaurant_review_summary(db, restaurant)
-    return restaurants
+    return _attach_restaurant_list_summaries(db, restaurants)
 
 
 @router.get("/new", response_model=list[RestaurantResponse])
 def get_new_restaurants(limit: int = 10, db: Session = Depends(get_db)):
     restaurants = crud_restaurant.get_newly_added_restaurants(db, limit)
-    for restaurant in restaurants:
-        attach_capacity_summary(db, restaurant)
-        attach_restaurant_review_summary(db, restaurant)
-    return restaurants
+    return _attach_restaurant_list_summaries(db, restaurants)
 
 
 @router.get("/", response_model=list[RestaurantResponse])
 def get_all_restaurants(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     restaurants = crud_restaurant.get_restaurants(db=db, skip=skip, limit=limit, status="APPROVED")
-    for restaurant in restaurants:
-        attach_capacity_summary(db, restaurant)
-        attach_restaurant_review_summary(db, restaurant)
-    return restaurants
+    return _attach_restaurant_list_summaries(db, restaurants)
 
 
 @router.get("/owner/{owner_id}", response_model=list[RestaurantResponse])

@@ -130,3 +130,72 @@ def attach_capacity_summary(db: Session, restaurant: Restaurant) -> Restaurant:
     setattr(restaurant, "max_tables", max_capacity)
     setattr(restaurant, "available_tables", available_capacity)
     return restaurant
+
+
+def attach_capacity_summaries(
+    db: Session,
+    restaurants: list[Restaurant],
+    target_date: date | None = None,
+) -> list[Restaurant]:
+    if not restaurants:
+        return restaurants
+
+    target_date = target_date or date.today()
+    restaurant_ids = [restaurant.restaurant_id for restaurant in restaurants]
+    day_of_week = _day_of_week_for_capacity(target_date)
+    start_datetime = datetime.combine(target_date, time.min)
+    end_datetime = start_datetime + timedelta(days=1)
+
+    override_capacity_by_restaurant = dict(
+        db.query(CapacityOverride.restaurant_id, func.max(CapacityOverride.max_capacity))
+        .filter(
+            CapacityOverride.restaurant_id.in_(restaurant_ids),
+            CapacityOverride.override_date == target_date,
+        )
+        .group_by(CapacityOverride.restaurant_id)
+        .all()
+    )
+    daily_capacity_by_restaurant = dict(
+        db.query(Capacity.restaurant_id, func.max(Capacity.max_capacity))
+        .filter(
+            Capacity.restaurant_id.in_(restaurant_ids),
+            Capacity.day_of_week == day_of_week,
+        )
+        .group_by(Capacity.restaurant_id)
+        .all()
+    )
+    max_capacity_by_restaurant = dict(
+        db.query(Capacity.restaurant_id, func.max(Capacity.max_capacity))
+        .filter(Capacity.restaurant_id.in_(restaurant_ids))
+        .group_by(Capacity.restaurant_id)
+        .all()
+    )
+    booked_capacity_by_restaurant = dict(
+        db.query(Reservation.restaurant_id, func.sum(Reservation.guest_count))
+        .filter(
+            Reservation.restaurant_id.in_(restaurant_ids),
+            Reservation.reservation_time >= start_datetime,
+            Reservation.reservation_time < end_datetime,
+            Reservation.status.in_(["PENDING", "CONFIRMED"]),
+        )
+        .group_by(Reservation.restaurant_id)
+        .all()
+    )
+
+    for restaurant in restaurants:
+        restaurant_id = restaurant.restaurant_id
+        max_capacity = int(
+            override_capacity_by_restaurant.get(restaurant_id)
+            or daily_capacity_by_restaurant.get(restaurant_id)
+            or max_capacity_by_restaurant.get(restaurant_id)
+            or 0
+        )
+        booked_capacity = int(booked_capacity_by_restaurant.get(restaurant_id) or 0)
+        available_capacity = max(max_capacity - booked_capacity, 0)
+
+        setattr(restaurant, "max_capacity", max_capacity)
+        setattr(restaurant, "available_capacity", available_capacity)
+        setattr(restaurant, "max_tables", max_capacity)
+        setattr(restaurant, "available_tables", available_capacity)
+
+    return restaurants

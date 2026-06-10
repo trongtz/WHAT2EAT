@@ -59,6 +59,43 @@ def attach_restaurant_review_summary(db: Session, restaurant: Restaurant) -> Res
     return restaurant
 
 
+def attach_restaurant_review_summaries(db: Session, restaurants: list[Restaurant]) -> list[Restaurant]:
+    if not restaurants:
+        return restaurants
+
+    restaurant_ids = [restaurant.restaurant_id for restaurant in restaurants]
+    stats_by_restaurant = {
+        restaurant_id: {
+            "average_rating": Decimal(str(average_rating)).quantize(Decimal("0.01"))
+            if average_rating is not None
+            else Decimal("0.00"),
+            "total_reviews": int(total_reviews or 0),
+        }
+        for restaurant_id, average_rating, total_reviews in (
+            db.query(Review.restaurant_id, func.avg(Review.rating), func.count(Review.review_id))
+            .filter(
+                Review.restaurant_id.in_(restaurant_ids),
+                Review.status != "REJECTED",
+            )
+            .group_by(Review.restaurant_id)
+            .all()
+        )
+    }
+
+    for restaurant in restaurants:
+        stats = stats_by_restaurant.get(
+            restaurant.restaurant_id,
+            {"average_rating": Decimal("0.00"), "total_reviews": 0},
+        )
+        if stats["total_reviews"] > 0:
+            restaurant.average_rating = stats["average_rating"]
+        elif restaurant.average_rating is None:
+            restaurant.average_rating = Decimal("0.00")
+        setattr(restaurant, "review_count", stats["total_reviews"])
+
+    return restaurants
+
+
 def update_restaurant_rating(db: Session, restaurant_id: UUID) -> Restaurant | None:
     restaurant = db.query(Restaurant).filter(Restaurant.restaurant_id == restaurant_id).first()
     if not restaurant:
