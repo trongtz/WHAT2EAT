@@ -48,7 +48,7 @@ AVAILABILITY_CUES = {
 CONFIRM_CUES = {"ok", "oke", "okay", "dong y", "xac nhan", "chot", "dat di", "dat luon"}
 DETAIL_CUES = {"quan thu", "quan so", "so ", "xem quan", "chon quan", "duoc do", "lay quan"}
 CANCEL_CUES = {"huy", "thoi", "khong dat nua", "bo qua", "cancel"}
-CHANGE_RESTAURANT_CUES = {"quan khac", "doi quan", "chon quan khac", "khac di"}
+CHANGE_RESTAURANT_CUES = {"quan khac", "doi quan", "chon quan khac", "khac di", "doi sang", "chuyen sang"}
 MODIFY_CUES = {"doi", "sua", "thay", "thanh", "luc", "gio", "nguoi", "khach", "cho"}
 FAVORITE_ADD_CUES = {"yeu thich", "luu quan", "them vao yeu thich", "tha tim", "bam tim", "like quan"}
 FAVORITE_REMOVE_CUES = {"bo yeu thich", "xoa yeu thich", "bo tim", "unlike", "khong thich nua"}
@@ -78,11 +78,20 @@ def handle_agent_turn(
         latest_restaurants=latest_restaurants,
     )
 
+    if _should_bypass_agent(action, normalized_query, state):
+        return None
+
     if action["action"] == "cancel_pending_booking":
         return _cancel_pending_booking(action)
 
     if action["action"] == "change_restaurant":
-        return _change_pending_restaurant(action)
+        return _change_pending_restaurant(
+            action=action,
+            state=state,
+            latest_restaurants=latest_restaurants,
+            latitude=latitude,
+            longitude=longitude,
+        )
 
     if _is_create_booking_action(action) and state.get("pending_action") == "confirm_booking":
         return _confirm_pending_booking(
@@ -145,6 +154,46 @@ def handle_agent_turn(
         "get_restaurant_detail",
     }
 
+    guest_count = action.get("guest_count") or _coerce_int(state.get("guest_count"))
+    reservation_time = (
+        _parse_reservation_time(action.get("reservation_time_text") or "")
+        or _parse_reservation_time(query)
+        or _parse_iso_datetime(state.get("reservation_time"))
+    )
+
+    if has_selection and state.get("pending_action") in {"collect_booking_info", "confirm_booking"}:
+        missing: list[str] = []
+        if guest_count is None:
+            missing.append("số người")
+        if reservation_time is None:
+            missing.append("thời gian")
+        if missing:
+            return _build_agent_message(
+                message=_build_missing_booking_message(selected_restaurant, missing, guest_count, reservation_time),
+                status="needs_booking_info",
+                restaurant=selected_restaurant,
+                latitude=latitude,
+                longitude=longitude,
+                pending_state={
+                    "pending_action": "collect_booking_info",
+                    "restaurant_id": str(selected_restaurant.restaurant_id),
+                    "restaurant_name": selected_restaurant.name,
+                    "guest_count": guest_count,
+                    "reservation_time": reservation_time.isoformat() if reservation_time else None,
+                },
+                action=action,
+            )
+
+        return _check_availability_and_ask_confirmation(
+            db=db,
+            restaurant=selected_restaurant,
+            guest_count=guest_count,
+            reservation_time=reservation_time,
+            latitude=latitude,
+            longitude=longitude,
+            action=action,
+        )
+
     if not is_booking and has_selection:
         return _build_selected_restaurant_response(
             selected_restaurant,
@@ -156,17 +205,11 @@ def handle_agent_turn(
     if not is_booking:
         return None
 
-    guest_count = action.get("guest_count") or _coerce_int(state.get("guest_count"))
-    reservation_time = (
-        _parse_reservation_time(action.get("reservation_time_text") or "")
-        or _parse_reservation_time(query)
-        or _parse_iso_datetime(state.get("reservation_time"))
-    )
-
     if selected_restaurant is None:
         return _build_agent_message(
             message=_build_missing_booking_message(None, ["quán"], guest_count, reservation_time),
             status="needs_restaurant",
+            restaurants=latest_restaurants[:5],
             pending_state={
                 "pending_action": "collect_booking_info",
                 "guest_count": guest_count,
@@ -239,11 +282,34 @@ def _cancel_pending_booking(action: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _change_pending_restaurant(action: dict[str, Any]) -> dict[str, Any]:
+def _change_pending_restaurant(
+    *,
+    action: dict[str, Any],
+    state: dict[str, Any],
+    latest_restaurants: list[Restaurant],
+    latitude: float | None,
+    longitude: float | None,
+) -> dict[str, Any]:
+    pending_state = {
+        "pending_action": "collect_booking_info",
+        "guest_count": _coerce_int(state.get("guest_count")),
+        "reservation_time": state.get("reservation_time"),
+    }
+    guest_count = pending_state["guest_count"]
+    reservation_time = _parse_iso_datetime(pending_state["reservation_time"])
+    context_bits: list[str] = []
+    if guest_count is not None:
+        context_bits.append(f"{guest_count} người")
+    if reservation_time is not None:
+        context_bits.append(f"lúc {_format_datetime(reservation_time)}")
+    context_text = f" Mình vẫn giữ thông tin {', '.join(context_bits)}." if context_bits else ""
     return _build_agent_message(
-        message="Ok, mình bỏ lựa chọn quán hiện tại. Bạn nói nhu cầu mới hoặc chọn một quán khác trong danh sách gợi ý nhé.",
+        message=f"Ok, mình bỏ lựa chọn quán hiện tại.{context_text} Bạn chọn một quán khác trong danh sách gợi ý nhé.",
         status="needs_restaurant",
-        pending_state={},
+        restaurants=latest_restaurants[:5],
+        latitude=latitude,
+        longitude=longitude,
+        pending_state=pending_state,
         action=action,
     )
 
@@ -273,7 +339,15 @@ def _rule_based_action(query: str, normalized_query: str, state: dict[str, Any] 
     awaiting_confirmation = state.get("pending_action") == "confirm_booking"
     if has_pending_booking and any(cue in normalized_query for cue in CANCEL_CUES):
         return _base_action(action="cancel_pending_booking", planner_mode="rule")
-    if has_pending_booking and any(cue in normalized_query for cue in CHANGE_RESTAURANT_CUES):
+    if has_pending_booking and _is_switch_restaurant_request(normalized_query) and _parse_restaurant_index(normalized_query):
+        return _base_action(
+            action="modify_pending_booking",
+            restaurant_rank=_parse_restaurant_index(normalized_query),
+            guest_count=_parse_guest_count(normalized_query),
+            reservation_time_text=query,
+            planner_mode="rule",
+        )
+    if has_pending_booking and _is_switch_restaurant_request(normalized_query):
         return _base_action(action="change_restaurant", planner_mode="rule")
     if awaiting_confirmation and _is_booking_request(normalized_query):
         return _base_action(
@@ -382,6 +456,37 @@ def _base_action(**updates: Any) -> dict[str, Any]:
     }
     action.update(updates)
     return action
+
+
+def _should_bypass_agent(action: dict[str, Any], normalized_query: str, state: dict[str, Any]) -> bool:
+    if state.get("pending_action"):
+        return False
+    action_name = action.get("action") or "none"
+    if action_name in {"none", "recommend", "save_preference"}:
+        return False
+    if _has_explicit_agent_followup_cue(normalized_query):
+        return False
+    return True
+
+
+def _has_explicit_agent_followup_cue(normalized_query: str) -> bool:
+    if _parse_restaurant_index(normalized_query) is not None:
+        return True
+    if any(phrase in normalized_query for phrase in ["quan nay", "quan do", "o do", "quan khac", "doi quan"]):
+        return True
+    if _is_booking_request(normalized_query):
+        return True
+    if _has_selection_cue(normalized_query):
+        return True
+    if _is_confirmation(normalized_query):
+        return True
+    if _is_favorite_request(normalized_query) or _is_unfavorite_request(normalized_query):
+        return True
+    if _is_checkin_request(normalized_query):
+        return True
+    if _is_show_reviews_request(normalized_query) or _is_create_review_request(normalized_query):
+        return True
+    return False
 
 
 def _latest_results_payload(restaurants: list[Restaurant]) -> list[dict[str, Any]]:
@@ -607,6 +712,7 @@ def _handle_restaurant_side_action(
         return _build_agent_message(
             message="Mình chưa biết bạn đang nói tới quán nào. Bạn chọn quán trong danh sách trước nhé, ví dụ: 'chọn quán 1'.",
             status="needs_restaurant",
+            restaurants=latest_restaurants[:5],
             pending_state=state,
             action=action,
         )
@@ -741,6 +847,7 @@ def _handle_review_flow(
         return _build_agent_message(
             message="Mình chưa rõ bạn muốn xem hay viết review cho quán nào. Bạn chọn quán trước nhé.",
             status="needs_restaurant",
+            restaurants=latest_restaurants[:5],
             pending_state=state,
             action=action,
         )
@@ -814,19 +921,21 @@ def _build_agent_message(
     message: str,
     status: str,
     restaurant: Restaurant | None = None,
+    restaurants: list[Restaurant] | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
     pending_state: dict[str, Any] | None = None,
     booking: dict[str, Any] | None = None,
     action: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    restaurants = [_restaurant_payload(restaurant, latitude, longitude)] if restaurant is not None else []
+    restaurant_list = restaurants if restaurants is not None else ([restaurant] if restaurant is not None else [])
+    restaurant_payloads = [_restaurant_payload(item, latitude, longitude) for item in restaurant_list if item is not None]
     return {
         "message": message,
-        "total_found": len(restaurants),
+        "total_found": len(restaurant_payloads),
         "filters_applied": {},
-        "result_restaurant_ids": [item["id"] for item in restaurants],
-        "recommended_restaurants": restaurants,
+        "result_restaurant_ids": [item["id"] for item in restaurant_payloads],
+        "recommended_restaurants": restaurant_payloads,
         "source": "AGENT",
         "agent": {
             "enabled": True,
@@ -879,6 +988,14 @@ def _resolve_restaurant_reference(
         if restaurant:
             return restaurant
 
+    index = action.get("restaurant_rank") or _parse_restaurant_index(normalized_query)
+    if index is not None and 0 <= index - 1 < len(latest_restaurants):
+        return latest_restaurants[index - 1]
+
+    explicit_name_match = _find_named_restaurant_match(latest_restaurants, action.get("restaurant_ref") or query)
+    if explicit_name_match is not None:
+        return explicit_name_match
+
     state_restaurant_id = _parse_uuid(state.get("restaurant_id"))
     if state_restaurant_id and action.get("action") in {
         "check_availability",
@@ -894,9 +1011,20 @@ def _resolve_restaurant_reference(
         if restaurant:
             return restaurant
 
-    index = action.get("restaurant_rank") or _parse_restaurant_index(normalized_query)
-    if index is not None and 0 <= index - 1 < len(latest_restaurants):
-        return latest_restaurants[index - 1]
+    if state_restaurant_id and action.get("action") in {
+        "check_availability",
+        "favorite_restaurant",
+        "unfavorite_restaurant",
+        "checkin_restaurant",
+        "show_reviews",
+        "create_review",
+        "ask_review_info",
+        "get_restaurant_detail",
+        "select_restaurant",
+    }:
+        restaurant = crud_restaurant.get_restaurant_by_id(db, state_restaurant_id)
+        if restaurant:
+            return restaurant
 
     if action.get("action") in {
         "check_availability",
@@ -906,18 +1034,29 @@ def _resolve_restaurant_reference(
         "show_reviews",
         "create_review",
         "ask_review_info",
-    } and latest_restaurants:
+        "get_restaurant_detail",
+        "select_restaurant",
+    } and len(latest_restaurants) == 1:
         return latest_restaurants[0]
-
-    normalized_query_text = normalize_text(action.get("restaurant_ref") or query)
-    for restaurant in latest_restaurants:
-        if normalize_text(restaurant.name) in normalized_query_text:
-            return restaurant
 
     if _looks_like_restaurant_name(query):
         matches = crud_restaurant.search_restaurants(db, query=query, limit=1)
         return matches[0] if matches else None
     return None
+
+
+def _find_named_restaurant_match(restaurants: list[Restaurant], text: str | None) -> Restaurant | None:
+    normalized_query_text = normalize_text(text)
+    if not normalized_query_text:
+        return None
+    matches = [
+        restaurant
+        for restaurant in restaurants
+        if normalize_text(restaurant.name) and normalize_text(restaurant.name) in normalized_query_text
+    ]
+    if not matches:
+        return None
+    return max(matches, key=lambda restaurant: len(normalize_text(restaurant.name)))
 
 
 def _latest_recommended_restaurants(db: Session, session_id: UUID | None) -> list[Restaurant]:
@@ -993,6 +1132,12 @@ def _is_confirmation(normalized_query: str) -> bool:
 
 def _has_selection_cue(normalized_query: str) -> bool:
     return any(cue in normalized_query for cue in DETAIL_CUES)
+
+
+def _is_switch_restaurant_request(normalized_query: str) -> bool:
+    if any(cue in normalized_query for cue in CHANGE_RESTAURANT_CUES):
+        return True
+    return bool(re.search(r"\b(?:doi|chuyen)\s+sang\b", normalized_query))
 
 
 def _parse_restaurant_index(normalized_query: str) -> int | None:

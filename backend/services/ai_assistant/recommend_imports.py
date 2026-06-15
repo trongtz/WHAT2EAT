@@ -117,10 +117,61 @@ PREFERENCE_PATTERNS = {
 }
 
 DISH_PATTERNS = {
-    "mì trộn": ["mi tron"],
-    "mì cay": ["mi cay"],
-    "cơm tấm": ["com tam"],
+    "phở": ["pho", "pho bo", "pho ga", "pho tai", "pho nam", "pho dac biet"],
+    "bún": ["bun"],
+    "bún đậu": ["bun dau", "bun dau mam tom"],
     "bún bò Huế": ["bun bo hue", "bun bo"],
+    "bún chả": ["bun cha"],
+    "bún thịt nướng": ["bun thit nuong"],
+    "bún riêu": ["bun rieu"],
+    "bún mắm": ["bun mam"],
+    "bún mọc": ["bun moc"],
+    "hủ tiếu": ["hu tieu"],
+    "hủ tiếu Nam Vang": ["hu tieu nam vang"],
+    "mì": ["mi", "my"],
+    "mì cay": ["mi cay"],
+    "mì trộn": ["mi tron"],
+    "mì quảng": ["mi quang"],
+    "mì hoành thánh": ["mi hoanh thanh", "hoanh thanh mi"],
+    "ramen": ["ramen"],
+    "udon": ["udon"],
+    "cơm": ["com", "com suat", "com dia"],
+    "cơm tấm": ["com tam", "com suon"],
+    "cơm gà": ["com ga", "ga xoi mo", "com ga xoi mo"],
+    "cơm chiên": ["com chien", "fried rice"],
+    "cơm niêu": ["com nieu"],
+    "cơm văn phòng": ["com van phong", "com trua"],
+    "cháo": ["chao"],
+    "cháo lòng": ["chao long"],
+    "cháo ếch": ["chao ech"],
+    "bánh mì": ["banh mi"],
+    "bánh cuốn": ["banh cuon"],
+    "bánh xèo": ["banh xeo"],
+    "bánh canh": ["banh canh"],
+    "gỏi cuốn": ["goi cuon"],
+    "nem nướng": ["nem nuong"],
+    "bò kho": ["bo kho"],
+    "lẩu": ["lau", "hotpot", "hot pot"],
+    "nướng": ["nuong", "thit nuong", "do nuong", "grill"],
+    "bbq": ["bbq"],
+    "gà rán": ["ga ran", "fried chicken"],
+    "sushi": ["sushi"],
+    "sashimi": ["sashimi"],
+    "tokbokki": ["tokbokki", "tteokbokki", "tokbok"],
+    "kimbap": ["kimbap", "gimbap"],
+    "pizza": ["pizza"],
+    "pasta": ["pasta", "spaghetti", "y nui"],
+    "salad": ["salad"],
+    "burger": ["burger", "hamburger"],
+    "dim sum": ["dim sum"],
+    "há cảo": ["ha cao"],
+    "xíu mại": ["xiu mai"],
+    "ốc": ["oc"],
+    "hải sản": ["hai san", "seafood"],
+    "trà sữa": ["tra sua", "milk tea"],
+    "cà phê": ["ca phe", "cafe", "coffee"],
+    "chè": ["che"],
+    "ăn vặt": ["an vat", "do an vat", "snack"],
 }
 
 DISTRICT_PATTERNS = [
@@ -298,6 +349,21 @@ def infer_semantic_tags(*texts: str) -> list[str]:
     )
 
 
+def infer_dish_terms(*texts: str) -> list[str]:
+    normalized = " ".join(normalize_text(text) for text in texts if text)
+    matches = _match_patterns(normalized, DISH_PATTERNS)
+    return _prune_overlapping_dish_terms(matches)
+
+
+def dish_aliases(dish: str) -> list[str]:
+    normalized_dish = normalize_text(dish)
+    for label, patterns in DISH_PATTERNS.items():
+        aliases = unique_preserve_order([label, *patterns])
+        if normalize_text(label) == normalized_dish or any(normalize_text(pattern) == normalized_dish for pattern in patterns):
+            return aliases
+    return [dish]
+
+
 def parse_query_heuristically(query: str) -> QueryIntent:
     normalized = normalize_text(query)
     keywords = tokenize(query)
@@ -325,7 +391,11 @@ def parse_query_heuristically(query: str) -> QueryIntent:
     excluded_cuisines = _extract_excluded_cuisines(normalized)
     excluded_keywords = _extract_excluded_keywords(normalized)
     preference_tags = _match_patterns(normalized, PREFERENCE_PATTERNS)
-    dish_terms = _match_patterns(normalized, DISH_PATTERNS)
+    dish_terms = infer_dish_terms(query)
+    excluded_dish_terms = _extract_excluded_dish_terms(normalized)
+    if excluded_dish_terms:
+        excluded_dish_tokens = {normalize_text(dish) for dish in excluded_dish_terms}
+        dish_terms = [dish for dish in dish_terms if normalize_text(dish) not in excluded_dish_tokens]
     if "troi_nong" in weather_tags:
         preference_tags = unique_preserve_order([*preference_tags, "cooling_food"])
     if "troi_mua" in weather_tags:
@@ -375,6 +445,24 @@ def _match_patterns(normalized_text: str, patterns_map: dict[str, list[str]]) ->
 
 def _contains_pattern(normalized_text: str, pattern: str) -> bool:
     return re.search(rf"\b{re.escape(normalize_text(pattern))}\b", normalized_text) is not None
+
+
+def _prune_overlapping_dish_terms(dish_terms: list[str]) -> list[str]:
+    normalized_tokens = {
+        dish: set(normalize_text(dish).split())
+        for dish in dish_terms
+    }
+    output: list[str] = []
+    for dish in dish_terms:
+        current_tokens = normalized_tokens[dish]
+        is_generic_parent = any(
+            current_tokens < other_tokens
+            for other_dish, other_tokens in normalized_tokens.items()
+            if other_dish != dish
+        )
+        if not is_generic_parent:
+            output.append(dish)
+    return output
 
 
 def _parse_price(normalized_text: str) -> tuple[int | None, int | None, str | None]:
@@ -429,7 +517,21 @@ def _parse_group_size(normalized_text: str) -> int | None:
 def _extract_excluded_cuisines(normalized_text: str) -> list[str]:
     excluded: list[str] = []
     negative_cues = ["khong an", "khong phai", "dung goi y", "bo qua", "ghet", "tranh"]
-    for cuisine, patterns in CUISINE_PATTERNS.items():
+    cuisine_negative_aliases = {
+        "món việt": ["mon viet", "do viet", "viet nam", "quan viet"],
+        "món nhật": ["mon nhat", "do nhat", "nhat ban", "japanese"],
+        "món hàn": ["mon han", "do han", "han quoc", "korean"],
+        "món thái": ["mon thai", "do thai", "thai lan"],
+        "món trung hoa": ["mon trung hoa", "do trung", "chinese", "dim sum"],
+        "bbq / nướng": ["bbq", "nuong", "grill"],
+        "lẩu": ["lau", "hotpot", "hot pot"],
+        "hải sản": ["hai san", "seafood", "quan oc", "oc"],
+        "chay / healthy": ["chay", "healthy", "salad", "vegetarian"],
+        "cà phê / brunch": ["ca phe", "coffee", "cafe", "brunch", "tra sua"],
+        "pizza / Âu": ["pizza", "pasta", "italian", "western", "do au"],
+        "buffet": ["buffet"],
+    }
+    for cuisine, patterns in cuisine_negative_aliases.items():
         for pattern in patterns:
             if any(f"{cue} {pattern}" in normalized_text for cue in negative_cues):
                 excluded.append(cuisine)
@@ -448,6 +550,25 @@ def _extract_excluded_keywords(normalized_text: str) -> list[str]:
         excluded.extend(["cay", "mi cay"])
     if any(phrase in normalized_text for phrase in ["vua an com", "an com roi", "khong an com"]):
         excluded.append("com")
+    return unique_preserve_order(excluded)
+
+
+def _extract_excluded_dish_terms(normalized_text: str) -> list[str]:
+    negative_cues = [
+        "khong an",
+        "khong phai",
+        "dung goi y",
+        "bo qua",
+        "ghet",
+        "tranh",
+        "vua an",
+        "an roi",
+    ]
+    excluded: list[str] = []
+    for label, patterns in DISH_PATTERNS.items():
+        aliases = [label, *patterns]
+        if any(f"{cue} {normalize_text(alias)}" in normalized_text for cue in negative_cues for alias in aliases):
+            excluded.append(label)
     return unique_preserve_order(excluded)
 
 

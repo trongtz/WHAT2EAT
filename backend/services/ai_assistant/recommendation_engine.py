@@ -491,8 +491,26 @@ def _decimal_to_float(value: Decimal | float | None) -> float | None:
 
 
 def _join_reason(explanations: list[str]) -> str:
-    unique_reasons = list(dict.fromkeys(reason for reason in explanations if reason))
-    return ". ".join(unique_reasons[:3]) + ("." if unique_reasons else "")
+    unique_reasons = list(dict.fromkeys(reason.strip().rstrip(".") for reason in explanations if reason))
+    filtered: list[str] = []
+    has_cuisine_reason = False
+    has_highlight_rating = False
+    has_quality_rating = False
+    for reason in unique_reasons:
+        if reason.startswith("Đúng nhóm ") or reason.startswith("Phù hợp nhóm "):
+            if has_cuisine_reason:
+                continue
+            has_cuisine_reason = True
+        if reason.startswith("Điểm đánh giá nổi bật "):
+            if has_highlight_rating:
+                continue
+            has_highlight_rating = True
+        if reason.startswith("Được đánh giá tốt ") or reason.startswith("Rating ổn "):
+            if has_highlight_rating or has_quality_rating:
+                continue
+            has_quality_rating = True
+        filtered.append(reason)
+    return ". ".join(filtered[:3]) + ("." if filtered else "")
 
 
 def _select_diverse_results(scored: list[ScoredRestaurant], limit: int, intent: Any) -> list[ScoredRestaurant]:

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from models.restaurant import Restaurant
 from models.restaurant_taxonomy import RestaurantCuisine
 from services.ai_assistant.intent_extractor import intent_value
-from services.ai_assistant.recommend_imports import extract_district_slug_from_text, haversine_km, normalize_text
+from services.ai_assistant.recommend_imports import dish_aliases, extract_district_slug_from_text, haversine_km, normalize_text
 from services.capacity_service import count_booked_tables_for_date, get_restaurant_capacity_for_date
 from services.opening_hours_service import get_primary_open_hours
 
@@ -175,10 +175,11 @@ def available_menu_text(restaurant: Restaurant, *, limit: int = 40) -> str:
 
 
 def restaurant_matches_dish(restaurant: Restaurant, dish: str) -> bool:
+    aliases = dish_aliases(dish)
     restaurant_text = normalize_text(
         f"{restaurant.name} {restaurant.description or ''} {getattr(restaurant, 'cuisine_type', '')}"
     )
-    if _contains_alias(restaurant_text, dish):
+    if any(_contains_alias(restaurant_text, alias) for alias in aliases):
         return True
     for item in (getattr(restaurant, "menu_items", []) or [])[:40]:
         if getattr(item, "availability_status", "AVAILABLE") != "AVAILABLE":
@@ -186,7 +187,7 @@ def restaurant_matches_dish(restaurant: Restaurant, dish: str) -> bool:
         item_text = normalize_text(
             f"{item.name} {getattr(item, 'description', '') or ''} {getattr(item, 'category', '') or ''}"
         )
-        if _contains_alias(item_text, dish):
+        if any(_contains_alias(item_text, alias) for alias in aliases):
             return True
     return False
 

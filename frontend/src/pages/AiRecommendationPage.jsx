@@ -148,20 +148,17 @@ const buildRecommendationReply = (message, restaurants) => {
   if (!restaurants.length) return message || noResultMessage;
 
   const reasonText = restaurants
-    .flatMap((restaurant) => String(restaurant.aiReason || restaurant.reason || "").split("."))
-    .map((reason) => reason.trim())
+    .map((restaurant) => String(restaurant.aiReason || restaurant.reason || "").trim())
     .filter(Boolean);
   const uniqueReasons = [...new Set(reasonText)].slice(0, 3);
-  const names = restaurants
-    .slice(0, 3)
-    .map((restaurant) => restaurant.name)
-    .filter(Boolean)
-    .join(", ");
   const reasonSentence = uniqueReasons.length
-    ? uniqueReasons.join(". ") + "."
-    : "các quán này phù hợp với mô tả bạn vừa nhập.";
+    ? uniqueReasons
+        .map((reason) => reason.replace(/\.$/, "").trim())
+        .filter(Boolean)
+        .join(". ") + "."
+    : "các quán này khá khớp với mô tả bạn vừa nhập.";
 
-  return `Mình tìm được vài lựa chọn hợp nè. Mình ưu tiên các quán trong danh sách vì ${reasonSentence}`;
+  return `Mình tìm được vài lựa chọn phù hợp. Mình ưu tiên các quán trong danh sách vì ${reasonSentence}`;
 };
 
 const buildAssistantReply = ({ source, message, restaurants }) => {
@@ -318,6 +315,9 @@ function RecommendationListCard({ restaurant, index }) {
 function AgentActionButtons({ message, onQuickAction }) {
   const status = message.agent?.status;
   if (!status) return null;
+  const candidateRestaurants = Array.isArray(message.restaurants) ? message.restaurants.slice(0, 3) : [];
+  const pendingState = message.agent?.pending_state || {};
+  const selectedName = pendingState.restaurant_name || candidateRestaurants[0]?.name || "quán này";
 
   const buttonSx = {
     minHeight: 34,
@@ -335,22 +335,30 @@ function AgentActionButtons({ message, onQuickAction }) {
     },
   };
 
+  const selectionActions =
+    candidateRestaurants.length > 0
+      ? candidateRestaurants.map((restaurant, index) => ({
+          label: `Chọn quán ${index + 1}`,
+          prompt: `chọn quán ${index + 1}`,
+        }))
+      : [
+          { label: "Chọn quán 1", prompt: "chọn quán 1" },
+          { label: "Chọn quán 2", prompt: "chọn quán 2" },
+        ];
+
   const actionsByStatus = {
     restaurant_selected: [
-      { label: "Đặt quán này", prompt: "đặt quán này cho 4 người lúc 19h" },
+      { label: `Đặt ${selectedName}`, prompt: "đặt quán này cho 4 người lúc 19h" },
       { label: "Chọn quán khác", prompt: "quán khác đi" },
     ],
-    needs_restaurant: [
-      { label: "Chọn quán 1", prompt: "đặt quán thứ 1" },
-      { label: "Chọn quán 2", prompt: "đặt quán thứ 2" },
-    ],
+    needs_restaurant: selectionActions,
     needs_booking_info: [
       { label: "4 người lúc 19h", prompt: "4 người lúc 19h" },
-      { label: "Đổi quán", prompt: "quán khác đi" },
+      ...(candidateRestaurants.length > 1 ? [{ label: "Đổi sang quán 2", prompt: "đổi sang quán 2" }] : [{ label: "Đổi quán", prompt: "quán khác đi" }]),
     ],
     awaiting_booking_confirmation: [
       { label: "Xác nhận đặt", prompt: "ok đặt đi" },
-      { label: "Đổi thành 6 người", prompt: "đổi thành 6 người" },
+      ...(candidateRestaurants.length > 1 ? [{ label: "Đổi sang quán 2", prompt: "đổi sang quán 2" }] : [{ label: "Đổi quán", prompt: "quán khác đi" }]),
       { label: "Hủy", prompt: "thôi không đặt nữa" },
     ],
     booking_created: [
@@ -359,7 +367,7 @@ function AgentActionButtons({ message, onQuickAction }) {
     ],
     booking_rejected: [
       { label: "Đổi giờ 20h", prompt: "đổi sang 20h" },
-      { label: "Chọn quán khác", prompt: "quán khác đi" },
+      ...(candidateRestaurants.length > 1 ? [{ label: "Đổi sang quán 2", prompt: "đổi sang quán 2" }] : [{ label: "Chọn quán khác", prompt: "quán khác đi" }]),
     ],
     needs_login: [
       { label: "Đăng nhập", to: "/dang-nhap" },
@@ -502,11 +510,24 @@ function AiRecommendationPage() {
     );
   }, []);
 
-  const latestRecommendationMessage = [...messages]
-    .reverse()
-    .find((message) => message.role === "assistant" && (message.restaurants?.length || message.isEmpty || message.isFallback));
+  const latestSidebarMessage =
+    [...messages].reverse().find(
+      (message) =>
+        message.role === "assistant" &&
+        !message.agent &&
+        (message.restaurants?.length || message.isEmpty || message.isFallback)
+    ) ||
+    [...messages].reverse().find(
+      (message) =>
+        message.role === "assistant" &&
+        message.agent?.status === "needs_restaurant" &&
+        (message.restaurants?.length || message.isEmpty || message.isFallback)
+    ) ||
+    [...messages].reverse().find(
+      (message) => message.role === "assistant" && (message.restaurants?.length || message.isEmpty || message.isFallback)
+    );
 
-  const recommendedRestaurants = latestRecommendationMessage?.restaurants || [];
+  const recommendedRestaurants = latestSidebarMessage?.restaurants || [];
 
   const handleNewChat = () => {
     setSessionId(createSessionId());
@@ -561,7 +582,7 @@ function AiRecommendationPage() {
           }),
           restaurants,
           isFallback: data.source === "FALLBACK",
-          isEmpty: restaurants.length === 0,
+          isEmpty: restaurants.length === 0 && data.source !== "AGENT",
           agent: data.agent,
           booking: data.booking,
         }),
@@ -765,7 +786,7 @@ function AiRecommendationPage() {
                   maxHeight: { xs: "none", lg: 620 },
                 }}
               >
-                {latestRecommendationMessage?.isFallback ? (
+                {latestSidebarMessage?.isFallback ? (
                   <Alert severity="warning" sx={{ mb: 2 }}>
                     {fallbackMessage}
                   </Alert>
@@ -797,7 +818,7 @@ function AiRecommendationPage() {
                     <Stack spacing={1.2} alignItems="center" sx={{ maxWidth: 320, textAlign: "center" }}>
                       <Typography variant="h4">Chưa có gợi ý nhà hàng</Typography>
                       <Typography color="text.secondary">
-                        {latestRecommendationMessage?.isEmpty
+                        {latestSidebarMessage?.isEmpty
                           ? noResultMessage
                           : "Hãy gửi một yêu cầu ở khung chat để xem danh sách nhà hàng được đề xuất."}
                       </Typography>
