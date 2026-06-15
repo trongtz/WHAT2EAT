@@ -5,10 +5,24 @@ import EmptyState from "../components/EmptyState";
 import LoadingScreen from "../components/LoadingScreen";
 import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
-import { bookingService } from "../services/bookingService";
+import { bookingService, getRecentAiBookings } from "../services/bookingService";
 import { restaurantService } from "../services/restaurantService";
 import { getGuestBookings } from "../utils/guestSession";
 import { formatDate, getStatusColor } from "../utils/helpers";
+
+const mergeBookings = (primaryBookings, secondaryBookings) => {
+  const merged = [...primaryBookings];
+  const seenIds = new Set(primaryBookings.map((item) => item.id || item.reservationId));
+
+  for (const booking of secondaryBookings) {
+    const bookingId = booking.id || booking.reservationId;
+    if (seenIds.has(bookingId)) continue;
+    merged.unshift(booking);
+    seenIds.add(bookingId);
+  }
+
+  return merged;
+};
 
 function BookingHistoryPage() {
   const { user } = useAuth();
@@ -24,8 +38,25 @@ function BookingHistoryPage() {
         restaurantService.getRestaurants(),
       ]);
 
-      setHistory(bookingData);
-      setRestaurantMap(Object.fromEntries(restaurantData.map((item) => [item.id, item])));
+      const recentAiBookings = user.isGuest ? [] : getRecentAiBookings();
+      const mergedBookings = mergeBookings(bookingData, recentAiBookings);
+      const restaurantMapSeed = Object.fromEntries(restaurantData.map((item) => [String(item.id), item]));
+      const missingRestaurantIds = [...new Set(mergedBookings.map((item) => String(item.restaurantId)).filter((id) => id && !restaurantMapSeed[id]))];
+
+      if (missingRestaurantIds.length) {
+        const missingRestaurants = await Promise.allSettled(
+          missingRestaurantIds.map((restaurantId) => restaurantService.getRestaurantDetail(restaurantId))
+        );
+
+        for (const result of missingRestaurants) {
+          if (result.status !== "fulfilled") continue;
+          const restaurant = result.value;
+          restaurantMapSeed[String(restaurant.id)] = restaurant;
+        }
+      }
+
+      setHistory(mergedBookings);
+      setRestaurantMap(restaurantMapSeed);
       if (showLoading) setLoading(false);
     },
     [user.id, user.isGuest]
@@ -56,7 +87,7 @@ function BookingHistoryPage() {
             <CustomCard key={booking.id}>
               <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
                 <Stack spacing={0.5}>
-                  <Typography variant="h4">{restaurantMap[booking.restaurantId]?.name || "Nhà hàng"}</Typography>
+                  <Typography variant="h4">{restaurantMap[String(booking.restaurantId)]?.name || "Nhà hàng"}</Typography>
                   <Typography color="text.secondary">
                     {formatDate(booking.date)} • {booking.time} • {booking.guests} khách
                   </Typography>

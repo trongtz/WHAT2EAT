@@ -1,6 +1,8 @@
 import apiClient from "./apiClient";
 import { invalidateCachePrefix } from "./requestCache";
 
+const AI_RECENT_BOOKINGS_KEY = "smartfood_recent_ai_bookings";
+
 const BOOKING_STATUS_LABELS = {
   PENDING: "Chờ duyệt",
   CONFIRMED: "Đã xác nhận",
@@ -44,6 +46,33 @@ const normalizeBooking = (booking) => {
     createdAt: booking.created_at ?? booking.createdAt,
   };
 };
+
+const readRecentAiBookings = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    const rawValue = window.sessionStorage.getItem(AI_RECENT_BOOKINGS_KEY);
+    if (!rawValue) return [];
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.map(normalizeBooking) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeRecentAiBookings = (bookings) => {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(AI_RECENT_BOOKINGS_KEY, JSON.stringify(bookings));
+};
+
+export const rememberRecentAiBooking = (booking) => {
+  if (!booking) return null;
+  const normalized = normalizeBooking(booking);
+  const current = readRecentAiBookings().filter((item) => item.id !== normalized.id);
+  writeRecentAiBookings([normalized, ...current].slice(0, 20));
+  return normalized;
+};
+
+export const getRecentAiBookings = () => readRecentAiBookings();
 
 export const bookingService = {
   getHistory: async () => {

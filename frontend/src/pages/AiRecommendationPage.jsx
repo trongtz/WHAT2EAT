@@ -14,6 +14,7 @@ import FormInput from "../components/FormInput";
 import AppLogoImage from "../components/AppLogoImage";
 import { useAuth } from "../hooks/useAuth";
 import { aiService } from "../services/aiService";
+import { rememberRecentAiBooking } from "../services/bookingService";
 import { normalizeRestaurant, restaurantService } from "../services/restaurantService";
 import { formatPriceRangeDisplay } from "../utils/helpers";
 import { validatePrompt } from "../utils/validators";
@@ -184,6 +185,7 @@ const getAgentStatusLabel = (status) => {
     favorite_added: "Đã lưu yêu thích",
     favorite_removed: "Đã bỏ yêu thích",
     checkin_created: "Đã check-in",
+    checkin_owner_required: "Nhà hàng sẽ xác nhận check-in",
     showing_reviews: "Đang xem review",
     review_created: "Đã gửi review",
   };
@@ -514,8 +516,9 @@ function AiRecommendationPage() {
     setMessages(createInitialMessages("Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?"));
   };
 
-  const sendPrompt = async (rawPrompt) => {
-    const nextError = validatePrompt(rawPrompt);
+  const sendPrompt = async (rawPrompt, options = {}) => {
+    const { skipValidation = false } = options;
+    const nextError = skipValidation ? "" : validatePrompt(rawPrompt);
     setError(nextError);
     if (nextError) return;
 
@@ -543,6 +546,10 @@ function AiRecommendationPage() {
             };
           })
         : [];
+
+      if (data.booking) {
+        rememberRecentAiBooking(data.booking);
+      }
 
       setMessages((current) => [
         ...current,
@@ -601,7 +608,7 @@ function AiRecommendationPage() {
 
   const handleQuickAction = async (quickPrompt) => {
     if (loading) return;
-    await sendPrompt(quickPrompt);
+    await sendPrompt(quickPrompt, { skipValidation: true });
   };
 
   return (

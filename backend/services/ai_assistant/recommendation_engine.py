@@ -222,6 +222,8 @@ def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
         token
         for token in query_tokens & restaurant_tokens
         if token
+        and len(token) >= 3
+        and token
         not in {
             "mon",
             "quan",
@@ -249,6 +251,7 @@ def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
             "duoi",
             "hoc",
             "dai",
+            "dh",
             "khoa",
             "tu",
             "nhien",
@@ -261,7 +264,7 @@ def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
     ]
     if not useful_tokens:
         return ""
-    return "Khớp các chi tiết: " + ", ".join(sorted(useful_tokens)[:4])
+    return "Khớp thêm một số chi tiết trong mô tả của bạn"
 
 
 def _cuisine_score(intent: Any, restaurant: Restaurant, search_text: str) -> float:

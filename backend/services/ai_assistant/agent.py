@@ -8,7 +8,6 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-import crud.checkin as crud_checkin
 import crud.favorite as crud_favorite
 import crud.reservation as crud_reservation
 import crud.restaurant as crud_restaurant
@@ -17,7 +16,6 @@ from models.ai_chat import RecommendationLog
 from models.restaurant import Restaurant
 from models.user import User
 from schemas.booking import ReservationCreate
-from schemas.checkin import CheckInCreate
 from schemas.favorite import FavoriteCreate
 from schemas.review import ReviewCreate
 from services.ai_assistant.openai_agent_planner import (
@@ -618,7 +616,7 @@ def _handle_restaurant_side_action(
     if action["action"] == "unfavorite_restaurant":
         return _unfavorite_restaurant(db, current_user, restaurant, latitude, longitude, action)
     if action["action"] == "checkin_restaurant":
-        return _checkin_restaurant(db, current_user, restaurant, query, latitude, longitude, action)
+        return _checkin_restaurant(restaurant, latitude, longitude, action)
     if action["action"] in {"show_reviews", "create_review", "ask_review_info"}:
         return _handle_review_flow(
             db=db,
@@ -703,30 +701,17 @@ def _unfavorite_restaurant(
 
 
 def _checkin_restaurant(
-    db: Session,
-    current_user: User | None,
     restaurant: Restaurant,
-    query: str,
     latitude: float | None,
     longitude: float | None,
     action: dict[str, Any],
 ) -> dict[str, Any]:
-    requirement = _require_customer_for_action(current_user, restaurant, latitude, longitude, "check-in", action)
-    if requirement:
-        return requirement
-    assert current_user is not None
-    checkin = crud_checkin.create_checkin(
-        db,
-        CheckInCreate(
-            restaurant_id=restaurant.restaurant_id,
-            crowd_status=_parse_crowd_status(normalize_text(query)),
-            note=_extract_checkin_note(query),
-        ),
-        current_user.user_id,
-    )
     return _build_agent_message(
-        message=f"Mình đã check-in {restaurant.name} cho bạn{', có gắn ghi chú' if checkin.note else ''}.",
-        status="checkin_created",
+        message=(
+            f"Check-in tại {restaurant.name} sẽ được nhà hàng xác nhận khi bạn đến nơi. "
+            "Nếu bạn đã đặt bàn, phía chủ quán có thể bấm xác nhận khách đến để lưu check-in."
+        ),
+        status="checkin_owner_required",
         restaurant=restaurant,
         latitude=latitude,
         longitude=longitude,

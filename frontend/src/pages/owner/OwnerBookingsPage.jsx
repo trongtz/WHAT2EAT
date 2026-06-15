@@ -78,6 +78,17 @@ function OwnerBookingsPage() {
     }
   };
 
+  const handleCheckin = async (bookingId) => {
+    try {
+      await dashboardService.markBookingCheckin({ bookingId });
+      setMessage("Đã xác nhận khách đến và lưu check-in.");
+      setError("");
+      await loadData({ showLoading: false });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   if (loading) return <LoadingScreen message="Đang tải lịch đặt bàn..." />;
 
   return (
@@ -160,11 +171,28 @@ function OwnerBookingsPage() {
                                   {formatDateTime(booking.reservationTime)} - {booking.guestCount} khách
                                 </Typography>
                                 <Typography color="text.secondary">Ghi chú: {booking.notes || "Không có"}</Typography>
-                                <Chip label={booking.status === "CONFIRMED" ? "Đã sẵn sàng phục vụ" : "Cần xử lý"} sx={{ alignSelf: "flex-start" }} />
+                                <Chip
+                                  label={
+                                    booking.status === "COMPLETED"
+                                      ? "Đã check-in"
+                                      : booking.status === "CONFIRMED"
+                                        ? "Đã sẵn sàng phục vụ"
+                                        : "Cần xử lý"
+                                  }
+                                  sx={{ alignSelf: "flex-start" }}
+                                />
                                 <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
                                   <CustomButton onClick={() => handleStatus(booking.id, "CONFIRMED")}>
                                     Xác nhận
                                   </CustomButton>
+                                  {booking.status === "CONFIRMED" ? (
+                                    <CustomButton
+                                      onClick={() => handleCheckin(booking.id)}
+                                      sx={{ background: "linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)" }}
+                                    >
+                                      Khách đã đến
+                                    </CustomButton>
+                                  ) : null}
                                   <CustomButton
                                     onClick={() => handleStatus(booking.id, "REJECTED")}
                                     sx={{ background: "linear-gradient(135deg, #E85D75 0%, #FB7185 100%)" }}

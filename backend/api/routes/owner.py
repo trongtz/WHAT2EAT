@@ -1,9 +1,11 @@
 from uuid import UUID
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import crud.checkin as crud_checkin
 from api.deps import get_current_user
 from core.database import get_db
 from models.booking import Reservation
@@ -19,6 +21,12 @@ VALID_BOOKING_STATUSES = {"PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMP
 class OwnerBookingStatusUpdate(BaseModel):
     bookingId: UUID
     status: str
+
+
+class OwnerBookingCheckInPayload(BaseModel):
+    bookingId: UUID
+    crowdStatus: Optional[str] = None
+    note: Optional[str] = None
 
 
 def require_owner(current_user: User) -> None:
@@ -165,5 +173,45 @@ def update_owner_booking_status(
     db.add(reservation)
     db.commit()
     db.refresh(reservation)
+
+    return serialize_owner_booking(reservation)
+
+
+@router.post("/bookings/check-in")
+def check_in_owner_booking(
+    payload: OwnerBookingCheckInPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_owner(current_user)
+
+    reservation = (
+        db.query(Reservation)
+        .join(Restaurant, Restaurant.restaurant_id == Reservation.restaurant_id)
+        .filter(
+            Reservation.reservation_id == payload.bookingId,
+            Restaurant.owner_id == current_user.user_id,
+        )
+        .first()
+    )
+    if not reservation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đơn đặt bàn")
+    if reservation.status not in {"CONFIRMED", "COMPLETED"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chỉ có thể check-in cho booking đã được xác nhận",
+        )
+
+    crud_checkin.create_verified_checkin_from_reservation(
+        db,
+        reservation,
+        crowd_status=payload.crowdStatus,
+        note=payload.note,
+    )
+    if reservation.status != "COMPLETED":
+        reservation.status = "COMPLETED"
+        db.add(reservation)
+        db.commit()
+        db.refresh(reservation)
 
     return serialize_owner_booking(reservation)

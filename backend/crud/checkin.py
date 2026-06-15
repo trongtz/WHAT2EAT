@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -26,6 +27,35 @@ def create_checkin(db: Session, payload: CheckInCreate, customer_id: UUID) -> Ch
         customer_id=customer_id,
         is_verified=is_verified,
         **payload.model_dump(),
+    )
+    db.add(checkin)
+    db.commit()
+    db.refresh(checkin)
+    return checkin
+
+
+def get_checkin_by_reservation(db: Session, reservation_id: UUID) -> Optional[CheckIn]:
+    return db.query(CheckIn).filter(CheckIn.reservation_id == reservation_id).first()
+
+
+def create_verified_checkin_from_reservation(
+    db: Session,
+    reservation: Reservation,
+    *,
+    crowd_status: Optional[str] = None,
+    note: Optional[str] = None,
+) -> CheckIn:
+    existing = get_checkin_by_reservation(db, reservation.reservation_id)
+    if existing:
+        return existing
+
+    checkin = CheckIn(
+        customer_id=reservation.customer_id,
+        restaurant_id=reservation.restaurant_id,
+        reservation_id=reservation.reservation_id,
+        crowd_status=crowd_status,
+        note=note,
+        is_verified=True,
     )
     db.add(checkin)
     db.commit()
