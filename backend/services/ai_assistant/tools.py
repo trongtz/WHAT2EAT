@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import math
 from datetime import datetime
 from typing import Any
 
@@ -30,17 +31,34 @@ CUISINE_HARD_ALIASES = {
 }
 
 
-def search_restaurants_tool(db: Session, limit: int = 10_000) -> list[Restaurant]:
-    return (
+def search_restaurants_tool(
+    db: Session,
+    limit: int = 10_000,
+    *,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
+) -> list[Restaurant]:
+    query = (
         db.query(Restaurant)
         .options(
             selectinload(Restaurant.menu_items),
             selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
         )
         .filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
-        .limit(limit)
-        .all()
     )
+
+    if latitude is not None and longitude is not None and radius_km is not None:
+        lat_delta = radius_km / 111.0
+        lng_delta = radius_km / max(111.0 * abs(math.cos(math.radians(latitude))), 1.0)
+        query = query.filter(
+            Restaurant.latitude.isnot(None),
+            Restaurant.longitude.isnot(None),
+            Restaurant.latitude.between(latitude - lat_delta, latitude + lat_delta),
+            Restaurant.longitude.between(longitude - lng_delta, longitude + lng_delta),
+        )
+
+    return query.limit(limit).all()
 
 
 def check_available_slots_tool(db: Session, restaurant: Restaurant) -> int | None:

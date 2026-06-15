@@ -91,7 +91,12 @@ class AIAssistantService:
         previous_result_ids = set(conversation_context["previous_result_ids"])
         candidates = [
             restaurant
-            for restaurant in search_restaurants_tool(db)
+            for restaurant in search_restaurants_tool(
+                db,
+                latitude=latitude,
+                longitude=longitude,
+                radius_km=radius_km,
+            )
             if passes_hard_constraints(restaurant, intent, db=db)
             and passes_location_constraint(
                 restaurant,
