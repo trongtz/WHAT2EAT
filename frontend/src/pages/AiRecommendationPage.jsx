@@ -160,12 +160,12 @@ const buildRecommendationReply = (message, restaurants) => {
     ? uniqueReasons.join(". ") + "."
     : "các quán này phù hợp với mô tả bạn vừa nhập.";
 
-  return `Mình recommend bạn các quán như trong danh sách bên phải vì: ${reasonSentence}`;
+  return `Mình tìm được vài lựa chọn hợp nè. Mình ưu tiên các quán trong danh sách vì ${reasonSentence}`;
 };
 
 const buildAssistantReply = ({ source, message, restaurants }) => {
-  if (restaurants.length) return buildRecommendationReply(message, restaurants);
   if (source === "AGENT") return message || "";
+  if (restaurants.length) return buildRecommendationReply(message, restaurants);
   return buildRecommendationReply(message, restaurants);
 };
 

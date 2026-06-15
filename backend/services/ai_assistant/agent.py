@@ -32,6 +32,15 @@ BOOKING_CUES = {
     "booking",
     "reservation",
 }
+AVAILABILITY_CUES = {
+    "con cho",
+    "con ban",
+    "con slot",
+    "du cho",
+    "het cho",
+    "kiem tra cho",
+    "co cho",
+}
 CONFIRM_CUES = {"ok", "oke", "okay", "dong y", "xac nhan", "chot", "dat di", "dat luon"}
 DETAIL_CUES = {"quan thu", "quan so", "so ", "xem quan", "chon quan", "duoc do", "lay quan"}
 CANCEL_CUES = {"huy", "thoi", "khong dat nua", "bo qua", "cancel"}
@@ -218,10 +227,20 @@ def _resolve_agent_action(
 def _rule_based_action(query: str, normalized_query: str, state: dict[str, Any] | None = None) -> dict[str, Any]:
     state = state or {}
     has_pending_booking = state.get("pending_action") in {"collect_booking_info", "confirm_booking"}
+    awaiting_confirmation = state.get("pending_action") == "confirm_booking"
     if has_pending_booking and any(cue in normalized_query for cue in CANCEL_CUES):
         return _base_action(action="cancel_pending_booking", planner_mode="rule")
     if has_pending_booking and any(cue in normalized_query for cue in CHANGE_RESTAURANT_CUES):
         return _base_action(action="change_restaurant", planner_mode="rule")
+    if awaiting_confirmation and _is_booking_request(normalized_query):
+        return _base_action(
+            action="create_booking",
+            confirmation=True,
+            restaurant_rank=_parse_restaurant_index(normalized_query),
+            guest_count=_parse_guest_count(normalized_query),
+            reservation_time_text=query,
+            planner_mode="rule",
+        )
     if has_pending_booking and (
         _parse_guest_count(normalized_query)
         or _parse_reservation_time(query)
@@ -569,6 +588,9 @@ def _resolve_restaurant_reference(
     if index is not None and 0 <= index - 1 < len(latest_restaurants):
         return latest_restaurants[index - 1]
 
+    if action.get("action") == "check_availability" and latest_restaurants:
+        return latest_restaurants[0]
+
     normalized_query_text = normalize_text(action.get("restaurant_ref") or query)
     for restaurant in latest_restaurants:
         if normalize_text(restaurant.name) in normalized_query_text:
@@ -620,7 +642,7 @@ def _validate_booking(db: Session, restaurant: Restaurant, reservation_time: dat
 
 
 def _is_booking_request(normalized_query: str) -> bool:
-    return any(cue in normalized_query for cue in BOOKING_CUES)
+    return any(cue in normalized_query for cue in BOOKING_CUES | AVAILABILITY_CUES)
 
 
 def _is_confirmation(normalized_query: str) -> bool:
