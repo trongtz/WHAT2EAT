@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080 # 7 ngày
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODE_CLASSIFIER: bool = False
     OPENAI_INTENT_PARSER: bool = False
     OPENAI_AGENT_PLANNER: bool = False
     OPENAI_AGENTIC_RERANKER: bool = False

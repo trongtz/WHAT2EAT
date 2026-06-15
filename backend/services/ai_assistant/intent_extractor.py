@@ -15,21 +15,21 @@ def extract_intent(query: str, previous_query: str | None = None) -> Any:
     if should_use_openai_intent_parser():
         try:
             parsed_intent = parse_intent_with_openai(query, previous_query=previous_query)
-            return _merge_local_heuristics(parsed_intent, parse_query_heuristically(query))
+            return _apply_general_intent_safeguards(_merge_local_heuristics(parsed_intent, parse_query_heuristically(query)))
         except OpenAIIntentParserError:
             pass
 
     intent = parse_query_heuristically(query) if parse_query_heuristically else _fallback_intent(query)
     if not previous_query:
-        return intent
+        return _apply_general_intent_safeguards(intent)
 
     previous_intent = parse_query_heuristically(previous_query) if parse_query_heuristically else _fallback_intent(previous_query)
     if hasattr(intent, "merged_with"):
-        return intent.merged_with(previous_intent)
+        return _apply_general_intent_safeguards(intent.merged_with(previous_intent))
 
     merged = dict(previous_intent)
     merged.update({key: value for key, value in intent.items() if value not in (None, [], "")})
-    return merged
+    return _apply_general_intent_safeguards(merged)
 
 
 def intent_value(intent: Any, key: str, default: Any = None) -> Any:
@@ -93,10 +93,16 @@ def _fallback_intent(query: str) -> dict[str, Any]:
 
 def _merge_local_heuristics(openai_intent: dict[str, Any], local_intent: Any) -> dict[str, Any]:
     merged = dict(openai_intent)
-    if _is_broad_recommendation(local_intent):
+    broad_recommendation = _is_broad_recommendation(local_intent)
+    keep_only_dish_filter = _should_keep_only_dish_filter(local_intent)
+    if broad_recommendation:
         # For vague prompts, GPT should help understand mood, not invent hard filters.
         merged["cuisines"] = []
         merged["dish_terms"] = []
+    if keep_only_dish_filter:
+        # If the user names a concrete dish but does not explicitly mention a cuisine,
+        # keep the query dish-driven and avoid hard cuisine filters inferred from that dish.
+        merged["cuisines"] = []
     if _should_drop_model_food_guesses(local_intent):
         # Contextual prompts like weather/mood should not become a guessed cuisine.
         merged["cuisines"] = []
@@ -118,10 +124,15 @@ def _merge_local_heuristics(openai_intent: dict[str, Any], local_intent: Any) ->
         "dish_terms",
         "conflicts",
     ):
+        local_values = intent_value(local_intent, key, []) or []
+        if key == "cuisines" and keep_only_dish_filter:
+            local_values = []
+        if key == "dish_terms" and broad_recommendation:
+            local_values = []
         merged[key] = unique_preserve_order(
             [
                 *(merged.get(key) or []),
-                *(intent_value(local_intent, key, []) or []),
+                *local_values,
             ]
         )
     for key in ("price_min", "price_max", "budget_label", "group_size", "open_now"):
@@ -190,6 +201,57 @@ def _should_drop_model_food_guesses(local_intent: Any) -> bool:
     return bool(contextual_tags) or bool(preference_tags & contextual_preferences)
 
 
+def _should_prefer_local_dish_only(local_intent: Any) -> bool:
+    local_cuisines = intent_value(local_intent, "cuisines", []) or []
+    local_dish_terms = intent_value(local_intent, "dish_terms", []) or []
+    if local_cuisines or not local_dish_terms:
+        return False
+    return not _has_explicit_cuisine_marker(local_intent)
+
+
+def _should_keep_only_dish_filter(local_intent: Any) -> bool:
+    local_dish_terms = intent_value(local_intent, "dish_terms", []) or []
+    if not local_dish_terms:
+        return False
+    return not _has_explicit_cuisine_marker(local_intent)
+
+
+def _has_explicit_cuisine_marker(local_intent: Any) -> bool:
+    normalized = normalize_text(intent_value(local_intent, "original_query", ""))
+    explicit_cuisine_markers = [
+        "mon viet",
+        "viet nam",
+        "mon han",
+        "han quoc",
+        "korean",
+        "mon nhat",
+        "nhat ban",
+        "japanese",
+        "mon thai",
+        "thai lan",
+        "mon thai lan",
+        "mon y",
+        "italian",
+        "mon trung hoa",
+        "trung hoa",
+        "chinese",
+        "chay",
+        "healthy",
+        "vegan",
+        "vegetarian",
+        "hai san",
+        "seafood",
+        "bbq",
+        "nuong",
+        "lau",
+        "buffet",
+        "ca phe",
+        "coffee",
+        "brunch",
+    ]
+    return any(marker in normalized for marker in explicit_cuisine_markers)
+
+
 def _sanitize_merged_intent(merged: dict[str, Any], local_intent: Any) -> None:
     normalized = normalize_text(intent_value(local_intent, "original_query", ""))
     if (
@@ -215,6 +277,16 @@ def _sanitize_merged_intent(merged: dict[str, Any], local_intent: Any) -> None:
         merged["notes"] = unique_preserve_order(
             [*(merged.get("notes") or []), "Đã bỏ group_size=1 vì câu nói về 1 người ăn chay trong nhóm."]
         )
+
+
+def _apply_general_intent_safeguards(intent: Any) -> Any:
+    if not _should_keep_only_dish_filter(intent):
+        return intent
+    if isinstance(intent, dict):
+        intent["cuisines"] = []
+        return intent
+    intent.cuisines = []
+    return intent
 
 
 def _prefer_local_price_when_openai_drops_k_suffix(merged: dict[str, Any], local_intent: Any, key: str) -> None:

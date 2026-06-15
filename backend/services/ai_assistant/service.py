@@ -8,6 +8,7 @@ from models.user import User
 from services.ai_assistant.agent import handle_agent_turn
 from services.ai_assistant.conversation_context import apply_conversation_memory, get_conversation_context
 from services.ai_assistant.intent_extractor import extract_intent, filters_from_intent, intent_to_dict, intent_value
+from services.ai_assistant.mode_classifier import classify_conversation_mode
 from services.ai_assistant.openai_reranker import (
     AgenticRerankError,
     agentic_shortlist_size,
@@ -45,25 +46,55 @@ class AIAssistantService:
         latitude, longitude, location_anchor = _resolve_location_anchor(query, latitude, longitude)
         base_intent = extract_intent(query)
         conversation_context = get_conversation_context(db, session_id, query, base_intent)
-        agent_response = handle_agent_turn(
-            db=db,
+        conversation_mode = classify_conversation_mode(
             query=query,
-            current_user=current_user,
-            session_id=session_id,
+            current_intent=base_intent,
             conversation_context=conversation_context,
-            latitude=latitude,
-            longitude=longitude,
         )
-        if agent_response:
-            agent_response["intent"] = intent_to_dict(base_intent)
-            agent_response["context_used"] = {
-                "previous_query": conversation_context["previous_query"],
-                "previous_result_ids": conversation_context["previous_result_ids"],
-                "use_previous_context": conversation_context["use_previous_context"],
-                "avoid_repeated_results": conversation_context["avoid_repeated_results"],
+        mode_name = conversation_mode["mode"]
+
+        if mode_name in {"restaurant_focus", "booking_flow", "profile_preference"}:
+            agent_response = handle_agent_turn(
+                db=db,
+                query=query,
+                current_user=current_user,
+                session_id=session_id,
+                conversation_context=conversation_context,
+                latitude=latitude,
+                longitude=longitude,
+            )
+            if agent_response:
+                agent_response["intent"] = intent_to_dict(base_intent)
+                agent_response["conversation_mode"] = conversation_mode
+                agent_response["context_used"] = {
+                    "previous_query": conversation_context["previous_query"],
+                    "previous_result_ids": conversation_context["previous_result_ids"],
+                    "use_previous_context": conversation_context["use_previous_context"],
+                    "avoid_repeated_results": conversation_context["avoid_repeated_results"],
+                }
+                return agent_response
+
+        if mode_name == "small_talk":
+            return {
+                "message": "Mình đang đây. Bạn nói món ăn, khu vực, mức giá hoặc kiểu quán bạn muốn, mình sẽ gợi ý ngay.",
+                "total_found": 0,
+                "result_restaurant_ids": [],
+                "recommended_restaurants": [],
+                "source": "HYBRID",
+                "intent": intent_to_dict(base_intent),
+                "conversation_mode": conversation_mode,
+                "context_used": {
+                    "previous_query": conversation_context["previous_query"],
+                    "previous_result_ids": conversation_context["previous_result_ids"],
+                    "use_previous_context": False,
+                    "avoid_repeated_results": False,
+                },
             }
-            return agent_response
-        if conversation_context["use_previous_context"]:
+
+        use_previous_context = mode_name == "follow_up_search" or (
+            mode_name not in {"new_search", "small_talk"} and conversation_context["use_previous_context"]
+        )
+        if use_previous_context:
             intent = extract_intent(query, previous_query=conversation_context["previous_query"])
         else:
             intent = base_intent
@@ -89,6 +120,7 @@ class AIAssistantService:
             return direct_response
         user_profile = get_user_preference_tool(db, current_user)
         previous_result_ids = set(conversation_context["previous_result_ids"])
+        search_terms = _candidate_search_terms(intent, query)
         candidates = [
             restaurant
             for restaurant in search_restaurants_tool(
@@ -96,6 +128,7 @@ class AIAssistantService:
                 latitude=latitude,
                 longitude=longitude,
                 radius_km=radius_km,
+                search_terms=search_terms,
             )
             if passes_hard_constraints(restaurant, intent, db=db)
             and passes_location_constraint(
@@ -157,10 +190,11 @@ class AIAssistantService:
         )
         response["agentic"] = agentic_metadata
         response["intent"] = intent_to_dict(intent)
+        response["conversation_mode"] = conversation_mode
         response["context_used"] = {
             "previous_query": conversation_context["previous_query"],
             "previous_result_ids": conversation_context["previous_result_ids"],
-            "use_previous_context": conversation_context["use_previous_context"],
+            "use_previous_context": use_previous_context,
             "avoid_repeated_results": conversation_context["avoid_repeated_results"],
         }
         return response
@@ -260,6 +294,55 @@ def _build_distance_lookup_response(
         ],
         "source": "HYBRID",
     }
+
+
+def _candidate_search_terms(intent: Any, query: str) -> list[str]:
+    dish_terms = intent_value(intent, "dish_terms", []) or []
+    cuisines = intent_value(intent, "cuisines", []) or []
+    raw_tokens = [
+        token.strip()
+        for token in str(query or "").replace(",", " ").split()
+        if len(token.strip()) >= 2
+    ]
+    stopwords = {
+        "toi",
+        "tôi",
+        "muon",
+        "muốn",
+        "an",
+        "ăn",
+        "tim",
+        "tìm",
+        "goi",
+        "gợi",
+        "y",
+        "ý",
+        "quan",
+        "quán",
+        "nha",
+        "nhà",
+        "hang",
+        "hàng",
+        "mon",
+        "món",
+        "gan",
+        "gần",
+        "day",
+        "đây",
+        "o",
+        "ở",
+    }
+    filtered_tokens = [token for token in raw_tokens if token.lower() not in stopwords]
+    terms = [*dish_terms, *cuisines, *filtered_tokens]
+    unique_terms: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        key = str(term).strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique_terms.append(str(term).strip())
+    return unique_terms[:6]
 
 
 def _apply_negative_overrides(intent: Any) -> Any:

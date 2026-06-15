@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import re
 import math
+import re
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
+from models.dish import MenuItem
 from models.restaurant import Restaurant
 from models.restaurant_taxonomy import RestaurantCuisine
 from services.ai_assistant.intent_extractor import intent_value
@@ -16,6 +18,106 @@ from services.opening_hours_service import get_primary_open_hours
 
 
 DEFAULT_RADIUS_KM = 2.0
+GENERIC_MEAL_DISHES = {
+    "cơm",
+    "bún",
+    "phở",
+    "mì",
+    "hủ tiếu",
+    "cháo",
+    "lẩu",
+    "nướng",
+}
+BEVERAGE_FIRST_PATTERNS = [
+    "cafe",
+    "ca phe",
+    "coffee",
+    "tra sua",
+    "milk tea",
+    "tea",
+    "juice",
+    "smoothie",
+    "hotel",
+]
+MEAL_IDENTITY_PATTERNS = [
+    "quan com",
+    "com tam",
+    "com ga",
+    "com nieu",
+    "pho",
+    "bun",
+    "hu tieu",
+    "chao",
+    "lau",
+    "nuong",
+    "bbq",
+    "grill",
+    "bo kho",
+    "banh canh",
+    "mi",
+    "restaurant",
+    "nha hang",
+    "buffet",
+]
+GENERIC_DISH_ITEM_EXCLUSIONS = {
+    "com": [
+        "com cuon",
+        "com nam",
+        "sushi",
+        "maki",
+        "onigiri",
+    ],
+    "pho": [
+        "pho mai",
+    ],
+}
+GENERIC_DISH_STRONG_ITEM_PATTERNS = {
+    "com": [
+        "com tam",
+        "com ga",
+        "com suon",
+        "com nieu",
+        "com chien",
+        "com trua",
+        "com van phong",
+        "com phan",
+        "com suat",
+        "com dia",
+        "com thit",
+        "com bo",
+        "com heo",
+        "com ca",
+        "com muc",
+        "com tom",
+        "com trang",
+        "com them",
+    ],
+    "pho": [
+        "pho bo",
+        "pho ga",
+        "pho tai",
+        "pho nam",
+        "pho dac biet",
+        "pho tron",
+        "pho xao",
+    ],
+}
+DISH_FAMILY_CONTEXT_PATTERNS = {
+    "pho": ["pho", "quan pho"],
+    "bun dau": ["bun dau", "quan bun dau", "mam tom"],
+    "bun bo hue": ["bun bo", "bun bo hue", "quan bun bo"],
+    "hu tieu": ["hu tieu", "quan hu tieu", "nam vang"],
+    "com tam": ["com tam", "suon", "quan com tam"],
+    "com ga": ["com ga", "ga xoi mo", "quan com ga"],
+    "sushi": ["sushi", "sashimi", "omakase", "izakaya", "mon nhat", "japanese"],
+    "ramen": ["ramen", "udon", "izakaya", "mon nhat", "japanese"],
+    "udon": ["udon", "ramen", "izakaya", "mon nhat", "japanese"],
+    "pizza": ["pizza", "pasta", "italian", "western", "au"],
+    "pasta": ["pasta", "pizza", "italian", "western", "au"],
+    "mi cay": ["mi cay", "tokbokki", "kimbap", "mon han", "han quoc", "korean"],
+    "tokbokki": ["tokbokki", "tteokbokki", "kimbap", "mon han", "han quoc", "korean"],
+    "kimbap": ["kimbap", "gimbap", "tokbokki", "mon han", "han quoc", "korean"],
+}
 
 CUISINE_HARD_ALIASES = {
     "ca phe brunch": ["ca phe", "cafe", "coffee", "tra sua", "brunch"],
@@ -38,6 +140,7 @@ def search_restaurants_tool(
     latitude: float | None = None,
     longitude: float | None = None,
     radius_km: float | None = None,
+    search_terms: list[str] | None = None,
 ) -> list[Restaurant]:
     query = (
         db.query(Restaurant)
@@ -57,6 +160,25 @@ def search_restaurants_tool(
             Restaurant.latitude.between(latitude - lat_delta, latitude + lat_delta),
             Restaurant.longitude.between(longitude - lng_delta, longitude + lng_delta),
         )
+
+    cleaned_search_terms = [str(term or "").strip() for term in (search_terms or []) if str(term or "").strip()]
+    if cleaned_search_terms:
+        term_clauses = []
+        for term in cleaned_search_terms[:6]:
+            pattern = f"%{term}%"
+            term_clauses.append(Restaurant.name.ilike(pattern))
+            term_clauses.append(Restaurant.description.ilike(pattern))
+            term_clauses.append(Restaurant.address.ilike(pattern))
+            term_clauses.append(
+                Restaurant.menu_items.any(
+                    or_(
+                        MenuItem.name.ilike(pattern),
+                        MenuItem.description.ilike(pattern),
+                        MenuItem.category.ilike(pattern),
+                    )
+                )
+            )
+        query = query.filter(or_(*term_clauses))
 
     return query.limit(limit).all()
 
@@ -83,7 +205,13 @@ def passes_hard_constraints(restaurant: Restaurant, intent: Any, *, db: Session 
 
     normalized_text = restaurant_constraint_text(restaurant)
     requested_dishes = intent_value(intent, "dish_terms", []) or []
-    if requested_dishes and not any(restaurant_matches_dish(restaurant, dish) for dish in requested_dishes):
+    normalized_requested_dishes = [normalize_text(dish) for dish in requested_dishes]
+    allow_soft_generic_dish_filter = bool(normalized_requested_dishes) and all(
+        dish == "com" for dish in normalized_requested_dishes
+    )
+    if requested_dishes and not allow_soft_generic_dish_filter and not any(
+        restaurant_matches_dish(restaurant, dish) for dish in requested_dishes
+    ):
         return False
     excluded_keywords = intent_value(intent, "excluded_keywords", []) or []
     if any(_contains_alias(normalized_text, keyword) for keyword in excluded_keywords):
@@ -102,8 +230,11 @@ def passes_hard_constraints(restaurant: Restaurant, intent: Any, *, db: Session 
 
     requested_districts = set(intent_value(intent, "districts", []) or [])
     restaurant_district = extract_district_slug_from_text(restaurant.address)
-    if requested_districts and restaurant_district and restaurant_district not in requested_districts:
-        return False
+    if requested_districts:
+        # When the user names a district, only keep restaurants whose address can be mapped
+        # to that district. This avoids nationwide rows slipping through with an unknown slug.
+        if restaurant_district is None or restaurant_district not in requested_districts:
+            return False
 
     requested_max = intent_value(intent, "price_max")
     price_min, _ = parse_price_range(restaurant.price_range)
@@ -165,7 +296,7 @@ def restaurant_constraint_text(restaurant: Restaurant) -> str:
     )
 
 
-def available_menu_text(restaurant: Restaurant, *, limit: int = 40) -> str:
+def available_menu_text(restaurant: Restaurant, *, limit: int = 120) -> str:
     menu_items = getattr(restaurant, "menu_items", []) or []
     return " ".join(
         f"{item.name} {getattr(item, 'description', '') or ''} {getattr(item, 'category', '') or ''}"
@@ -179,17 +310,74 @@ def restaurant_matches_dish(restaurant: Restaurant, dish: str) -> bool:
     restaurant_text = normalize_text(
         f"{restaurant.name} {restaurant.description or ''} {getattr(restaurant, 'cuisine_type', '')}"
     )
-    if any(_contains_alias(restaurant_text, alias) for alias in aliases):
+    identity_match = any(_contains_alias(restaurant_text, alias) for alias in aliases)
+    if identity_match:
         return True
-    for item in (getattr(restaurant, "menu_items", []) or [])[:40]:
+    normalized_dish = normalize_text(dish)
+    menu_match_count = 0
+    strong_menu_match_count = 0
+    for item in getattr(restaurant, "menu_items", []) or []:
         if getattr(item, "availability_status", "AVAILABLE") != "AVAILABLE":
             continue
         item_text = normalize_text(
             f"{item.name} {getattr(item, 'description', '') or ''} {getattr(item, 'category', '') or ''}"
         )
-        if any(_contains_alias(item_text, alias) for alias in aliases):
-            return True
-    return False
+        if not any(_contains_alias(item_text, alias) for alias in aliases):
+            continue
+        if _is_excluded_generic_dish_item(normalized_dish, item_text):
+            continue
+        menu_match_count += 1
+        if _is_strong_generic_dish_item_match(normalized_dish, item_text):
+            strong_menu_match_count += 1
+
+    if menu_match_count <= 0:
+        return False
+
+    if normalized_dish in {normalize_text(item) for item in GENERIC_MEAL_DISHES}:
+        if _is_beverage_first_venue(restaurant_text):
+            return False
+        if normalized_dish == "com":
+            if strong_menu_match_count <= 0 and not _has_meal_identity(restaurant_text):
+                return False
+            if not _has_meal_identity(restaurant_text) and strong_menu_match_count < 2:
+                return False
+        elif not _has_meal_identity(restaurant_text) and menu_match_count < 3:
+            return False
+    else:
+        if _is_beverage_first_venue(restaurant_text) and menu_match_count < 2:
+            return False
+        if menu_match_count < 2 and not _has_dish_family_context(normalized_dish, restaurant_text):
+            return False
+    return True
+
+
+def _is_beverage_first_venue(restaurant_text: str) -> bool:
+    return any(_contains_alias(restaurant_text, pattern) for pattern in BEVERAGE_FIRST_PATTERNS)
+
+
+def _has_meal_identity(restaurant_text: str) -> bool:
+    return any(_contains_alias(restaurant_text, pattern) for pattern in MEAL_IDENTITY_PATTERNS)
+
+
+def _is_excluded_generic_dish_item(normalized_dish: str, item_text: str) -> bool:
+    return any(
+        _contains_alias(item_text, pattern)
+        for pattern in GENERIC_DISH_ITEM_EXCLUSIONS.get(normalized_dish, [])
+    )
+
+
+def _is_strong_generic_dish_item_match(normalized_dish: str, item_text: str) -> bool:
+    patterns = GENERIC_DISH_STRONG_ITEM_PATTERNS.get(normalized_dish, [])
+    if any(_contains_alias(item_text, pattern) for pattern in patterns):
+        return True
+    return normalized_dish == "com" and item_text.startswith("com ")
+
+
+def _has_dish_family_context(normalized_dish: str, restaurant_text: str) -> bool:
+    return any(
+        _contains_alias(restaurant_text, pattern)
+        for pattern in DISH_FAMILY_CONTEXT_PATTERNS.get(normalized_dish, [])
+    )
 
 
 def _is_obvious_non_restaurant(restaurant: Restaurant) -> bool:

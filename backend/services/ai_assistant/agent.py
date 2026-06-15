@@ -23,7 +23,7 @@ from services.ai_assistant.openai_agent_planner import (
     plan_agent_action,
     should_use_openai_agent_planner,
 )
-from services.ai_assistant.recommend_imports import haversine_km, normalize_text
+from services.ai_assistant.recommend_imports import haversine_km, normalize_text, parse_query_heuristically
 from services.capacity_service import get_restaurant_capacity_for_date
 
 
@@ -321,16 +321,58 @@ def _resolve_agent_action(
     state: dict[str, Any],
     latest_restaurants: list[Restaurant],
 ) -> dict[str, Any]:
+    rule_action = _rule_based_action(query, normalized_query, state)
     if should_use_openai_agent_planner():
         try:
-            return plan_agent_action(
+            planned_action = plan_agent_action(
                 query=query,
                 agent_state=state,
                 latest_results=_latest_results_payload(latest_restaurants),
             )
+            if _should_prefer_rule_action(planned_action, rule_action, state):
+                return rule_action
+            return planned_action
         except OpenAIAgentPlannerError:
             pass
-    return _rule_based_action(query, normalized_query, state)
+    return rule_action
+
+
+def _should_prefer_rule_action(
+    planned_action: dict[str, Any],
+    rule_action: dict[str, Any],
+    state: dict[str, Any],
+) -> bool:
+    rule_name = rule_action.get("action") or "none"
+    planned_name = planned_action.get("action") or "none"
+    if rule_name == "none":
+        return False
+    if planned_name == "none":
+        return True
+
+    pending_action = state.get("pending_action")
+    if pending_action in {"collect_booking_info", "confirm_booking"}:
+        if rule_name in {
+            "create_booking",
+            "modify_pending_booking",
+            "cancel_pending_booking",
+            "change_restaurant",
+        } and planned_name not in {
+            "create_booking",
+            "modify_pending_booking",
+            "cancel_pending_booking",
+            "change_restaurant",
+        }:
+            return True
+
+    if rule_action.get("confirmation") and not planned_action.get("confirmation"):
+        return True
+    if rule_action.get("restaurant_rank") is not None and planned_action.get("restaurant_rank") is None:
+        return True
+    if rule_action.get("guest_count") is not None and planned_action.get("guest_count") is None:
+        return True
+    if rule_action.get("reservation_time_text") and not planned_action.get("reservation_time_text"):
+        return True
+    return False
 
 
 def _rule_based_action(query: str, normalized_query: str, state: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -459,6 +501,8 @@ def _base_action(**updates: Any) -> dict[str, Any]:
 
 
 def _should_bypass_agent(action: dict[str, Any], normalized_query: str, state: dict[str, Any]) -> bool:
+    if state.get("pending_action") and _is_new_recommendation_request(normalized_query):
+        return True
     if state.get("pending_action"):
         return False
     action_name = action.get("action") or "none"
@@ -487,6 +531,39 @@ def _has_explicit_agent_followup_cue(normalized_query: str) -> bool:
     if _is_show_reviews_request(normalized_query) or _is_create_review_request(normalized_query):
         return True
     return False
+
+
+def _is_new_recommendation_request(normalized_query: str) -> bool:
+    if _has_explicit_agent_followup_cue(normalized_query):
+        return False
+    heuristic_intent = parse_query_heuristically(normalized_query)
+    if any(
+        [
+            heuristic_intent.cuisines,
+            heuristic_intent.dish_terms,
+            heuristic_intent.districts,
+            heuristic_intent.ambience_tags,
+            heuristic_intent.amenity_tags,
+            heuristic_intent.occasion_tags,
+            heuristic_intent.weather_tags,
+            heuristic_intent.price_min is not None,
+            heuristic_intent.price_max is not None,
+            heuristic_intent.budget_label,
+        ]
+    ):
+        return True
+    fresh_search_phrases = [
+        "toi muon an",
+        "muon an",
+        "tim mon",
+        "goi y mon",
+        "goi y quan",
+        "tim quan",
+        "an gi",
+        "mon khac",
+        "tiep tuc tim",
+    ]
+    return any(phrase in normalized_query for phrase in fresh_search_phrases)
 
 
 def _latest_results_payload(restaurants: list[Restaurant]) -> list[dict[str, Any]]:

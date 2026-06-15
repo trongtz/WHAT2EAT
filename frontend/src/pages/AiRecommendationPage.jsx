@@ -29,6 +29,18 @@ const AI_CHAT_STORAGE_KEY = "what2eat:ai-recommendation-chat";
 
 const createSessionId = () => crypto.randomUUID();
 
+const summarizeReasonClause = (reason) => {
+  const cleaned = String(reason || "").trim().replace(/\.$/, "");
+  if (!cleaned) return "";
+  if (/^Điểm đánh giá nổi bật\s+\d+(?:\.\d+)?\/5$/i.test(cleaned)) return "Điểm đánh giá tốt";
+  if (/^Được đánh giá tốt\s+\(\d+(?:\.\d+)?\/5\)$/i.test(cleaned)) return "Được đánh giá tốt";
+  if (/^Rating ổn\s+\(\d+(?:\.\d+)?\/5\)$/i.test(cleaned)) return "Được đánh giá ổn";
+  if (/^Cách điểm tìm kiếm khoảng /i.test(cleaned) || /^Đi bộ\/di chuyển ngắn/i.test(cleaned) || /^Rất gần điểm demo/i.test(cleaned)) {
+    return "Vị trí khá gần";
+  }
+  return cleaned;
+};
+
 const getPromptSignals = (prompt) => {
   const normalizedPrompt = String(prompt || "").toLowerCase();
 
@@ -119,6 +131,28 @@ const createInitialMessages = (text = "Chào bạn, hãy mô tả nhu cầu củ
   createAssistantMessage({ text }),
 ];
 
+const deriveSidebarMessage = (messages) => {
+  const allMessages = Array.isArray(messages) ? messages : [];
+  return (
+    [...allMessages].reverse().find(
+      (message) =>
+        message.role === "assistant" &&
+        !message.agent &&
+        (message.restaurants?.length || message.isEmpty || message.isFallback)
+    ) ||
+    [...allMessages].reverse().find(
+      (message) =>
+        message.role === "assistant" &&
+        message.agent?.status === "needs_restaurant" &&
+        (message.restaurants?.length || message.isEmpty || message.isFallback)
+    ) ||
+    [...allMessages].reverse().find(
+      (message) => message.role === "assistant" && (message.restaurants?.length || message.isEmpty || message.isFallback)
+    ) ||
+    null
+  );
+};
+
 const getStoredChat = () => {
   if (typeof window === "undefined") return null;
 
@@ -154,7 +188,8 @@ const buildRecommendationReply = (message, restaurants) => {
   if (!restaurants.length) return message || noResultMessage;
 
   const reasonText = restaurants
-    .map((restaurant) => String(restaurant.aiReason || restaurant.reason || "").trim())
+    .flatMap((restaurant) => String(restaurant.aiReason || restaurant.reason || "").split("."))
+    .map((reason) => summarizeReasonClause(reason))
     .filter(Boolean);
   const uniqueReasons = [...new Set(reasonText)].slice(0, 3);
   const reasonSentence = uniqueReasons.length
@@ -480,6 +515,7 @@ function AiRecommendationPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState(() => getStoredChat()?.messages || createInitialMessages());
+  const [sidebarMessage, setSidebarMessage] = useState(() => deriveSidebarMessage(getStoredChat()?.messages || createInitialMessages()));
   const [userLocation, setUserLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState("checking");
 
@@ -516,31 +552,20 @@ function AiRecommendationPage() {
     );
   }, []);
 
-  const latestSidebarMessage =
-    [...messages].reverse().find(
-      (message) =>
-        message.role === "assistant" &&
-        !message.agent &&
-        (message.restaurants?.length || message.isEmpty || message.isFallback)
-    ) ||
-    [...messages].reverse().find(
-      (message) =>
-        message.role === "assistant" &&
-        message.agent?.status === "needs_restaurant" &&
-        (message.restaurants?.length || message.isEmpty || message.isFallback)
-    ) ||
-    [...messages].reverse().find(
-      (message) => message.role === "assistant" && (message.restaurants?.length || message.isEmpty || message.isFallback)
-    );
+  useEffect(() => {
+    setSidebarMessage(deriveSidebarMessage(messages));
+  }, [messages]);
 
-  const recommendedRestaurants = latestSidebarMessage?.restaurants || [];
+  const recommendedRestaurants = sidebarMessage?.restaurants || [];
 
   const handleNewChat = () => {
     setSessionId(createSessionId());
     setPrompt("");
     setError("");
     setLoading(false);
-    setMessages(createInitialMessages("Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?"));
+    const initialMessages = createInitialMessages("Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?");
+    setMessages(initialMessages);
+    setSidebarMessage(deriveSidebarMessage(initialMessages));
   };
 
   const sendPrompt = async (rawPrompt, options = {}) => {
@@ -578,9 +603,8 @@ function AiRecommendationPage() {
         rememberRecentAiBooking(data.booking);
       }
 
-      setMessages((current) => [
-        ...current,
-        createAssistantMessage({
+      setMessages((current) => {
+        const nextAssistantMessage = createAssistantMessage({
           text: buildAssistantReply({
             source: data.source,
             message: data.message,
@@ -591,16 +615,20 @@ function AiRecommendationPage() {
           isEmpty: restaurants.length === 0 && data.source !== "AGENT",
           agent: data.agent,
           booking: data.booking,
-        }),
-      ]);
+        });
+        const nextMessages = [...current, nextAssistantMessage];
+        if (!nextAssistantMessage.agent || nextAssistantMessage.agent?.status === "needs_restaurant") {
+          setSidebarMessage(nextAssistantMessage);
+        }
+        return nextMessages;
+      });
     } catch (requestError) {
       try {
         const restaurants = await restaurantService.getRestaurants();
         const fallbackResult = buildFallbackRecommendation(userPrompt, restaurants);
 
-        setMessages((current) => [
-          ...current,
-          createAssistantMessage({
+        setMessages((current) => {
+          const nextAssistantMessage = createAssistantMessage({
             text: buildRecommendationReply(
               fallbackResult.restaurants.length
                 ? "Mình vẫn tìm được một vài lựa chọn gần với nội dung bạn nhập."
@@ -610,8 +638,11 @@ function AiRecommendationPage() {
             restaurants: fallbackResult.restaurants,
             isFallback: true,
             isEmpty: fallbackResult.isEmpty,
-          }),
-        ]);
+          });
+          const nextMessages = [...current, nextAssistantMessage];
+          setSidebarMessage(nextAssistantMessage);
+          return nextMessages;
+        });
       } catch {
         setMessages((current) => [
           ...current,
@@ -802,7 +833,7 @@ function AiRecommendationPage() {
                   maxHeight: { xs: "none", lg: 620 },
                 }}
               >
-                {latestSidebarMessage?.isFallback ? (
+                {sidebarMessage?.isFallback ? (
                   <Alert severity="warning" sx={{ mb: 2 }}>
                     {fallbackMessage}
                   </Alert>
@@ -834,7 +865,7 @@ function AiRecommendationPage() {
                     <Stack spacing={1.2} alignItems="center" sx={{ maxWidth: 320, textAlign: "center" }}>
                       <Typography variant="h4">Chưa có gợi ý nhà hàng</Typography>
                       <Typography color="text.secondary">
-                        {latestSidebarMessage?.isEmpty
+                        {sidebarMessage?.isEmpty
                           ? noResultMessage
                           : "Hãy gửi một yêu cầu ở khung chat để xem danh sách nhà hàng được đề xuất."}
                       </Typography>

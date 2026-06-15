@@ -54,7 +54,7 @@ class RecommendationEngine:
         user_profile: dict[str, Any],
         limit: int,
     ) -> tuple[list[ScoredRestaurant], int]:
-        scored = [
+        initial_scored = [
             scored_restaurant
             for restaurant in candidate_restaurants
             if (
@@ -66,10 +66,28 @@ class RecommendationEngine:
                     latitude,
                     longitude,
                     user_profile,
+                    include_db_signals=False,
                 )
             ).score
             > 0
         ]
+        initial_scored.sort(key=lambda item: item.score, reverse=True)
+        shortlist_size = min(len(initial_scored), max(limit * 12, 60))
+        shortlist = initial_scored[:shortlist_size]
+        scored = [
+            self._score_restaurant(
+                db,
+                item.restaurant,
+                intent,
+                query,
+                latitude,
+                longitude,
+                user_profile,
+                include_db_signals=True,
+            )
+            for item in shortlist
+        ]
+        scored = [item for item in scored if item.score > 0]
         scored.sort(key=lambda item: item.score, reverse=True)
         return _select_diverse_results(scored, limit, intent), len(scored)
 
@@ -82,6 +100,7 @@ class RecommendationEngine:
         latitude: float | None,
         longitude: float | None,
         user_profile: dict[str, Any],
+        include_db_signals: bool,
     ) -> ScoredRestaurant:
         search_text = restaurant_search_text(restaurant)
         restaurant_tokens = set(tokenize(search_text))
@@ -141,26 +160,31 @@ class RecommendationEngine:
             if rating >= 4.3:
                 explanations.append(f"Điểm đánh giá nổi bật {rating:.1f}/5")
 
-        quality_signals = get_restaurant_signals(db, restaurant)
-        if quality_signals.quality_score:
-            score += quality_signals.quality_score * 8
-            explanations.extend(quality_signals.quality_reasons)
-        if "less_popular" in (intent_value(intent, "preference_tags", []) or []) and quality_signals.favorite_count <= 2:
-            score += 8
-            explanations.append("Ít phổ biến hơn các lựa chọn quen thuộc")
+        quality_signals = None
+        if include_db_signals:
+            quality_signals = get_restaurant_signals(db, restaurant)
+            if quality_signals.quality_score:
+                score += quality_signals.quality_score * 8
+                explanations.extend(quality_signals.quality_reasons)
+            if "less_popular" in (intent_value(intent, "preference_tags", []) or []) and quality_signals.favorite_count <= 2:
+                score += 8
+                explanations.append("Ít phổ biến hơn các lựa chọn quen thuộc")
 
         behavior_score, behavior_reason = user_behavior_score(restaurant, user_profile, search_text)
         if behavior_score:
             score += behavior_score
             explanations.insert(0, behavior_reason)
 
-        available_capacity = check_available_slots_tool(db, restaurant)
         group_size = intent_value(intent, "group_size")
         normalized_group_size = int(group_size) if group_size is not None else None
-        availability_value, availability_reasons = availability_score(available_capacity, normalized_group_size)
-        if availability_value:
-            score += availability_value * 7
-            explanations.extend(availability_reasons)
+        available_capacity = None
+        availability_value = 0.0
+        if include_db_signals and normalized_group_size is not None:
+            available_capacity = check_available_slots_tool(db, restaurant)
+            availability_value, availability_reasons = availability_score(available_capacity, normalized_group_size)
+            if availability_value:
+                score += availability_value * 7
+                explanations.extend(availability_reasons)
 
         if not explanations and score == 0:
             score = rating
@@ -172,7 +196,7 @@ class RecommendationEngine:
             reason=_join_reason(explanations),
             distance_km=round(distance_km, 2) if distance_km is not None else None,
             available_capacity=available_capacity,
-            quality_score=quality_signals.quality_score,
+            quality_score=quality_signals.quality_score if quality_signals is not None else 0.0,
             availability_score=round(availability_value, 4),
             quality_signals={
                 "rating_avg": quality_signals.rating_avg,
@@ -180,6 +204,14 @@ class RecommendationEngine:
                 "checkin_count_30d": quality_signals.checkin_count_30d,
                 "favorite_count": quality_signals.favorite_count,
                 "booking_count_30d": quality_signals.booking_count_30d,
+            }
+            if quality_signals is not None
+            else {
+                "rating_avg": rating,
+                "rating_count": 0,
+                "checkin_count_30d": 0,
+                "favorite_count": 0,
+                "booking_count_30d": 0,
             },
         )
 
@@ -214,6 +246,20 @@ def _dish_score(intent: Any, restaurant: Restaurant) -> tuple[float, str]:
     ]
     if not matches:
         return 0.0, ""
+    primary_match = normalize_text(matches[0])
+    identity_text = normalize_text(
+        f"{restaurant.name} {restaurant.description or ''} {getattr(restaurant, 'cuisine_type', '')}"
+    )
+    if primary_match in {"com", "bun", "pho", "mi", "hu tieu", "chao", "lau", "nuong"}:
+        if any(token in identity_text for token in [primary_match, f"quan {primary_match}"]):
+            return 46.0, "Có món " + ", ".join(matches[:2])
+        if any(token in identity_text for token in ["cafe", "ca phe", "coffee", "tra sua", "hotel"]):
+            return 18.0, "Có món " + ", ".join(matches[:2])
+        if any(
+            token in identity_text
+            for token in ["quan com", "com tam", "com ga", "pho", "bun", "hu tieu", "chao", "lau", "nuong", "bbq", "restaurant", "nha hang"]
+        ):
+            return 38.0, "Có món " + ", ".join(matches[:2])
     return 32.0, "Có món " + ", ".join(matches[:2])
 
 
