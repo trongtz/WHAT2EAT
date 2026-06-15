@@ -62,6 +62,8 @@ Thêm hoặc sửa các dòng:
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_INTENT_PARSER=true
+OPENAI_AGENTIC_RERANKER=true
+OPENAI_RERANK_SHORTLIST_SIZE=12
 ```
 
 Sau đó chạy lại smoke test. Nếu parser chạy qua OpenAI, response sẽ có:
@@ -75,3 +77,35 @@ Sau đó chạy lại smoke test. Nếu parser chạy qua OpenAI, response sẽ 
 ```
 
 Nếu OpenAI lỗi, timeout hoặc thiếu key, hệ thống tự fallback về `heuristic`.
+
+## Test Agentic Reranker
+
+Khi `OPENAI_AGENTIC_RERANKER=true`, backend vẫn lọc geo, giá, exclusion,
+capacity và giờ mở cửa bằng code trước. OpenAI chỉ nhận tối đa
+`OPENAI_RERANK_SHORTLIST_SIZE` quán đã hợp lệ để rerank và viết câu chat ngắn.
+
+Response agentic thành công có:
+
+```json
+{
+  "source": "HYBRID_AGENTIC",
+  "agentic": {
+    "enabled": true,
+    "used": true,
+    "shortlist_size": 12
+  }
+}
+```
+
+Nếu OpenAI lỗi hoặc timeout, response tự fallback về offline ranking:
+
+```json
+{
+  "source": "HYBRID",
+  "agentic": {
+    "enabled": true,
+    "used": false,
+    "fallback": "offline_ranking"
+  }
+}
+```

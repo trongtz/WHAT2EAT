@@ -13,9 +13,11 @@ def compose_recommendation_response(
     total_found: int,
     intent: Any,
     filters_applied: dict[str, Any],
+    message_override: str | None = None,
+    source: str = "HYBRID",
 ) -> dict[str, Any]:
     return {
-        "message": build_message(query, matches, intent),
+        "message": message_override or build_message(query, matches, intent),
         "total_found": total_found,
         "filters_applied": filters_applied,
         "result_restaurant_ids": [str(match.restaurant.restaurant_id) for match in matches],
@@ -36,25 +38,59 @@ def compose_recommendation_response(
             }
             for match in matches
         ],
-        "source": "HYBRID",
+        "source": source,
     }
 
 
 def build_message(query: str, matches: list[ScoredRestaurant], intent: Any) -> str:
+    prefix = _build_intent_prefix(intent)
     if not matches:
-        return "Mình chưa tìm thấy nhà hàng thật sự khớp. Bạn thử nói rõ hơn khu vực, món ăn hoặc ngân sách nhé."
+        return prefix + _build_empty_result_message(intent)
 
     cuisine_text = _display_cuisine_text(intent_value(intent, "cuisines", []) or [])
+    dish_text = ", ".join(intent_value(intent, "dish_terms", []) or [])
     district_text = ", ".join(intent_value(intent, "districts", []) or [])
     context = " theo mô tả của bạn"
     if cuisine_text and district_text:
-        context = f" cho món {cuisine_text} ở {district_text}"
+        context = f" cho {cuisine_text} ở {district_text}"
     elif cuisine_text:
-        context = f" cho món {cuisine_text}"
+        context = f" cho {cuisine_text}"
+    elif dish_text:
+        context = f" có {dish_text}"
     elif district_text:
         context = f" gần {district_text}"
 
-    return f"Mình tìm được {len(matches)} gợi ý{context}. Kết quả được xếp hạng bằng recommend system dựa trên intent, từ khóa, giá, vị trí, chất lượng quán và tình trạng còn chỗ."
+    return prefix + f"Mình tìm được {len(matches)} gợi ý{context}. Kết quả đã tính theo nhu cầu, vị trí, chất lượng quán và tình trạng còn chỗ."
+
+
+def _build_empty_result_message(intent: Any) -> str:
+    preference_tags = intent_value(intent, "preference_tags", []) or []
+    excluded_keywords = intent_value(intent, "excluded_keywords", []) or []
+    excluded_cuisines = intent_value(intent, "excluded_cuisines", []) or []
+    dish_terms = intent_value(intent, "dish_terms", []) or []
+
+    if "light_meal" in preference_tags and any(keyword in excluded_keywords for keyword in ["com", "cơm"]):
+        return (
+            "Mình đang ưu tiên món ăn nhẹ và tránh cơm theo ngữ cảnh bạn vừa nói, "
+            "nhưng hiện chưa tìm thấy quán phù hợp trong khu vực này. "
+            "Mình không bù bằng quán cơm hoặc món nặng bụng để tránh gợi ý sai nhu cầu."
+        )
+    if excluded_cuisines or excluded_keywords:
+        exclusions = [*excluded_cuisines, *excluded_keywords]
+        return (
+            "Mình đã giữ các điều kiện cần tránh như "
+            + ", ".join(exclusions[:3])
+            + ", nhưng hiện chưa tìm thấy quán thật sự phù hợp. "
+            "Bạn có thể nới lỏng một điều kiện hoặc thử khu vực khác."
+        )
+    if dish_terms:
+        return (
+            "Mình hiểu bạn đang tìm "
+            + ", ".join(dish_terms[:2])
+            + ", nhưng hiện chưa tìm thấy quán phù hợp trong khu vực này. "
+            "Mình không bù bằng quán chỉ khớp một phần để tránh gợi ý sai món."
+        )
+    return "Mình chưa tìm thấy nhà hàng thật sự khớp. Bạn thử nới lỏng một tiêu chí hoặc nói rõ hơn khu vực nhé."
 
 
 def _display_cuisine_text(cuisines: list[str]) -> str:
@@ -67,3 +103,39 @@ def _display_cuisine_text(cuisines: list[str]) -> str:
         "cà phê / brunch": "cà phê / brunch",
     }
     return ", ".join(labels.get(cuisine, cuisine) for cuisine in cuisines)
+
+
+def _build_intent_prefix(intent: Any) -> str:
+    parts: list[str] = []
+    conflicts = intent_value(intent, "conflicts", []) or []
+    if conflicts:
+        parts.append("Lưu ý: " + " ".join(conflicts[:2]))
+
+    excluded_cuisines = intent_value(intent, "excluded_cuisines", []) or []
+    excluded_keywords = intent_value(intent, "excluded_keywords", []) or []
+    if excluded_cuisines or excluded_keywords:
+        exclusions = [*excluded_cuisines, *excluded_keywords]
+        parts.append("Mình đã tránh các lựa chọn liên quan đến " + ", ".join(exclusions[:3]) + ".")
+
+    preference_tags = intent_value(intent, "preference_tags", []) or []
+    preference_labels = {
+        "easy_to_eat": "món dễ ăn",
+        "light_meal": "món nhẹ bụng",
+        "healthy": "healthy",
+        "filling": "món no bụng",
+        "less_popular": "quán ít phổ biến hơn",
+        "quick_service": "phục vụ nhanh",
+        "comfort_food": "comfort food",
+        "cooling_food": "món giúp giải nhiệt",
+        "vegetarian_option": "lựa chọn cho người ăn chay",
+        "kid_friendly": "chỗ phù hợp trẻ em",
+        "group_work": "chỗ hợp làm việc nhóm",
+        "outdoor_seating": "chỗ ngồi ngoài trời",
+        "parking": "chỗ thuận tiện gửi xe",
+        "soupy_food": "món nước",
+    }
+    readable_preferences = [preference_labels[tag] for tag in preference_tags if tag in preference_labels]
+    if readable_preferences:
+        parts.append("Mình đang ưu tiên " + ", ".join(readable_preferences[:3]) + ".")
+
+    return (" ".join(parts) + " ") if parts else ""

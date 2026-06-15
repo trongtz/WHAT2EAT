@@ -78,6 +78,17 @@ export const dashboardService = {
     return normalizeOwnerBooking(response.data);
   },
 
+  markBookingCheckin: async (payload) => {
+    const response = await apiClient.post("/owner/bookings/check-in", payload);
+    invalidateCachePrefix("owner:bookings");
+    invalidateCachePrefix("admin:overview");
+    invalidateCachePrefix("restaurants:list");
+    invalidateCachePrefix("restaurants:detail:");
+    invalidateCachePrefix("restaurants:owner:");
+    invalidateCachePrefix("restaurants:manage:");
+    return normalizeOwnerBooking(response.data);
+  },
+
   getAdminOverview: async (options = {}) => {
     return getCachedResource(
       "admin:overview",

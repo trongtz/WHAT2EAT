@@ -18,7 +18,13 @@ from services.ai_assistant.recommend_imports import (
     normalize_text,
     tokenize,
 )
-from services.ai_assistant.tools import check_available_slots_tool, parse_price_range, price_budget_label
+from services.ai_assistant.tools import (
+    available_menu_text,
+    check_available_slots_tool,
+    parse_price_range,
+    price_budget_label,
+    restaurant_matches_dish,
+)
 from services.ai_assistant.restaurant_signals import availability_score, get_restaurant_signals
 from services.ai_assistant.user_preferences import user_behavior_score
 
@@ -65,7 +71,7 @@ class RecommendationEngine:
             > 0
         ]
         scored.sort(key=lambda item: item.score, reverse=True)
-        return scored[:limit], len(scored)
+        return _select_diverse_results(scored, limit, intent), len(scored)
 
     def _score_restaurant(
         self,
@@ -89,6 +95,11 @@ class RecommendationEngine:
             score += 32 * lexical_score
             lexical_reason = _keyword_reason(query_tokens, restaurant_tokens)
 
+        dish_score, dish_reason = _dish_score(intent, restaurant)
+        if dish_score:
+            score += dish_score
+            explanations.append(dish_reason)
+
         cuisine_score = _cuisine_score(intent, restaurant, search_text)
         if cuisine_score:
             score += cuisine_score
@@ -100,6 +111,11 @@ class RecommendationEngine:
         if semantic_score:
             score += semantic_score
             explanations.append(semantic_reason)
+
+        preference_score, preference_reason = _preference_score(intent, search_text)
+        if preference_score:
+            score += preference_score
+            explanations.append(preference_reason)
 
         if lexical_reason:
             explanations.append(lexical_reason)
@@ -129,6 +145,9 @@ class RecommendationEngine:
         if quality_signals.quality_score:
             score += quality_signals.quality_score * 8
             explanations.extend(quality_signals.quality_reasons)
+        if "less_popular" in (intent_value(intent, "preference_tags", []) or []) and quality_signals.favorite_count <= 2:
+            score += 8
+            explanations.append("Ít phổ biến hơn các lựa chọn quen thuộc")
 
         behavior_score, behavior_reason = user_behavior_score(restaurant, user_profile, search_text)
         if behavior_score:
@@ -175,6 +194,7 @@ def restaurant_search_text(restaurant: Restaurant) -> str:
             restaurant.address,
             cuisine_text,
             restaurant.price_range,
+            available_menu_text(restaurant),
         ]
     )
 
@@ -186,11 +206,24 @@ def _overlap_score(query_tokens: set[str], restaurant_tokens: set[str]) -> float
     return overlap / math.sqrt(len(query_tokens) * len(restaurant_tokens))
 
 
+def _dish_score(intent: Any, restaurant: Restaurant) -> tuple[float, str]:
+    matches = [
+        dish
+        for dish in (intent_value(intent, "dish_terms", []) or [])
+        if restaurant_matches_dish(restaurant, dish)
+    ]
+    if not matches:
+        return 0.0, ""
+    return 32.0, "Có món " + ", ".join(matches[:2])
+
+
 def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
     useful_tokens = [
         token
         for token in query_tokens & restaurant_tokens
         if token
+        and len(token) >= 3
+        and token
         not in {
             "mon",
             "quan",
@@ -218,6 +251,7 @@ def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
             "duoi",
             "hoc",
             "dai",
+            "dh",
             "khoa",
             "tu",
             "nhien",
@@ -230,7 +264,7 @@ def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
     ]
     if not useful_tokens:
         return ""
-    return "Khớp các chi tiết: " + ", ".join(sorted(useful_tokens)[:4])
+    return "Khớp thêm một số chi tiết trong mô tả của bạn"
 
 
 def _cuisine_score(intent: Any, restaurant: Restaurant, search_text: str) -> float:
@@ -310,7 +344,7 @@ def _cuisine_aliases(normalized_cuisine: str) -> list[str]:
         "lau": ["lau", "hotpot"],
         "bbq nuong": ["bbq", "nuong", "grill"],
         "mon nhat": ["nhat", "sushi", "ramen", "udon"],
-        "mon han": ["han", "han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "seoul", "daegu"],
+        "mon han": ["han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "mi cay", "seoul", "daegu"],
         "hai san": ["hai san", "seafood", "oc"],
         "chay healthy": ["chay", "healthy", "salad"],
     }
@@ -321,8 +355,6 @@ def _contains_alias(normalized_text: str, alias: str) -> bool:
     normalized_alias = normalize_text(alias)
     if not normalized_alias:
         return False
-    if " " in normalized_alias:
-        return normalized_alias in normalized_text
     return re.search(rf"\b{re.escape(normalized_alias)}\b", normalized_text) is not None
 
 
@@ -356,6 +388,51 @@ def _semantic_reason(tags: set[str]) -> str:
     }
     reasons = [reason_by_tag[tag] for tag in sorted(tags) if tag in reason_by_tag]
     return ". ".join(reasons[:2]) if reasons else "Hợp vibe/nhu cầu bạn mô tả"
+
+
+def _preference_score(intent: Any, search_text: str) -> tuple[float, str]:
+    normalized = normalize_text(search_text)
+    requested_tags = intent_value(intent, "preference_tags", []) or []
+    patterns_by_tag = {
+        "easy_to_eat": ["com", "bun", "pho", "banh", "chay", "can tin"],
+        "light_meal": ["an nhe", "nhe bung", "chay", "salad", "banh", "tra sua", "cafe", "an vat"],
+        "healthy": ["healthy", "chay", "salad", "rau", "eat clean", "thanh dam"],
+        "filling": ["com", "lau", "buffet", "bun", "pho", "mi", "ga", "thit"],
+        "quick_service": ["an nhanh", "phuc vu nhanh", "len mon nhanh", "can tin", "com", "banh mi"],
+        "comfort_food": ["com", "pho", "bun", "lau", "mi", "am bung"],
+        "cooling_food": ["tra sua", "nuoc", "kem", "salad", "cafe", "giai nhiet"],
+        "vegetarian_option": ["chay", "healthy", "salad", "rau", "vegetarian"],
+        "kid_friendly": ["tre em", "gia dinh", "kids"],
+        "group_work": ["wifi", "o cam", "hoc nhom", "lam viec", "meeting"],
+        "outdoor_seating": ["ngoai troi", "san vuon", "ban cong", "terrace"],
+        "parking": ["do xe", "giu xe", "bai xe", "parking", "xe may"],
+        "soupy_food": ["pho", "bun", "hu tieu", "lau", "canh", "mi", "sup", "soup", "bo kho"],
+    }
+    reason_by_tag = {
+        "easy_to_eat": "Ưu tiên món dễ ăn",
+        "light_meal": "Hợp nhu cầu ăn nhẹ",
+        "healthy": "Có lựa chọn thiên về healthy",
+        "filling": "Ưu tiên món giúp no bụng",
+        "quick_service": "Phù hợp nhu cầu ăn nhanh",
+        "comfort_food": "Hợp kiểu comfort food dễ ăn",
+        "cooling_food": "Có lựa chọn mát và dễ dùng khi trời nóng",
+        "vegetarian_option": "Có lựa chọn phù hợp người ăn chay",
+        "kid_friendly": "Phù hợp nhóm có trẻ em",
+        "group_work": "Phù hợp ngồi làm việc nhóm",
+        "outdoor_seating": "Có yếu tố không gian ngoài trời",
+        "parking": "Thuận tiện cho nhóm đi xe máy",
+        "soupy_food": "Ưu tiên món nước",
+    }
+    hits = [
+        tag
+        for tag in requested_tags
+        if tag in patterns_by_tag and any(_contains_alias(normalized, pattern) for pattern in patterns_by_tag[tag])
+    ]
+    if not hits:
+        if any(tag in requested_tags for tag in ["healthy", "light_meal", "vegetarian_option", "cooling_food"]):
+            return -12.0, ""
+        return 0.0, ""
+    return min(18.0, 6.0 + len(hits) * 4.0), ". ".join(reason_by_tag[tag] for tag in hits[:2])
 
 
 def _district_score(intent: Any, address: str) -> float:
@@ -416,3 +493,72 @@ def _decimal_to_float(value: Decimal | float | None) -> float | None:
 def _join_reason(explanations: list[str]) -> str:
     unique_reasons = list(dict.fromkeys(reason for reason in explanations if reason))
     return ". ".join(unique_reasons[:3]) + ("." if unique_reasons else "")
+
+
+def _select_diverse_results(scored: list[ScoredRestaurant], limit: int, intent: Any) -> list[ScoredRestaurant]:
+    if limit <= 0 or len(scored) <= limit:
+        return scored[:limit]
+
+    explicit_food_request = bool(intent_value(intent, "cuisines", []) or intent_value(intent, "dish_terms", []))
+    max_per_cuisine = limit if explicit_food_request else max(1, min(2, limit // 2))
+
+    selected: list[ScoredRestaurant] = []
+    used_ids: set[str] = set()
+    used_name_families: set[str] = set()
+    cuisine_counts: dict[str, int] = {}
+
+    def try_add(item: ScoredRestaurant, *, enforce_cuisine: bool, enforce_family: bool) -> None:
+        if len(selected) >= limit:
+            return
+        restaurant_id = str(item.restaurant.restaurant_id)
+        if restaurant_id in used_ids:
+            return
+        name_family = _name_family_key(item.restaurant.name)
+        cuisine_key = _primary_cuisine_key(item.restaurant)
+        if enforce_family and name_family and name_family in used_name_families:
+            return
+        if enforce_cuisine and cuisine_key and cuisine_counts.get(cuisine_key, 0) >= max_per_cuisine:
+            return
+        selected.append(item)
+        used_ids.add(restaurant_id)
+        if name_family:
+            used_name_families.add(name_family)
+        if cuisine_key:
+            cuisine_counts[cuisine_key] = cuisine_counts.get(cuisine_key, 0) + 1
+
+    for item in scored:
+        try_add(item, enforce_cuisine=True, enforce_family=True)
+    for item in scored:
+        try_add(item, enforce_cuisine=False, enforce_family=True)
+    for item in scored:
+        try_add(item, enforce_cuisine=False, enforce_family=False)
+
+    return selected[:limit]
+
+
+def _name_family_key(name: str | None) -> str:
+    normalized = normalize_text(name)
+    if not normalized:
+        return ""
+    normalized = re.sub(
+        r"\b(?:quan|nha hang|cafe|ca phe|tra sua|chi nhanh|co so|cn|thu duc|di an|linh trung|lang dai hoc)\b",
+        " ",
+        normalized,
+    )
+    normalized = re.sub(r"\b(?:duong|hem|so|quan|phuong)\b.*$", " ", normalized)
+    tokens = [token for token in normalized.split() if token and not token.isdigit()]
+    return " ".join(tokens[:3])
+
+
+def _primary_cuisine_key(restaurant: Restaurant) -> str:
+    category_names = [
+        normalize_text(link.category.name)
+        for link in (getattr(restaurant, "cuisine_links", []) or [])
+        if getattr(link, "category", None) is not None and getattr(link.category, "name", None)
+    ]
+    if category_names:
+        return category_names[0]
+    inferred = _safe_infer_cuisines(restaurant_search_text(restaurant))
+    if inferred:
+        return normalize_text(inferred[0])
+    return normalize_text(getattr(restaurant, "cuisine_type", "") or "")

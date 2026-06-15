@@ -14,6 +14,7 @@ import FormInput from "../components/FormInput";
 import AppLogoImage from "../components/AppLogoImage";
 import { useAuth } from "../hooks/useAuth";
 import { aiService } from "../services/aiService";
+import { rememberRecentAiBooking } from "../services/bookingService";
 import { normalizeRestaurant, restaurantService } from "../services/restaurantService";
 import { formatPriceRangeDisplay } from "../utils/helpers";
 import { validatePrompt } from "../utils/validators";
@@ -93,14 +94,20 @@ const buildFallbackRecommendation = (prompt, restaurants) => {
   };
 };
 
-const createAssistantMessage = ({ text, restaurants = [], isFallback = false, isEmpty = false }) => ({
-  id: `assistant-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  role: "assistant",
-  text,
-  restaurants,
-  isFallback,
-  isEmpty,
-});
+const createAssistantMessage = ({ text, restaurants = [], isFallback = false, isEmpty = false, agent = null, booking = null }) => {
+  const safeRestaurants = Array.isArray(restaurants) ? restaurants : [];
+
+  return {
+    id: `assistant-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role: "assistant",
+    text,
+    restaurants: safeRestaurants,
+    isFallback,
+    isEmpty: Boolean(isEmpty && safeRestaurants.length === 0),
+    agent,
+    booking,
+  };
+};
 
 const createUserMessage = (text) => ({
   id: `user-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -154,7 +161,42 @@ const buildRecommendationReply = (message, restaurants) => {
     ? uniqueReasons.join(". ") + "."
     : "các quán này phù hợp với mô tả bạn vừa nhập.";
 
-  return `Mình recommend bạn các quán như trong danh sách bên phải vì: ${reasonSentence}`;
+  return `Mình tìm được vài lựa chọn hợp nè. Mình ưu tiên các quán trong danh sách vì ${reasonSentence}`;
+};
+
+const buildAssistantReply = ({ source, message, restaurants }) => {
+  if (source === "AGENT") return message || "";
+  if (restaurants.length) return buildRecommendationReply(message, restaurants);
+  return buildRecommendationReply(message, restaurants);
+};
+
+const getAgentStatusLabel = (status) => {
+  const labels = {
+    restaurant_selected: "Đã chọn quán",
+    needs_restaurant: "Cần chọn quán",
+    needs_booking_info: "Cần thêm thông tin",
+    needs_review_info: "Cần thêm review",
+    awaiting_booking_confirmation: "Chờ xác nhận đặt bàn",
+    booking_created: "Đã tạo booking",
+    booking_cancelled: "Đã hủy bước đặt",
+    booking_rejected: "Không thể đặt",
+    needs_login: "Cần đăng nhập",
+    preference_saved: "Đã ghi nhớ sở thích",
+    favorite_added: "Đã lưu yêu thích",
+    favorite_removed: "Đã bỏ yêu thích",
+    checkin_created: "Đã check-in",
+    checkin_owner_required: "Nhà hàng sẽ xác nhận check-in",
+    showing_reviews: "Đang xem review",
+    review_created: "Đã gửi review",
+  };
+  return labels[status] || "Agent đang xử lý";
+};
+
+const getAgentStatusColor = (status) => {
+  if (status === "booking_created") return "success";
+  if (["booking_rejected", "needs_login"].includes(status)) return "error";
+  if (["awaiting_booking_confirmation", "needs_booking_info", "needs_restaurant", "needs_review_info"].includes(status)) return "warning";
+  return "info";
 };
 
 function RecommendationListCard({ restaurant, index }) {
@@ -273,7 +315,92 @@ function RecommendationListCard({ restaurant, index }) {
   );
 }
 
-function MessageBubble({ message }) {
+function AgentActionButtons({ message, onQuickAction }) {
+  const status = message.agent?.status;
+  if (!status) return null;
+
+  const buttonSx = {
+    minHeight: 34,
+    px: 1.4,
+    py: 0.55,
+    fontSize: "0.78rem",
+    boxShadow: "none",
+    backgroundImage: "none",
+    bgcolor: "rgba(255,255,255,0.92)",
+    color: "var(--app-primary)",
+    border: "1px solid color-mix(in srgb, var(--app-primary) 20%, white)",
+    "&:hover": {
+      backgroundImage: "none",
+      bgcolor: "rgba(255,255,255,1)",
+    },
+  };
+
+  const actionsByStatus = {
+    restaurant_selected: [
+      { label: "Đặt quán này", prompt: "đặt quán này cho 4 người lúc 19h" },
+      { label: "Chọn quán khác", prompt: "quán khác đi" },
+    ],
+    needs_restaurant: [
+      { label: "Chọn quán 1", prompt: "đặt quán thứ 1" },
+      { label: "Chọn quán 2", prompt: "đặt quán thứ 2" },
+    ],
+    needs_booking_info: [
+      { label: "4 người lúc 19h", prompt: "4 người lúc 19h" },
+      { label: "Đổi quán", prompt: "quán khác đi" },
+    ],
+    awaiting_booking_confirmation: [
+      { label: "Xác nhận đặt", prompt: "ok đặt đi" },
+      { label: "Đổi thành 6 người", prompt: "đổi thành 6 người" },
+      { label: "Hủy", prompt: "thôi không đặt nữa" },
+    ],
+    booking_created: [
+      { label: "Xem lịch sử đặt bàn", to: "/lich-su-dat-ban" },
+      { label: "Gợi ý tiếp", prompt: "gợi ý quán khác gần đây" },
+    ],
+    booking_rejected: [
+      { label: "Đổi giờ 20h", prompt: "đổi sang 20h" },
+      { label: "Chọn quán khác", prompt: "quán khác đi" },
+    ],
+    needs_login: [
+      { label: "Đăng nhập", to: "/dang-nhap" },
+      { label: "Hủy", prompt: "thôi không đặt nữa" },
+    ],
+  };
+
+  const actions = actionsByStatus[status] || [];
+
+  return (
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap">
+        <Chip
+          size="small"
+          color={getAgentStatusColor(status)}
+          label={getAgentStatusLabel(status)}
+          sx={{ fontWeight: 800 }}
+        />
+      </Stack>
+
+      {actions.length ? (
+        <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
+          {actions.map((action) => (
+            <CustomButton
+              key={action.label}
+              component={action.to ? RouterLink : "button"}
+              to={action.to}
+              type="button"
+              onClick={action.prompt ? () => onQuickAction(action.prompt) : undefined}
+              sx={buttonSx}
+            >
+              {action.label}
+            </CustomButton>
+          ))}
+        </Stack>
+      ) : null}
+    </Stack>
+  );
+}
+
+function MessageBubble({ message, onQuickAction }) {
   const isAssistant = message.role === "assistant";
 
   return (
@@ -304,6 +431,12 @@ function MessageBubble({ message }) {
       >
         <Stack spacing={1.2}>
           <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{message.text}</Typography>
+          {isAssistant ? <AgentActionButtons message={message} onQuickAction={onQuickAction} /> : null}
+          {message.booking?.reservation_id ? (
+            <Alert severity="success">
+              Booking #{String(message.booking.reservation_id).slice(0, 8)} đang ở trạng thái {message.booking.status}.
+            </Alert>
+          ) : null}
           {message.isFallback ? <Alert severity="warning">{fallbackMessage}</Alert> : null}
           {message.isEmpty ? <Alert severity="info">{noResultMessage}</Alert> : null}
         </Stack>
@@ -383,13 +516,13 @@ function AiRecommendationPage() {
     setMessages(createInitialMessages("Phiên chat mới đã sẵn sàng. Bạn đang muốn tìm trải nghiệm ăn uống như thế nào?"));
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    const nextError = validatePrompt(prompt);
+  const sendPrompt = async (rawPrompt, options = {}) => {
+    const { skipValidation = false } = options;
+    const nextError = skipValidation ? "" : validatePrompt(rawPrompt);
     setError(nextError);
     if (nextError) return;
 
-    const userPrompt = prompt.trim();
+    const userPrompt = rawPrompt.trim();
     setMessages((current) => [...current, createUserMessage(userPrompt)]);
     setPrompt("");
     setLoading(true);
@@ -414,13 +547,23 @@ function AiRecommendationPage() {
           })
         : [];
 
+      if (data.booking) {
+        rememberRecentAiBooking(data.booking);
+      }
+
       setMessages((current) => [
         ...current,
         createAssistantMessage({
-          text: buildRecommendationReply(data.message, restaurants),
+          text: buildAssistantReply({
+            source: data.source,
+            message: data.message,
+            restaurants,
+          }),
           restaurants,
           isFallback: data.source === "FALLBACK",
           isEmpty: restaurants.length === 0,
+          agent: data.agent,
+          booking: data.booking,
         }),
       ]);
     } catch (requestError) {
@@ -458,10 +601,14 @@ function AiRecommendationPage() {
     }
   };
 
-  const handlePromptKeyDown = (event) => {
-    if (event.key !== "Enter" || event.shiftKey) return;
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
+    await sendPrompt(prompt);
+  };
+
+  const handleQuickAction = async (quickPrompt) => {
+    if (loading) return;
+    await sendPrompt(quickPrompt, { skipValidation: true });
   };
 
   const handleComposerKeyDown = (event) => {
@@ -499,7 +646,7 @@ function AiRecommendationPage() {
               >
                 <Stack spacing={2}>
                   {messages.map((message) => (
-                    <MessageBubble key={message.id} message={message} />
+                    <MessageBubble key={message.id} message={message} onQuickAction={handleQuickAction} />
                   ))}
 
                   {loading ? (

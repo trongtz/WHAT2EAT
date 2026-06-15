@@ -19,14 +19,10 @@ def create_checkin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "CUSTOMER":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chi khach hang moi co the check-in")
-
-    restaurant = crud_restaurant.get_restaurant_by_id(db, payload.restaurant_id)
-    if not restaurant or restaurant.status != "APPROVED":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Khong tim thay nha hang")
-
-    return crud_checkin.create_checkin(db, payload, current_user.user_id)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Check-in được xác nhận từ phía nhà hàng khi khách đến, không tạo trực tiếp từ phía người dùng",
+    )
 
 
 @router.get("/me", response_model=list[CheckInResponse])
@@ -47,5 +43,13 @@ def get_restaurant_checkins(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    restaurant = crud_restaurant.get_restaurant_by_id(db, restaurant_id)
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Khong tim thay nha hang")
+    if current_user.role not in {"OWNER", "ADMIN"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Khong co quyen xem check-in cua nha hang")
+    if current_user.role == "OWNER" and restaurant.owner_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Khong co quyen xem check-in cua nha hang nay")
     return crud_checkin.get_checkins_by_restaurant(db, restaurant_id, skip=skip, limit=limit)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
@@ -120,10 +121,40 @@ def count_booked_tables_for_date(
     return int(booked_capacity)
 
 
+def _demo_booked_tables(restaurant_id: UUID, target_date: date, max_capacity: int) -> int:
+    if max_capacity <= 1:
+        return 0
+
+    seed = f"{restaurant_id}:{target_date.isoformat()}".encode("utf-8")
+    digest = hashlib.sha256(seed).digest()
+    occupancy_percent = 15 + digest[0] % 56
+    demo_booked = round(max_capacity * occupancy_percent / 100)
+    return min(max(demo_booked, 1), max_capacity - 1)
+
+
+def _display_available_capacity(
+    restaurant_id: UUID,
+    target_date: date,
+    max_capacity: int,
+    booked_capacity: int,
+) -> int:
+    if max_capacity <= 0:
+        return 0
+
+    display_booked = max(booked_capacity, _demo_booked_tables(restaurant_id, target_date, max_capacity))
+    return max(max_capacity - display_booked, 0)
+
+
 def attach_capacity_summary(db: Session, restaurant: Restaurant) -> Restaurant:
-    max_capacity = get_restaurant_capacity_for_date(db, restaurant.restaurant_id)
-    booked_capacity = count_booked_tables_for_date(db, restaurant.restaurant_id)
-    available_capacity = max(max_capacity - booked_capacity, 0)
+    target_date = date.today()
+    max_capacity = get_restaurant_capacity_for_date(db, restaurant.restaurant_id, target_date)
+    booked_capacity = count_booked_tables_for_date(db, restaurant.restaurant_id, target_date)
+    available_capacity = _display_available_capacity(
+        restaurant.restaurant_id,
+        target_date,
+        max_capacity,
+        booked_capacity,
+    )
 
     setattr(restaurant, "max_capacity", max_capacity)
     setattr(restaurant, "available_capacity", available_capacity)
@@ -191,7 +222,12 @@ def attach_capacity_summaries(
             or 0
         )
         booked_capacity = int(booked_capacity_by_restaurant.get(restaurant_id) or 0)
-        available_capacity = max(max_capacity - booked_capacity, 0)
+        available_capacity = _display_available_capacity(
+            restaurant_id,
+            target_date,
+            max_capacity,
+            booked_capacity,
+        )
 
         setattr(restaurant, "max_capacity", max_capacity)
         setattr(restaurant, "available_capacity", available_capacity)

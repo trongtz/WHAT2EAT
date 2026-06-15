@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import json
-import re
 from typing import Any
 
-import httpx
-
 from core.config import settings
+from services.ai_assistant.openai_response_client import OpenAIResponsesError, request_structured_json
 from services.ai_assistant.recommend_imports import normalize_text, tokenize
 
 
@@ -15,6 +12,52 @@ class OpenAIIntentParserError(RuntimeError):
 
 
 ALLOWED_BUDGET_LABELS = {"binh_dan", "trung_binh", "kha_cao", "cao_cap"}
+INTENT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "keywords": {"type": "array", "items": {"type": "string"}},
+        "cuisines": {"type": "array", "items": {"type": "string"}},
+        "districts": {"type": "array", "items": {"type": "string"}},
+        "ambience_tags": {"type": "array", "items": {"type": "string"}},
+        "amenity_tags": {"type": "array", "items": {"type": "string"}},
+        "occasion_tags": {"type": "array", "items": {"type": "string"}},
+        "weather_tags": {"type": "array", "items": {"type": "string"}},
+        "price_min": {"type": ["integer", "null"]},
+        "price_max": {"type": ["integer", "null"]},
+        "budget_label": {"type": ["string", "null"]},
+        "group_size": {"type": ["integer", "null"]},
+        "open_now": {"type": ["boolean", "null"]},
+        "excluded_cuisines": {"type": "array", "items": {"type": "string"}},
+        "excluded_keywords": {"type": "array", "items": {"type": "string"}},
+        "preference_tags": {"type": "array", "items": {"type": "string"}},
+        "dish_terms": {"type": "array", "items": {"type": "string"}},
+        "conflicts": {"type": "array", "items": {"type": "string"}},
+        "walking_only": {"type": "boolean"},
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "keywords",
+        "cuisines",
+        "districts",
+        "ambience_tags",
+        "amenity_tags",
+        "occasion_tags",
+        "weather_tags",
+        "price_min",
+        "price_max",
+        "budget_label",
+        "group_size",
+        "open_now",
+        "excluded_cuisines",
+        "excluded_keywords",
+        "preference_tags",
+        "dish_terms",
+        "conflicts",
+        "walking_only",
+        "notes",
+    ],
+}
 
 
 def should_use_openai_intent_parser() -> bool:
@@ -50,70 +93,25 @@ def parse_intent_with_openai(query: str, previous_query: str | None = None) -> d
             "budget_label": "binh_dan|trung_binh|kha_cao|cao_cap|null",
             "group_size": "number|null",
             "open_now": "boolean|null",
+            "excluded_cuisines": ["string"],
+            "excluded_keywords": ["string"],
+            "preference_tags": ["string"],
+            "dish_terms": ["string"],
+            "conflicts": ["string"],
+            "walking_only": "boolean",
             "notes": ["string"],
         },
     }
     try:
-        response = httpx.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": settings.OPENAI_MODEL,
-                "input": [
-                    {
-                        "role": "system",
-                        "content": "You parse restaurant search prompts. Return valid JSON only.",
-                    },
-                    {
-                        "role": "user",
-                        "content": json.dumps(payload, ensure_ascii=False),
-                    },
-                ],
-            },
-            timeout=settings.OPENAI_TIMEOUT_SECONDS,
+        parsed = request_structured_json(
+            schema_name="restaurant_intent",
+            schema=INTENT_SCHEMA,
+            payload=payload,
+            instructions="Parse restaurant search prompts into the requested structured JSON. Do not recommend restaurants.",
         )
-    except httpx.HTTPError as exc:
-        raise OpenAIIntentParserError("OpenAI request failed or timed out.") from exc
-
-    if response.status_code >= 400:
-        raise OpenAIIntentParserError(f"OpenAI request failed: {response.status_code}")
-
-    return _normalize_payload(_extract_json(_extract_response_text(response.json())), query)
-
-
-def _extract_response_text(response: dict[str, Any]) -> str:
-    if response.get("output_text"):
-        return str(response["output_text"])
-
-    parts: list[str] = []
-    for output_item in response.get("output", []) or []:
-        for content_item in output_item.get("content", []) or []:
-            text = content_item.get("text")
-            if text:
-                parts.append(str(text))
-    if not parts:
-        raise OpenAIIntentParserError("OpenAI response did not contain text.")
-    return "\n".join(parts)
-
-
-def _extract_json(text: str) -> dict[str, Any]:
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
-        cleaned = re.sub(r"\s*```$", "", cleaned)
-    match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-    if match:
-        cleaned = match.group(0)
-    try:
-        payload = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        raise OpenAIIntentParserError("OpenAI response was not valid JSON.") from exc
-    if not isinstance(payload, dict):
-        raise OpenAIIntentParserError("OpenAI response JSON was not an object.")
-    return payload
+    except OpenAIResponsesError as exc:
+        raise OpenAIIntentParserError(str(exc)) from exc
+    return _normalize_payload(parsed, query)
 
 
 def _normalize_payload(payload: dict[str, Any], query: str) -> dict[str, Any]:
@@ -132,6 +130,12 @@ def _normalize_payload(payload: dict[str, Any], query: str) -> dict[str, Any]:
         "budget_label": payload.get("budget_label") if payload.get("budget_label") in ALLOWED_BUDGET_LABELS else None,
         "group_size": _optional_int(payload.get("group_size")),
         "open_now": payload.get("open_now") if isinstance(payload.get("open_now"), bool) else None,
+        "excluded_cuisines": _string_list(payload.get("excluded_cuisines")),
+        "excluded_keywords": _string_list(payload.get("excluded_keywords")),
+        "preference_tags": _string_list(payload.get("preference_tags")),
+        "dish_terms": _string_list(payload.get("dish_terms")),
+        "conflicts": _string_list(payload.get("conflicts")),
+        "walking_only": bool(payload.get("walking_only")),
         "parser_mode": "openai",
         "notes": _string_list(payload.get("notes")),
     }

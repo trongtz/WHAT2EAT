@@ -10,6 +10,7 @@ from models.user import User
 from schemas.ai import AIRecommendationRequest, AIRecommendationResponse
 from schemas.ai_chat import AIChatMessageCreate, AIChatSessionUpdate, RecommendationLogCreate
 from schemas.search_history import SearchHistoryCreate
+from services.ai_assistant.agent import serialize_agent_state
 from services.ai_assistant.conversation_context import summarize_context
 
 
@@ -22,6 +23,7 @@ def save_ai_trace(
     extracted_intent: dict | None = None,
     filters_applied: dict | None = None,
     result_restaurant_ids: list[str] | None = None,
+    agent_state: dict | None = None,
 ) -> None:
     session = None
     if request.session_id:
@@ -90,6 +92,7 @@ def save_ai_trace(
                     request.query,
                     filters_applied,
                     result_restaurant_ids,
+                    serialize_agent_state(agent_state),
                 )
             ),
         )

@@ -9,6 +9,7 @@ export const aiService = {
       latitude: payload?.latitude,
       longitude: payload?.longitude,
       session_id: payload?.session_id ?? payload?.sessionId,
+      customer_id: payload?.customer_id ?? payload?.customerId,
     });
     const data = response.data || {};
 
@@ -16,6 +17,8 @@ export const aiService = {
       message: data.message ?? "",
       sessionId: data.session_id ?? payload?.session_id ?? payload?.sessionId,
       source: data.source ?? "AI",
+      agent: data.agent ?? null,
+      booking: data.booking ?? null,
       restaurants: Array.isArray(data.recommended_restaurants)
         ? data.recommended_restaurants.map(normalizeRestaurant)
         : [],
