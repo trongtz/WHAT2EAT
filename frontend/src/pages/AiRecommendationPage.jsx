@@ -365,9 +365,6 @@ function AgentActionButtons({ message, onQuickAction }) {
           label={getAgentStatusLabel(status)}
           sx={{ fontWeight: 800 }}
         />
-        {message.agent?.planner_mode ? (
-          <Chip size="small" variant="outlined" label={`planner: ${message.agent.planner_mode}`} />
-        ) : null}
       </Stack>
 
       {actions.length ? (
