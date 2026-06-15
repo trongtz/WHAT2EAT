@@ -9,6 +9,7 @@ export const aiService = {
       latitude: payload?.latitude,
       longitude: payload?.longitude,
       session_id: payload?.session_id ?? payload?.sessionId,
+      customer_id: payload?.customer_id ?? payload?.customerId,
     });
     const data = response.data || {};
 

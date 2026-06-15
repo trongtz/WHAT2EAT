@@ -93,16 +93,20 @@ const buildFallbackRecommendation = (prompt, restaurants) => {
   };
 };
 
-const createAssistantMessage = ({ text, restaurants = [], isFallback = false, isEmpty = false, agent = null, booking = null }) => ({
-  id: `assistant-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  role: "assistant",
-  text,
-  restaurants,
-  isFallback,
-  isEmpty,
-  agent,
-  booking,
-});
+const createAssistantMessage = ({ text, restaurants = [], isFallback = false, isEmpty = false, agent = null, booking = null }) => {
+  const safeRestaurants = Array.isArray(restaurants) ? restaurants : [];
+
+  return {
+    id: `assistant-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role: "assistant",
+    text,
+    restaurants: safeRestaurants,
+    isFallback,
+    isEmpty: Boolean(isEmpty && safeRestaurants.length === 0),
+    agent,
+    booking,
+  };
+};
 
 const createUserMessage = (text) => ({
   id: `user-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -160,6 +164,7 @@ const buildRecommendationReply = (message, restaurants) => {
 };
 
 const buildAssistantReply = ({ source, message, restaurants }) => {
+  if (restaurants.length) return buildRecommendationReply(message, restaurants);
   if (source === "AGENT") return message || "";
   return buildRecommendationReply(message, restaurants);
 };
