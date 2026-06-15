@@ -1,5 +1,7 @@
 import { Chip, Stack, Typography } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CustomButton from "../components/CustomButton";
 import CustomCard from "../components/CustomCard";
 import EmptyState from "../components/EmptyState";
 import LoadingScreen from "../components/LoadingScreen";
@@ -26,9 +28,12 @@ const mergeBookings = (primaryBookings, secondaryBookings) => {
 
 function BookingHistoryPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [history, setHistory] = useState([]);
   const [restaurantMap, setRestaurantMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [busyBookingId, setBusyBookingId] = useState(null);
+  const actionWidth = 154;
 
   const loadData = useCallback(
     async ({ showLoading = true } = {}) => {
@@ -62,6 +67,33 @@ function BookingHistoryPage() {
     [user.id, user.isGuest]
   );
 
+  const handleCancel = async (booking) => {
+    setBusyBookingId(booking.id);
+    try {
+      await bookingService.cancel(booking.id);
+      await loadData({ showLoading: false });
+    } finally {
+      setBusyBookingId(null);
+    }
+  };
+
+  const handleChange = (booking) => {
+    const restaurantId = booking.restaurantId || "";
+    const date = booking.date || "";
+    const time = booking.time || "";
+    const guests = booking.guests || booking.guestCount || 2;
+    const note = booking.note || booking.notes || "";
+    const params = new URLSearchParams({
+      bookingId: booking.id,
+      nhaHang: restaurantId,
+      date,
+      time,
+      guests: String(guests),
+      note,
+    });
+    navigate(`/dat-ban?${params.toString()}`);
+  };
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -93,8 +125,52 @@ function BookingHistoryPage() {
                   </Typography>
                   <Typography color="text.secondary">Ghi chú: {booking.note || "Không có"}</Typography>
                 </Stack>
-                <Stack alignItems={{ xs: "flex-start", md: "flex-end" }} spacing={1}>
-                  <Chip label={booking.statusLabel || booking.status} color={getStatusColor(booking.statusLabel || booking.status)} />
+                <Stack
+                  alignItems={{ xs: "flex-start", md: "flex-end" }}
+                  spacing={0.9}
+                  sx={{ minWidth: { xs: "100%", md: actionWidth } }}
+                >
+                  <Chip
+                    label={booking.statusLabel || booking.status}
+                    color={getStatusColor(booking.statusLabel || booking.status)}
+                    sx={{
+                      width: actionWidth,
+                      alignSelf: { xs: "flex-start", md: "flex-end" },
+                      justifyContent: "center",
+                    }}
+                  />
+                  {booking.status === "PENDING" ? (
+                    <Stack spacing={0.9} sx={{ width: actionWidth }}>
+                      <CustomButton
+                        variant="outlined"
+                        onClick={() => handleChange(booking)}
+                        sx={{
+                          width: actionWidth,
+                          minHeight: 40,
+                          py: 0.75,
+                          background: "transparent",
+                          color: "var(--app-primary)",
+                          borderColor: "color-mix(in srgb, var(--app-primary) 28%, white)",
+                          boxShadow: "none",
+                        }}
+                      >
+                        Thay đổi thông tin
+                      </CustomButton>
+                      <CustomButton
+                        onClick={() => handleCancel(booking)}
+                        disabled={busyBookingId === booking.id}
+                        sx={{
+                          width: actionWidth,
+                          minHeight: 40,
+                          py: 0.75,
+                          background: "linear-gradient(135deg, #E85D75 0%, #FB7185 100%)",
+                          boxShadow: "0 14px 28px rgba(232,93,117,0.22)",
+                        }}
+                      >
+                        {busyBookingId === booking.id ? "Đang hủy..." : "Hủy"}
+                      </CustomButton>
+                    </Stack>
+                  ) : null}
                 </Stack>
               </Stack>
             </CustomCard>

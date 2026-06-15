@@ -85,6 +85,9 @@ def serialize_owner_booking(reservation: Reservation) -> dict:
 
 @router.get("/reviews")
 def get_owner_reviews(
+    skip: int = 0,
+    limit: int = 100,
+    restaurant_id: UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -94,21 +97,24 @@ def get_owner_reviews(
     if not restaurant_ids:
         return []
 
-    reviews = (
+    query = (
         db.query(Review)
         .filter(
             Review.restaurant_id.in_(restaurant_ids),
             Review.status != "REJECTED",
         )
-        .order_by(Review.created_at.desc())
-        .all()
     )
+    if restaurant_id:
+        query = query.filter(Review.restaurant_id == restaurant_id)
+
+    reviews = query.order_by(Review.created_at.desc()).offset(skip).limit(limit).all()
 
     return [
         {
             "id": review.review_id,
             "review_id": review.review_id,
             "restaurant_id": review.restaurant_id,
+            "restaurant_name": review.restaurant.name if review.restaurant else "Nhà hàng",
             "customer_id": review.customer_id,
             "rating": review.rating,
             "comment": review.comment,

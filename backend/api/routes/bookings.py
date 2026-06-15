@@ -2,14 +2,17 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import crud.reservation as crud_reservation
 import crud.restaurant as crud_restaurant
 from api.deps import get_current_user
 from core.database import get_db
+from models.booking import Reservation
 from models.user import User
 from schemas.booking import ReservationCreate, ReservationResponse
+from schemas.booking import ReservationUpdate
 from services.capacity_service import get_restaurant_capacity_for_date
 
 router = APIRouter()
@@ -106,4 +109,64 @@ def cancel_my_booking(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
     updated_booking = crud_reservation.cancel_reservation(db, booking_id)
+    return _serialize_reservation(updated_booking)
+
+
+@router.put("/{booking_id}", response_model=ReservationResponse)
+def update_my_booking(
+    booking_id: UUID,
+    booking_in: ReservationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    booking = crud_reservation.get_reservation_by_id(db, booking_id)
+    if not booking or booking.customer_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+    if booking.status != "PENDING":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending bookings can be updated")
+
+    reservation_time = _to_utc_naive(booking_in.reservation_time or booking.reservation_time)
+    minimum_time = datetime.now(timezone.utc).replace(tzinfo=None) + MIN_BOOKING_NOTICE
+    if reservation_time <= minimum_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reservation time must be at least 30 minutes in the future",
+        )
+
+    guest_count = booking_in.guest_count if booking_in.guest_count is not None else booking.guest_count
+    if guest_count <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guest count must be greater than 0")
+
+    max_capacity = get_restaurant_capacity_for_date(db, booking.restaurant_id, reservation_time.date())
+    if max_capacity <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Restaurant capacity is not available for this date",
+        )
+
+    booked_seats = (
+        db.query(func.sum(Reservation.guest_count))
+        .filter(
+            Reservation.restaurant_id == booking.restaurant_id,
+            Reservation.reservation_time == reservation_time,
+            Reservation.status.in_(["CONFIRMED", "PENDING"]),
+            Reservation.reservation_id != booking_id,
+        )
+        .scalar()
+        or 0
+    )
+    if guest_count > max_capacity - int(booked_seats):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not enough capacity for this time slot")
+
+    updated_booking = crud_reservation.update_reservation(
+        db,
+        booking_id,
+        booking_in.model_copy(
+            update={
+                "reservation_time": reservation_time,
+                "guest_count": guest_count,
+            }
+        ),
+    )
     return _serialize_reservation(updated_booking)

@@ -15,6 +15,9 @@ class AIRestaurantMatch(BaseModel):
     id: str
     name: str
     address: str
+    images: Optional[list[str]] = None
+    image: Optional[str] = None
+    average_rating: Optional[float] = None
     distance_km: Optional[float] = None
     match_score: Optional[float] = None
     reason: Optional[str] = None

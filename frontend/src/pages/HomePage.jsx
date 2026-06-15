@@ -47,6 +47,22 @@ const formatDistanceLabel = (distanceKm) => {
 const hasCoordinates = (restaurant) =>
   Number.isFinite(Number(restaurant.latitude)) && Number.isFinite(Number(restaurant.longitude));
 
+const normalizeRestaurantSignature = (restaurant) =>
+  [restaurant.name, restaurant.address, restaurant.category]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .join("|");
+
+const dedupeRestaurants = (restaurants) => {
+  const seen = new Set();
+
+  return restaurants.filter((restaurant) => {
+    const signature = normalizeRestaurantSignature(restaurant);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+};
+
 const buildFallbackBackground = (index) => {
   const palettes = [
     "linear-gradient(135deg, rgba(47,133,90,0.92), rgba(104,211,145,0.72))",
@@ -238,7 +254,7 @@ function HomePage() {
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        const data = await restaurantService.getRestaurants();
+        const data = dedupeRestaurants(await restaurantService.getRestaurants());
         setRestaurants(data);
         const firstLocatedRestaurant = data.find((restaurant) => hasCoordinates(restaurant));
         setSelectedRestaurantId(firstLocatedRestaurant?.id || data[0]?.id || null);
@@ -295,7 +311,10 @@ function HomePage() {
   }, []);
 
   const mapRestaurants = useMemo(
-    () => restaurants.filter((restaurant) => hasCoordinates(restaurant)).map(decorateRestaurant),
+    () =>
+      dedupeRestaurants(restaurants)
+        .filter((restaurant) => hasCoordinates(restaurant))
+        .map(decorateRestaurant),
     [restaurants]
   );
 
@@ -356,7 +375,7 @@ function HomePage() {
   }, [selectedMapRestaurant?.position, userPosition, viewport.bounds]);
 
   const nearbyRestaurants = useMemo(() => {
-    return mapRestaurants
+    return dedupeRestaurants(mapRestaurants)
       .map((restaurant) => {
         const distanceKm = getDistanceInKm(nearbyAnchorPosition, restaurant.position);
         return {
@@ -370,7 +389,7 @@ function HomePage() {
   }, [mapRestaurants, nearbyAnchorPosition]);
 
   const featuredRestaurants = useMemo(() => {
-    return [...restaurants]
+    return dedupeRestaurants(restaurants)
       .sort((a, b) => {
         if (Number(b.averageRating || 0) !== Number(a.averageRating || 0)) {
           return Number(b.averageRating || 0) - Number(a.averageRating || 0);

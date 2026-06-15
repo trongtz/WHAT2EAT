@@ -1,6 +1,7 @@
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Alert, Box, Grid, Stack, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
+import CustomButton from "../../components/CustomButton";
 import CustomCard from "../../components/CustomCard";
 import EmptyState from "../../components/EmptyState";
 import LoadingScreen from "../../components/LoadingScreen";
@@ -16,12 +17,14 @@ function OwnerReviewsPage() {
   const [restaurantMap, setRestaurantMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [expandedRestaurants, setExpandedRestaurants] = useState({});
+  const [loadingMoreRestaurantId, setLoadingMoreRestaurantId] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const [reviewData, restaurantData] = await Promise.all([
-          dashboardService.getOwnerReviews(),
+          dashboardService.getOwnerReviews({ skip: 0, limit: 1000 }),
           restaurantService.getOwnerRestaurants(user.id),
         ]);
         setReviews(reviewData);
@@ -47,6 +50,31 @@ function OwnerReviewsPage() {
     return Array.from(groups.entries());
   }, [reviews]);
 
+  const toggleExpanded = (restaurantId) => {
+    setExpandedRestaurants((current) => ({
+      ...current,
+      [restaurantId]: !current[restaurantId],
+    }));
+  };
+
+  const loadMoreRestaurantReviews = async (restaurantId) => {
+    if (loadingMoreRestaurantId) return;
+
+    const currentCount = groupedReviews.find(([id]) => String(id) === String(restaurantId))?.[1]?.length || 0;
+    setLoadingMoreRestaurantId(restaurantId);
+    try {
+      const nextPage = await dashboardService.getOwnerReviews({ skip: currentCount, limit: 8, restaurantId });
+      if (!nextPage.length) {
+        setExpandedRestaurants((current) => ({ ...current, [restaurantId]: true }));
+        return;
+      }
+      setReviews((current) => [...current, ...nextPage]);
+      setExpandedRestaurants((current) => ({ ...current, [restaurantId]: true }));
+    } finally {
+      setLoadingMoreRestaurantId(null);
+    }
+  };
+
   if (loading) return <LoadingScreen message="Đang tải đánh giá của khách..." />;
 
   return (
@@ -62,7 +90,7 @@ function OwnerReviewsPage() {
                 <Stack spacing={2}>
                   <Typography variant="h4">{restaurantMap[restaurantId]?.name || "Nhà hàng"}</Typography>
                   <Grid container spacing={1.5}>
-                    {restaurantReviews.map((review) => (
+                    {(expandedRestaurants[restaurantId] ? restaurantReviews : restaurantReviews.slice(0, 4)).map((review) => (
                       <Grid key={review.id} size={{ xs: 12, xl: 6 }}>
                         <Box
                           sx={{
@@ -85,6 +113,26 @@ function OwnerReviewsPage() {
                       </Grid>
                     ))}
                   </Grid>
+                  {restaurantReviews.length > 4 ? (
+                    <CustomButton
+                      variant="outlined"
+                      onClick={() => (expandedRestaurants[restaurantId] ? toggleExpanded(restaurantId) : loadMoreRestaurantReviews(restaurantId))}
+                      disabled={loadingMoreRestaurantId === restaurantId}
+                      sx={{
+                        alignSelf: "flex-start",
+                        background: "transparent",
+                        color: "var(--app-primary)",
+                        borderColor: "color-mix(in srgb, var(--app-primary) 24%, white)",
+                        boxShadow: "none",
+                      }}
+                    >
+                      {loadingMoreRestaurantId === restaurantId
+                        ? "Đang tải..."
+                        : expandedRestaurants[restaurantId]
+                          ? "Thu gọn"
+                          : "Xem thêm"}
+                    </CustomButton>
+                  ) : null}
                 </Stack>
               </CustomCard>
             </Grid>

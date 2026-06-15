@@ -150,7 +150,8 @@ def get_restaurant_reviews(
     limit: int = 100,
     db: Session = Depends(get_db),
 ):
-    return crud_review.get_reviews_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    reviews = crud_review.get_reviews_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    return [crud_review.serialize_review(review) for review in reviews]
 
 
 @router.post("/", response_model=RestaurantResponse, status_code=status.HTTP_201_CREATED)

@@ -18,6 +18,7 @@ const normalizeOwnerReview = (review) => ({
   id: review.id ?? review.review_id,
   reviewId: review.review_id ?? review.id,
   restaurantId: review.restaurant_id ?? review.restaurantId,
+  restaurantName: review.restaurant_name ?? review.restaurantName ?? "",
   customerId: review.customer_id ?? review.customerId,
   createdAt: review.created_at ?? review.createdAt,
   rating: Number(review.rating || 0),
@@ -55,11 +56,11 @@ export const dashboardService = {
     return response.data.map(normalizeOwnerBooking);
   },
 
-  getOwnerReviews: async () => {
+  getOwnerReviews: async ({ skip = 0, limit = 100, restaurantId = null } = {}) => {
     return getCachedResource(
-      "owner:reviews",
+      `owner:reviews:${skip}:${limit}:${restaurantId || "all"}`,
       async () => {
-        const response = await apiClient.get("/owner/reviews");
+        const response = await apiClient.get("/owner/reviews", { params: { skip, limit, restaurant_id: restaurantId || undefined } });
         return response.data.map(normalizeOwnerReview);
       },
       { ttlMs: OWNER_DASHBOARD_TTL_MS }

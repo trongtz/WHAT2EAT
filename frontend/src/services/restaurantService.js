@@ -10,6 +10,17 @@ const MENU_TTL_MS = 3 * 60 * 1000;
 const ADMIN_TTL_MS = 2 * 60 * 1000;
 
 const stableSerialize = (value) => JSON.stringify(value || {});
+const normalizeSearchParams = (params = {}) =>
+  Object.fromEntries(
+    Object.entries({
+      query: params.keyword?.trim() || undefined,
+      cuisine_type: params.category?.trim() || undefined,
+      price_range: params.price?.trim() || undefined,
+      min_rating: params.minRating ?? params.min_rating ?? undefined,
+      skip: params.skip ?? undefined,
+      limit: params.limit ?? undefined,
+    }).filter(([, value]) => value !== undefined && value !== "")
+  );
 
 const invalidateRestaurantCaches = (restaurantId, ownerId) => {
   invalidateCachePrefix("restaurants:list");
@@ -70,7 +81,15 @@ const mapOpeningHoursPayload = (payload) => {
 };
 
 export const normalizeRestaurant = (restaurant) => {
-  const images = Array.isArray(restaurant.images) ? restaurant.images.filter(Boolean) : [];
+  const images = Array.isArray(restaurant.images)
+    ? restaurant.images.filter(Boolean)
+    : restaurant.image
+      ? [restaurant.image].filter(Boolean)
+      : restaurant.image_url
+        ? [restaurant.image_url].filter(Boolean)
+        : restaurant.imageUrl
+          ? [restaurant.imageUrl].filter(Boolean)
+          : [];
   const status = restaurant.approval_status ?? restaurant.status ?? "PENDING";
   const priceRange = restaurant.price_range ?? restaurant.priceRange ?? "";
   const cuisineType = restaurant.cuisine_type ?? restaurant.cuisineType ?? "";
@@ -85,6 +104,13 @@ export const normalizeRestaurant = (restaurant) => {
   const reviewCount = Number(
     restaurant.review_count ?? restaurant.reviewCount ?? restaurant.reviews ?? reviewsList.length ?? 0
   );
+  const qualityRating = Number(restaurant.quality_signals?.rating_avg ?? restaurant.qualitySignals?.rating_avg ?? 0);
+  const normalizedRating = Number(
+    restaurant.rating_avg ??
+      restaurant.average_rating ??
+      restaurant.averageRating ??
+      (qualityRating > 0 ? qualityRating : 0)
+  );
 
   return {
     ...restaurant,
@@ -93,8 +119,8 @@ export const normalizeRestaurant = (restaurant) => {
     ownerId: restaurant.owner_id ?? restaurant.ownerId,
     ownerName: restaurant.owner_name ?? restaurant.ownerName ?? "",
     ownerEmail: restaurant.owner_email ?? restaurant.ownerEmail ?? "",
-    averageRating: Number(restaurant.rating_avg ?? restaurant.average_rating ?? restaurant.averageRating ?? 0),
-    rating: Number(restaurant.rating_avg ?? restaurant.average_rating ?? restaurant.averageRating ?? 0),
+    averageRating: normalizedRating,
+    rating: normalizedRating,
     reviewCount,
     menuCount: Number(restaurant.menu_count ?? restaurant.menuCount ?? menu.length),
     approved: status === "APPROVED",
@@ -151,26 +177,14 @@ const mapRestaurantPayload = (payload) => ({
 
 export const restaurantService = {
   getRestaurants: async (params) => {
-    const hasFilters =
-      params &&
-      Object.values({
-        keyword: params.keyword,
-        category: params.category,
-        price: params.price,
-      }).some(Boolean);
-    const apiParams = hasFilters
-      ? {
-          query: params.keyword || undefined,
-          cuisine_type: params.category || undefined,
-          price_range: params.price || undefined,
-        }
-      : params;
+    const apiParams = normalizeSearchParams(params);
+    const hasFilters = Object.keys(apiParams).length > 0;
     const cacheKey = `restaurants:list:${hasFilters ? "search" : "all"}:${stableSerialize(apiParams)}`;
 
     return getCachedResource(
       cacheKey,
       async () => {
-        const response = await apiClient.get(hasFilters ? "/restaurants/search" : "/restaurants", { params: apiParams });
+        const response = await apiClient.get("/restaurants/search", { params: apiParams });
         return response.data.map(normalizeRestaurant);
       },
       { ttlMs: RESTAURANT_LIST_TTL_MS }
@@ -184,7 +198,7 @@ export const restaurantService = {
         const [restaurantResponse, menuResponse, reviewResponse] = await Promise.all([
           apiClient.get(`/restaurants/${restaurantId}`),
           apiClient.get(`/restaurants/${restaurantId}/menu`),
-          apiClient.get(`/restaurants/${restaurantId}/reviews`),
+          apiClient.get(`/restaurants/${restaurantId}/reviews`, { params: { limit: 1000 } }),
         ]);
 
         return normalizeRestaurant({
@@ -250,6 +264,11 @@ export const restaurantService = {
       },
       { ttlMs: MENU_TTL_MS }
     );
+  },
+
+  getRestaurantReviews: async (restaurantId, { skip = 0, limit = 20 } = {}) => {
+    const response = await apiClient.get(`/restaurants/${restaurantId}/reviews`, { params: { skip, limit } });
+    return response.data;
   },
 
   createMenuItem: async (restaurantId, payload) => {

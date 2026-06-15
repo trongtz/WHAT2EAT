@@ -1,5 +1,6 @@
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Alert, Box, Chip, Grid, Stack, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
@@ -11,23 +12,7 @@ import LoadingScreen from "../../components/LoadingScreen";
 import StatsCard from "../../components/StatsCard";
 import { useAuth } from "../../hooks/useAuth";
 import { dashboardService } from "../../services/dashboardService";
-
-const staticNotifications = [
-  {
-    id: 1,
-    customer: "Trà Hương",
-    title: "đã đánh giá 5 sao cho món Jolibee",
-    body: '"tôi đã ăn món này 1 tuần liên tục"',
-    tone: "rgba(245,158,11,0.10)",
-  },
-  {
-    id: 2,
-    customer: "Minh Anh",
-    title: "đã đánh giá 4 sao cho món Gà rán sốt cay",
-    body: '"vỏ giòn, sốt ngon nhưng mình muốn phần salad nhiều hơn một chút"',
-    tone: "rgba(96,165,250,0.12)",
-  },
-];
+import { formatDateTime } from "../../utils/helpers";
 
 const getStatusConfig = (status) => {
   if (status === "APPROVED") {
@@ -110,7 +95,7 @@ function OwnerDashboardPage() {
         <Grid container spacing={3} alignItems="stretch">
           <Grid size={{ xs: 12, lg: 8 }}>
             <CustomCard sx={{ height: "100%" }}>
-              <Stack spacing={2}>
+              <Stack spacing={2.2}>
                 <Typography variant="h4">Chi nhánh nổi bật</Typography>
 
                 <Stack spacing={1.5}>
@@ -122,9 +107,9 @@ function OwnerDashboardPage() {
                         key={restaurant.id}
                         sx={{
                           p: 1.6,
-                          borderRadius: 2.25,
+                          borderRadius: 2.5,
                           border: "1px solid rgba(15,23,42,0.08)",
-                          bgcolor: "rgba(255,255,255,0.84)",
+                          bgcolor: "rgba(255,255,255,0.88)",
                         }}
                       >
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.6}>
@@ -239,54 +224,77 @@ function OwnerDashboardPage() {
           </Grid>
 
           <Grid size={{ xs: 12, lg: 4 }}>
-            <CustomCard sx={{ height: "100%" }}>
-              <Stack spacing={2}>
+            <CustomCard sx={{ height: "100%", minHeight: 620 }}>
+              <Stack spacing={2.4}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <NotificationsRoundedIcon sx={{ color: "var(--app-primary)", fontSize: 24 }} />
+                  <NotificationsRoundedIcon sx={{ color: "var(--app-primary)", fontSize: 28 }} />
                   <Typography variant="h4">Thông báo</Typography>
                 </Stack>
 
-                <Stack spacing={1.1}>
-                  {staticNotifications.map((item) => (
-                    <Box
-                      key={item.id}
-                      sx={{
-                        p: 1.25,
-                        borderRadius: 2,
-                        bgcolor: item.tone,
-                        border: "1px solid rgba(15,23,42,0.08)",
-                      }}
-                    >
-                      <Stack spacing={0.45} sx={{ minWidth: 0 }}>
-                        <Typography
+                <Stack spacing={1.5}>
+                  {data.reviews.length
+                    ? data.reviews.slice(0, 4).map((review, index) => (
+                        <Box
+                          key={review.id}
                           sx={{
-                            fontSize: "0.98rem",
-                            fontWeight: 800,
-                            lineHeight: 1.45,
-                            wordBreak: "break-word",
+                            p: 2,
+                            minHeight: 148,
+                            borderRadius: 3,
+                            bgcolor: index % 2 === 0 ? "#FFF3E4" : "#EAF1FF",
+                            border: "1px solid rgba(15,23,42,0.10)",
+                            boxShadow: "0 10px 20px rgba(15,23,42,0.04)",
                           }}
                         >
-                          {item.customer} {item.title}
-                        </Typography>
-                        <Typography
-                          color="text.secondary"
-                          sx={{
-                            fontSize: "0.94rem",
-                            lineHeight: 1.6,
-                            display: "-webkit-box",
-                            WebkitBoxOrient: "vertical",
-                            WebkitLineClamp: 3,
-                            overflow: "hidden",
-                          }}
-                        >
-                          {item.body}
-                        </Typography>
-                      </Stack>
-                    </Box>
-                  ))}
+                          <Stack spacing={0.7} sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={0.9} alignItems="center" flexWrap="wrap" useFlexGap>
+                              <RateReviewRoundedIcon sx={{ color: "var(--app-primary)", fontSize: 18 }} />
+                              <Typography
+                                sx={{
+                                  fontSize: "0.96rem",
+                                  fontWeight: 800,
+                                  lineHeight: 1.4,
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {review.userName || "Khách hàng"} {review.rating}/5
+                              </Typography>
+                            </Stack>
+
+                            <Typography
+                              sx={{
+                                fontSize: "0.88rem",
+                                fontWeight: 700,
+                                color: "text.secondary",
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {review.restaurantName || "Nhà hàng"}
+                            </Typography>
+
+                            <Typography
+                              color="text.secondary"
+                              sx={{
+                                fontSize: "0.9rem",
+                                lineHeight: 1.5,
+                                display: "-webkit-box",
+                                WebkitBoxOrient: "vertical",
+                                WebkitLineClamp: 2,
+                                overflow: "hidden",
+                              }}
+                            >
+                              {review.comment || "Không có nội dung."}
+                            </Typography>
+
+                            <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>
+                              {formatDateTime(review.createdAt)}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                      ))
+                    : null}
                 </Stack>
 
-                <CustomButton sx={{ alignSelf: "flex-start", minWidth: 140 }}>Xem thêm</CustomButton>
+                <CustomButton sx={{ alignSelf: "stretch", minWidth: 180, py: 1.1 }}>Xem thêm</CustomButton>
               </Stack>
             </CustomCard>
           </Grid>

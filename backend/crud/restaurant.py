@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import re
 from uuid import UUID
 
 from sqlalchemy import or_
@@ -10,6 +11,36 @@ from models.restaurant import Restaurant
 from models.restaurant_taxonomy import CuisineCategory, RestaurantCuisine, RestaurantImage
 from schemas.restaurant import RestaurantCreate, RestaurantUpdate
 from services.opening_hours_service import normalize_opening_hours
+
+
+def _parse_price_range(price_range: str | None) -> tuple[int | None, int | None]:
+    numbers = [int(match) for match in re.findall(r"\d+", str(price_range or ""))]
+    if not numbers:
+        return None, None
+    if len(numbers) == 1:
+        return numbers[0], numbers[0]
+    return min(numbers[:2]), max(numbers[:2])
+
+
+def _matches_price_band(restaurant_price_range: str | None, budget: str | None) -> bool:
+    budget_key = str(budget or "").strip().lower()
+    if not budget_key:
+        return True
+
+    price_min, price_max = _parse_price_range(restaurant_price_range)
+    if price_min is None and price_max is None:
+        return False
+
+    if budget_key in {"cheap", "binh_dan", "bình_dân", "duoi100", "duoi_100"}:
+        return (price_min or 0) <= 100_000
+
+    if budget_key in {"mid", "trung_binh", "trung_bình"}:
+        return (price_min or 0) <= 300_000 and (price_max or 0) >= 100_000
+
+    if budget_key in {"expensive", "kha_cao", "khá_cao", "cao_cap", "cao_cấp"}:
+        return (price_max or 0) >= 300_000
+
+    return str(restaurant_price_range or "").strip().lower() == budget_key
 
 
 def _extract_related_restaurant_data(data: dict) -> tuple[list[str] | None, str | None, list[UUID] | None]:
@@ -177,13 +208,15 @@ def search_restaurants(
             .filter(CuisineCategory.name.ilike(f"%{cuisine_type}%"))
         )
 
-    if price_range:
-        base_query = base_query.filter(Restaurant.price_range == price_range)
-
     if min_rating is not None:
         base_query = base_query.filter(Restaurant.rating_avg >= min_rating)
 
-    return base_query.distinct().offset(skip).limit(limit).all()
+    restaurants = base_query.distinct().all()
+
+    if price_range:
+        restaurants = [restaurant for restaurant in restaurants if _matches_price_band(restaurant.price_range, price_range)]
+
+    return restaurants[skip : skip + limit]
 
 
 def search_by_location(
