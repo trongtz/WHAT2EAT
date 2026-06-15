@@ -8,6 +8,9 @@ import uuid
 
 class Review(Base):
     __tablename__ = "reviews"
+    __table_args__ = (
+        UniqueConstraint("customer_id", "restaurant_id", name="uq_reviews_customer_restaurant"),
+    )
 
     review_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     customer_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)

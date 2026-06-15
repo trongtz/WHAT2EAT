@@ -15,7 +15,7 @@ import SectionHeader from "../components/SectionHeader";
 import { useAuth } from "../hooks/useAuth";
 import { favoriteService } from "../services/favoriteService";
 import { restaurantService } from "../services/restaurantService";
-import { getGuestFavoriteIds, getGuestReviewsByRestaurant, toggleGuestFavorite } from "../utils/guestSession";
+import { getGuestFavoriteIds, toggleGuestFavorite } from "../utils/guestSession";
 import { formatCurrency, formatDate, formatOpenHours, formatPriceRangeDisplay, getTableAvailabilityLabel } from "../utils/helpers";
 
 const buildFallbackImage = () =>
@@ -33,20 +33,20 @@ function RestaurantDetailPage() {
     const fetchRestaurant = async () => {
       try {
         const data = await restaurantService.getRestaurantDetail(id);
-        const guestReviews = user?.isGuest ? getGuestReviewsByRestaurant(id) : [];
-        const mergedReviews = [...guestReviews, ...(data.reviewsList || [])].sort(
+        const sortedReviews = [...(data.reviewsList || [])].sort(
           (firstReview, secondReview) =>
-            new Date(secondReview.createdAt || 0).getTime() - new Date(firstReview.createdAt || 0).getTime()
+            new Date(secondReview.createdAt || secondReview.created_at || 0).getTime() -
+            new Date(firstReview.createdAt || firstReview.created_at || 0).getTime()
         );
-        const mergedRatings = mergedReviews
+        const mergedRatings = sortedReviews
           .map((review) => Number(review.rating || 0))
           .filter((rating) => Number.isFinite(rating) && rating > 0);
 
         setRestaurant({
           ...data,
-          reviewsList: mergedReviews,
-          reviewCount: mergedReviews.length,
-          reviews: mergedReviews.length,
+          reviewsList: sortedReviews,
+          reviewCount: sortedReviews.length,
+          reviews: sortedReviews.length,
           averageRating: mergedRatings.length
             ? mergedRatings.reduce((sum, rating) => sum + rating, 0) / mergedRatings.length
             : Number(data.averageRating || data.rating || 0),
@@ -57,7 +57,7 @@ function RestaurantDetailPage() {
     };
 
     fetchRestaurant();
-  }, [id, user?.isGuest]);
+  }, [id]);
 
   useEffect(() => {
     const loadFavoriteState = async () => {
@@ -313,6 +313,9 @@ function RestaurantDetailPage() {
                 <Typography color="text.secondary">Số món hiện có: {restaurant.menu.length}</Typography>
                 <CustomButton component={RouterLink} to={`/dat-ban?nhaHang=${restaurant.id}`}>
                   Đặt bàn ngay
+                </CustomButton>
+                <CustomButton component={RouterLink} to={`/danh-gia?restaurantId=${restaurant.id}`}>
+                  Viết đánh giá
                 </CustomButton>
                 <CustomButton
                   onClick={handleFavorite}

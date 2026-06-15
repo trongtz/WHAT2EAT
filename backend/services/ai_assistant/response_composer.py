@@ -24,6 +24,8 @@ def compose_recommendation_response(
                 "id": str(match.restaurant.restaurant_id),
                 "name": match.restaurant.name,
                 "address": match.restaurant.address,
+                "images": [image for image in (match.restaurant.images or []) if image],
+                "image": next((image for image in (match.restaurant.images or []) if image), ""),
                 "distance_km": match.distance_km,
                 "match_score": round(min(match.score / 100, 1.0), 4),
                 "reason": match.reason,

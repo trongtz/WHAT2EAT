@@ -458,6 +458,22 @@ function AiRecommendationPage() {
     }
   };
 
+  const handlePromptKeyDown = (event) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  };
+
+  const handleComposerKeyDown = (event) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+
+    const isTextarea = event.target?.tagName === "TEXTAREA";
+    if (!isTextarea) return;
+
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+  };
+
   return (
     <Box sx={{ pb: { xs: 2, lg: 8 } }}>
       <Grid container spacing={3} alignItems="start">
@@ -510,7 +526,7 @@ function AiRecommendationPage() {
                 </Stack>
               </Box>
 
-              <Stack component="form" spacing={1.4} onSubmit={handleSubmit}>
+              <Stack component="form" spacing={1.4} onSubmit={handleSubmit} onKeyDown={handleComposerKeyDown}>
                 {error ? <Alert severity="error">{error}</Alert> : null}
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                   <Chip

@@ -15,6 +15,7 @@ function RestaurantCard({
   isFavorite = false,
   onToggleFavorite,
   hideFavoriteButton = false,
+  hideTopLabel = false,
 }) {
   const ratingValue = Number(restaurant.rating || restaurant.averageRating || 0);
   const ratingLabel = ratingValue > 0 ? ratingValue.toFixed(1) : "Mới";
@@ -64,7 +65,7 @@ function RestaurantCard({
               transition: "transform 0.35s ease",
             }}
           />
-          {topLabel ? (
+          {!hideTopLabel && topLabel ? (
             <Chip
               label={topLabel}
               sx={{

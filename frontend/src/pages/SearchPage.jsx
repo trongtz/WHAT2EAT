@@ -160,6 +160,7 @@ function SearchPage() {
                 restaurant={restaurant}
                 isFavorite={favoriteIds.includes(String(restaurant.id))}
                 onToggleFavorite={handleToggleFavorite}
+                hideTopLabel
                 action={
                   <CustomButton component={RouterLink} to={`/nha-hang/${restaurant.id}`}>
                     Xem ngay

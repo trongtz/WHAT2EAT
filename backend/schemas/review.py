@@ -21,6 +21,7 @@ class ReviewResponse(ReviewBase):
     reservation_id: Optional[UUID] = None
     status: str
     rejection_reason: Optional[str] = None
+    userName: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
