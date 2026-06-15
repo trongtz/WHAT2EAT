@@ -8,6 +8,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any, Callable
 
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -51,6 +52,10 @@ def _uuid(value: Any) -> uuid.UUID | None:
 def _str(value: Any, default: str | None = None) -> str | None:
     text = _clean(value)
     return text if text is not None else default
+
+
+def _identity_text(value: Any) -> str:
+    return str(value or "").strip().lower()
 
 
 def _int(value: Any, default: int | None = None) -> int | None:
@@ -152,13 +157,21 @@ def _add_by_primary_key(
     model: type,
     primary_key: str,
     build: RowBuilder,
+    duplicate_key: Callable[[Any], tuple[str, ...] | None] | None = None,
 ) -> int:
     rows = []
+    seen_duplicate_keys: set[tuple[str, ...]] = set()
     for row in _csv_rows(data_dir, filename):
         item = build(row)
         key_value = getattr(item, primary_key)
         if key_value is None:
             continue
+        if duplicate_key is not None:
+            item_duplicate_key = duplicate_key(item)
+            if item_duplicate_key:
+                if item_duplicate_key in seen_duplicate_keys:
+                    continue
+                seen_duplicate_keys.add(item_duplicate_key)
         rows.append(_model_values(item))
 
     added = _insert_ignore_conflicts(db, model, rows)
@@ -276,6 +289,39 @@ def _sync_seed_restaurant_images(db: Session, data_dir: str) -> int:
     return changed
 
 
+def _price_range_label(min_price: Decimal, max_price: Decimal) -> str:
+    return f"{int(min_price)} - {int(max_price)}"
+
+
+def _sync_restaurant_price_ranges(db: Session) -> int:
+    changed = 0
+    price_ranges = (
+        db.query(
+            MenuItem.restaurant_id,
+            func.min(MenuItem.price),
+            func.max(MenuItem.price),
+        )
+        .group_by(MenuItem.restaurant_id)
+        .all()
+    )
+
+    for restaurant_id, min_price, max_price in price_ranges:
+        if min_price is None or max_price is None:
+            continue
+        restaurant = db.get(Restaurant, restaurant_id)
+        if not restaurant:
+            continue
+        next_price_range = _price_range_label(min_price, max_price)
+        if restaurant.price_range != next_price_range:
+            restaurant.price_range = next_price_range
+            changed += 1
+
+    if changed:
+        db.commit()
+        print(f"Synchronized price ranges for {changed} restaurants from menu items.")
+    return changed
+
+
 def _import_csv_seed(db: Session, data_dir: str) -> None:
     _add_by_primary_key(
         db,
@@ -362,6 +408,7 @@ def _import_csv_seed(db: Session, data_dir: str) -> None:
             created_at=_datetime(row.get("created_at")),
             updated_at=_datetime(row.get("updated_at")),
         ),
+        duplicate_key=lambda item: (_identity_text(item.name), _identity_text(item.address)),
     )
     _add_by_primary_key(
         db,
@@ -395,6 +442,7 @@ def _import_csv_seed(db: Session, data_dir: str) -> None:
             availability_status=_str(row.get("availability_status"), "AVAILABLE"),
         ),
     )
+    _sync_restaurant_price_ranges(db)
     _add_by_primary_key(
         db,
         data_dir,
@@ -611,13 +659,14 @@ def seed_data(force_import: bool = False) -> None:
 
     try:
         if db.query(User).first() or db.query(Restaurant).first():
-            if force_import:
+            if os.path.exists(os.path.join(data_dir, "users.csv")):
                 print("Database already has seed data. Importing missing CSV rows with conflict-safe batch inserts...")
                 _import_csv_seed(db, data_dir)
-                print("CSV seed import completed.")
-                return
-            if os.path.exists(os.path.join(data_dir, "users.csv")):
                 _sync_seed_user_passwords(db, data_dir)
+                if os.path.exists(os.path.join(data_dir, "restaurant_images.csv")):
+                    _sync_seed_restaurant_images(db, data_dir)
+                print("CSV seed sync completed.")
+                return
             if os.path.exists(os.path.join(data_dir, "restaurant_images.csv")):
                 _sync_seed_restaurant_images(db, data_dir)
             print("Database already has seed data. Skipping initialization.")
