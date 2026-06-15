@@ -174,12 +174,18 @@ const getAgentStatusLabel = (status) => {
     restaurant_selected: "Đã chọn quán",
     needs_restaurant: "Cần chọn quán",
     needs_booking_info: "Cần thêm thông tin",
+    needs_review_info: "Cần thêm review",
     awaiting_booking_confirmation: "Chờ xác nhận đặt bàn",
     booking_created: "Đã tạo booking",
     booking_cancelled: "Đã hủy bước đặt",
     booking_rejected: "Không thể đặt",
     needs_login: "Cần đăng nhập",
     preference_saved: "Đã ghi nhớ sở thích",
+    favorite_added: "Đã lưu yêu thích",
+    favorite_removed: "Đã bỏ yêu thích",
+    checkin_created: "Đã check-in",
+    showing_reviews: "Đang xem review",
+    review_created: "Đã gửi review",
   };
   return labels[status] || "Agent đang xử lý";
 };
@@ -187,7 +193,7 @@ const getAgentStatusLabel = (status) => {
 const getAgentStatusColor = (status) => {
   if (status === "booking_created") return "success";
   if (["booking_rejected", "needs_login"].includes(status)) return "error";
-  if (["awaiting_booking_confirmation", "needs_booking_info", "needs_restaurant"].includes(status)) return "warning";
+  if (["awaiting_booking_confirmation", "needs_booking_info", "needs_restaurant", "needs_review_info"].includes(status)) return "warning";
   return "info";
 };
 
