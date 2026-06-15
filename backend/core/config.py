@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_INTENT_PARSER: bool = False
+    OPENAI_AGENT_PLANNER: bool = False
+    OPENAI_AGENTIC_RERANKER: bool = False
+    OPENAI_RERANK_SHORTLIST_SIZE: int = 12
     OPENAI_TIMEOUT_SECONDS: float = 8.0
     AUTO_CREATE_TABLES: bool = False
     AUTO_SEED: bool = False

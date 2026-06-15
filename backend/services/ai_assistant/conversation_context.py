@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from models.ai_chat import AIChatMessage, AIChatSession, RecommendationLog
 from services.ai_assistant.intent_extractor import intent_value
-from services.ai_assistant.recommend_imports import normalize_text
+from services.ai_assistant.recommend_imports import normalize_text, parse_query_heuristically, unique_preserve_order
 
 
 CONTEXT_CUES = {
@@ -22,6 +22,11 @@ CONTEXT_CUES = {
     "gan toi",
     "xa hon",
     "con ban",
+    "dung goi y",
+    "toi an mon nay nhieu roi",
+    "toi vua an com roi",
+    "ghet an cay",
+    "it pho bien hon",
 }
 
 REPEAT_AVOIDANCE_CUES = {
@@ -30,6 +35,10 @@ REPEAT_AVOIDANCE_CUES = {
     "doi quan",
     "them quan",
     "goi y khac",
+    "dung goi y lai",
+    "vua xem",
+    "an mon nay nhieu roi",
+    "it pho bien hon",
 }
 
 
@@ -39,6 +48,7 @@ def get_conversation_context(db: Session, session_id: UUID | None, query: str, c
 
     session = _get_session(db, session_id)
     previous_user_message = _get_previous_user_message(db, session_id)
+    recent_user_queries = _get_recent_user_queries(db, session_id)
     previous_result_ids = _get_previous_result_ids(db, session_id)
     normalized_query = normalize_text(query)
 
@@ -46,13 +56,19 @@ def get_conversation_context(db: Session, session_id: UUID | None, query: str, c
         "session": session,
         "previous_query": previous_user_message.content if previous_user_message else None,
         "previous_result_ids": previous_result_ids,
+        "recent_user_queries": recent_user_queries,
         "use_previous_context": _should_use_previous_context(normalized_query, current_intent, previous_user_message),
         "avoid_repeated_results": any(cue in normalized_query for cue in REPEAT_AVOIDANCE_CUES),
         "context_summary": session.context_summary if session else None,
     }
 
 
-def summarize_context(query: str, filters_applied: dict[str, Any] | None, result_restaurant_ids: list[str] | None) -> str:
+def summarize_context(
+    query: str,
+    filters_applied: dict[str, Any] | None,
+    result_restaurant_ids: list[str] | None,
+    agent_state: str | None = None,
+) -> str:
     filters_applied = filters_applied or {}
     result_restaurant_ids = result_restaurant_ids or []
     parts = [
@@ -64,6 +80,8 @@ def summarize_context(query: str, filters_applied: dict[str, Any] | None, result
         f"group_size={filters_applied.get('group_size')}",
         f"last_results={','.join(result_restaurant_ids[:5])}",
     ]
+    if agent_state:
+        parts.append(f"agent_state={agent_state}")
     return " | ".join(parts)
 
 
@@ -72,6 +90,7 @@ def _empty_context() -> dict[str, Any]:
         "session": None,
         "previous_query": None,
         "previous_result_ids": [],
+        "recent_user_queries": [],
         "use_previous_context": False,
         "avoid_repeated_results": False,
         "context_summary": None,
@@ -119,6 +138,40 @@ def _get_previous_result_ids(db: Session, session_id: UUID) -> list[str]:
         if restaurant_id not in ids:
             ids.append(restaurant_id)
     return ids
+
+
+def _get_recent_user_queries(db: Session, session_id: UUID) -> list[str]:
+    try:
+        messages = (
+            db.query(AIChatMessage)
+            .filter(AIChatMessage.session_id == session_id, AIChatMessage.role == "user")
+            .order_by(AIChatMessage.created_at.desc())
+            .limit(8)
+            .all()
+        )
+    except Exception:
+        return []
+    return [message.content for message in reversed(messages)]
+
+
+def apply_conversation_memory(intent: Any, recent_user_queries: list[str]) -> Any:
+    if not recent_user_queries:
+        return intent
+
+    for query in recent_user_queries:
+        memory_intent = parse_query_heuristically(query)
+        for key in ("excluded_cuisines", "excluded_keywords", "preference_tags"):
+            previous_values = intent_value(intent, key, []) or []
+            memory_values = intent_value(memory_intent, key, []) or []
+            _set_intent_value(intent, key, unique_preserve_order([*previous_values, *memory_values]))
+    return intent
+
+
+def _set_intent_value(intent: Any, key: str, value: Any) -> None:
+    if isinstance(intent, dict):
+        intent[key] = value
+    else:
+        setattr(intent, key, value)
 
 
 def _should_use_previous_context(normalized_query: str, current_intent: Any, previous_user_message: AIChatMessage | None) -> bool:

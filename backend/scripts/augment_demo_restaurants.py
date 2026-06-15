@@ -200,6 +200,15 @@ DEMO_INSERTS = [
         "price_range": "30000 - 90000",
         "rating_avg": "4.3",
     },
+    {
+        "name": "BBQ Sinh Viên Linh Trung",
+        "description": "BBQ Sinh Viên Linh Trung là quán nướng bình dân gần ĐH Khoa học Tự nhiên, có thịt nướng, xiên que, lẩu nướng và combo nhóm giá sinh viên.",
+        "address": "Đường Tân Hòa, Đông Hòa, Dĩ An, Bình Dương",
+        "latitude": "10.8798",
+        "longitude": "106.8061",
+        "price_range": "59000 - 150000",
+        "rating_avg": "4.5",
+    },
 ]
 
 

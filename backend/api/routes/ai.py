@@ -51,6 +51,8 @@ async def get_ai_recommendation(
             ],
             session_id=request.session_id,
             source=ai_data.get("source", "HYBRID"),
+            agent=ai_data.get("agent"),
+            booking=ai_data.get("booking"),
         )
         save_ai_trace(
             db,
@@ -60,6 +62,7 @@ async def get_ai_recommendation(
             extracted_intent=ai_data.get("intent"),
             filters_applied=ai_data.get("filters_applied"),
             result_restaurant_ids=ai_data.get("result_restaurant_ids"),
+            agent_state=ai_data.get("agent_state"),
         )
         return response
 

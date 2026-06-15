@@ -16,6 +16,8 @@ export const aiService = {
       message: data.message ?? "",
       sessionId: data.session_id ?? payload?.session_id ?? payload?.sessionId,
       source: data.source ?? "AI",
+      agent: data.agent ?? null,
+      booking: data.booking ?? null,
       restaurants: Array.isArray(data.recommended_restaurants)
         ? data.recommended_restaurants.map(normalizeRestaurant)
         : [],

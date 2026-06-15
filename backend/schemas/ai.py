@@ -32,3 +32,5 @@ class AIRecommendationResponse(BaseModel):
     recommended_restaurants: List[AIRestaurantMatch]
     session_id: Optional[UUID] = None
     source: str = "AI"
+    agent: Optional[dict[str, Any]] = None
+    booking: Optional[dict[str, Any]] = None

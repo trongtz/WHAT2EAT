@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-import crud.restaurant as crud_restaurant
 from models.restaurant import Restaurant
+from models.restaurant_taxonomy import RestaurantCuisine
 from services.ai_assistant.intent_extractor import intent_value
 from services.ai_assistant.recommend_imports import extract_district_slug_from_text, haversine_km, normalize_text
 from services.capacity_service import count_booked_tables_for_date, get_restaurant_capacity_for_date
+from services.opening_hours_service import get_primary_open_hours
 
 
 DEFAULT_RADIUS_KM = 2.0
@@ -19,16 +21,26 @@ CUISINE_HARD_ALIASES = {
     "lau": ["lau", "hotpot"],
     "bbq nuong": ["bbq", "nuong", "grill"],
     "mon nhat": ["nhat", "sushi", "ramen", "udon", "japanese"],
-    "mon han": ["han", "han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "seoul", "daegu"],
+    "mon han": ["han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "mi cay", "seoul", "daegu"],
     "hai san": ["hai san", "seafood", "oc"],
     "chay healthy": ["chay", "healthy", "salad", "vegan", "vegetarian"],
     "mon thai": ["thai", "tomyum", "pad thai"],
     "mon y": ["italy", "italian", "pizza", "pasta"],
+    "buffet": ["buffet"],
 }
 
 
 def search_restaurants_tool(db: Session, limit: int = 10_000) -> list[Restaurant]:
-    return crud_restaurant.get_restaurants(db, skip=0, limit=limit)
+    return (
+        db.query(Restaurant)
+        .options(
+            selectinload(Restaurant.menu_items),
+            selectinload(Restaurant.cuisine_links).selectinload(RestaurantCuisine.category),
+        )
+        .filter(Restaurant.approval_status == "APPROVED", Restaurant.is_active.is_(True))
+        .limit(limit)
+        .all()
+    )
 
 
 def check_available_slots_tool(db: Session, restaurant: Restaurant) -> int | None:
@@ -40,9 +52,34 @@ def check_available_slots_tool(db: Session, restaurant: Restaurant) -> int | Non
     return max(max_capacity - booked_capacity, 0)
 
 
-def passes_hard_constraints(restaurant: Restaurant, intent: Any) -> bool:
+def passes_hard_constraints(restaurant: Restaurant, intent: Any, *, db: Session | None = None) -> bool:
+    if _is_obvious_non_restaurant(restaurant):
+        return False
+
     requested_cuisines = intent_value(intent, "cuisines", []) or []
     if requested_cuisines and not _matches_requested_cuisine(restaurant, requested_cuisines):
+        return False
+    excluded_cuisines = intent_value(intent, "excluded_cuisines", []) or []
+    if excluded_cuisines and _matches_requested_cuisine(restaurant, excluded_cuisines):
+        return False
+
+    normalized_text = restaurant_constraint_text(restaurant)
+    requested_dishes = intent_value(intent, "dish_terms", []) or []
+    if requested_dishes and not any(restaurant_matches_dish(restaurant, dish) for dish in requested_dishes):
+        return False
+    excluded_keywords = intent_value(intent, "excluded_keywords", []) or []
+    if any(_contains_alias(normalized_text, keyword) for keyword in excluded_keywords):
+        return False
+    preference_tags = intent_value(intent, "preference_tags", []) or []
+    if "healthy" in preference_tags and not any(
+        _contains_alias(normalized_text, keyword)
+        for keyword in ["healthy", "chay", "salad", "rau", "eat clean", "thanh dam", "vegetarian"]
+    ):
+        return False
+    if "soupy_food" in preference_tags and not any(
+        _contains_alias(normalized_text, keyword)
+        for keyword in ["pho", "bun", "hu tieu", "lau", "canh", "mi", "sup", "soup", "bo kho"]
+    ):
         return False
 
     requested_districts = set(intent_value(intent, "districts", []) or [])
@@ -55,20 +92,20 @@ def passes_hard_constraints(restaurant: Restaurant, intent: Any) -> bool:
     if requested_max is not None and price_min is not None and price_min > int(requested_max):
         return False
 
+    if intent_value(intent, "open_now") and not _is_open_now(restaurant):
+        return False
+
+    group_size = intent_value(intent, "group_size")
+    if db is not None and group_size is not None:
+        available_capacity = check_available_slots_tool(db, restaurant)
+        if available_capacity is not None and available_capacity < int(group_size):
+            return False
+
     return True
 
 
 def _matches_requested_cuisine(restaurant: Restaurant, requested_cuisines: list[str]) -> bool:
-    normalized_text = normalize_text(
-        " ".join(
-            str(part or "")
-            for part in [
-                restaurant.name,
-                restaurant.description,
-                getattr(restaurant, "cuisine_type", ""),
-            ]
-        )
-    )
+    normalized_text = restaurant_identity_text(restaurant)
     for cuisine in requested_cuisines:
         normalized_cuisine = normalize_text(cuisine)
         aliases = CUISINE_HARD_ALIASES.get(normalized_cuisine, [normalized_cuisine])
@@ -77,12 +114,122 @@ def _matches_requested_cuisine(restaurant: Restaurant, requested_cuisines: list[
     return False
 
 
+def restaurant_identity_text(restaurant: Restaurant) -> str:
+    category_text = " ".join(
+        link.category.name
+        for link in (getattr(restaurant, "cuisine_links", []) or [])
+        if getattr(link, "category", None) is not None and getattr(link.category, "name", None)
+    )
+    return normalize_text(
+        " ".join(
+            str(part or "")
+            for part in [
+                restaurant.name,
+                restaurant.description,
+                getattr(restaurant, "cuisine_type", ""),
+                category_text,
+            ]
+        )
+    )
+
+
+def restaurant_constraint_text(restaurant: Restaurant) -> str:
+    return normalize_text(
+        " ".join(
+            str(part or "")
+            for part in [
+                restaurant.name,
+                restaurant.description,
+                getattr(restaurant, "cuisine_type", ""),
+                available_menu_text(restaurant),
+            ]
+        )
+    )
+
+
+def available_menu_text(restaurant: Restaurant, *, limit: int = 40) -> str:
+    menu_items = getattr(restaurant, "menu_items", []) or []
+    return " ".join(
+        f"{item.name} {getattr(item, 'description', '') or ''} {getattr(item, 'category', '') or ''}"
+        for item in menu_items[:limit]
+        if getattr(item, "availability_status", "AVAILABLE") == "AVAILABLE"
+    )
+
+
+def restaurant_matches_dish(restaurant: Restaurant, dish: str) -> bool:
+    restaurant_text = normalize_text(
+        f"{restaurant.name} {restaurant.description or ''} {getattr(restaurant, 'cuisine_type', '')}"
+    )
+    if _contains_alias(restaurant_text, dish):
+        return True
+    for item in (getattr(restaurant, "menu_items", []) or [])[:40]:
+        if getattr(item, "availability_status", "AVAILABLE") != "AVAILABLE":
+            continue
+        item_text = normalize_text(
+            f"{item.name} {getattr(item, 'description', '') or ''} {getattr(item, 'category', '') or ''}"
+        )
+        if _contains_alias(item_text, dish):
+            return True
+    return False
+
+
+def _is_obvious_non_restaurant(restaurant: Restaurant) -> bool:
+    normalized_name = normalize_text(getattr(restaurant, "name", "") or "")
+    non_restaurant_patterns = [
+        "ky tuc xa",
+        "truong dai hoc",
+        "dai hoc",
+        "hoc vien",
+        "benh vien",
+        "nha thuoc",
+        "sieu thi",
+        "tram xang",
+        "atm",
+    ]
+    if not any(pattern in normalized_name for pattern in non_restaurant_patterns):
+        return False
+
+    food_signals = [
+        "quan",
+        "cafe",
+        "ca phe",
+        "coffee",
+        "com",
+        "bun",
+        "pho",
+        "mi",
+        "lau",
+        "tra sua",
+        "banh",
+        "oc",
+        "bbq",
+        "sushi",
+        "restaurant",
+        "food",
+    ]
+    return not any(signal in normalized_name for signal in food_signals)
+
+
+def _is_open_now(restaurant: Restaurant) -> bool:
+    open_hours = get_primary_open_hours(getattr(restaurant, "opening_hours", None))
+    if not open_hours or "-" not in open_hours:
+        return True
+    try:
+        start_raw, end_raw = [part.strip() for part in open_hours.split("-", 1)]
+        start_time = datetime.strptime(start_raw, "%H:%M").time()
+        end_time = datetime.strptime(end_raw, "%H:%M").time()
+    except ValueError:
+        return True
+    current_time = datetime.now().astimezone().time()
+    if start_time <= end_time:
+        return start_time <= current_time <= end_time
+    return current_time >= start_time or current_time <= end_time
+
+
 def _contains_alias(normalized_text: str, alias: str) -> bool:
     normalized_alias = normalize_text(alias)
     if not normalized_alias:
         return False
-    if " " in normalized_alias:
-        return normalized_alias in normalized_text
     return re.search(rf"\b{re.escape(normalized_alias)}\b", normalized_text) is not None
 
 
