@@ -95,10 +95,14 @@ def fallback_trace_payload(response: AIRecommendationResponse, error: Exception,
 
 
 def _restaurant_to_ai_match(restaurant) -> AIRestaurantMatch:
+    images = [image.image_url for image in getattr(restaurant, "restaurant_images", []) if getattr(image, "image_url", None)]
     return AIRestaurantMatch(
         id=str(restaurant.restaurant_id),
         name=restaurant.name,
         address=restaurant.address,
+        images=images or None,
+        image=images[0] if images else None,
+        average_rating=float(restaurant.average_rating or 0),
         distance_km=None,
         match_score=max(0.0, min(1.0, float(restaurant.average_rating or 0) / 5)),
         reason="Fallback keyword search result",

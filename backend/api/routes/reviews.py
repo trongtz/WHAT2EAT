@@ -35,11 +35,13 @@ def _require_customer(current_user: User) -> None:
 
 @router.get("/me", response_model=list[ReviewResponse])
 def get_my_reviews(
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _require_customer(current_user)
-    reviews = crud_review.get_reviews_by_customer(db, current_user.user_id)
+    reviews = crud_review.get_reviews_by_customer(db, current_user.user_id, skip=skip, limit=limit)
     return [crud_review.serialize_review(review) for review in reviews]
 
 

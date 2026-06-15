@@ -15,6 +15,7 @@ def serialize_review(review: Review) -> dict:
         "review_id": review.review_id,
         "customer_id": review.customer_id,
         "restaurant_id": review.restaurant_id,
+        "restaurant_name": review.restaurant.name if review.restaurant else "Nhà hàng",
         "reservation_id": review.reservation_id,
         "rating": review.rating,
         "comment": review.comment,

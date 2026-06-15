@@ -1,7 +1,7 @@
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+﻿import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
-import { Alert, Box, Chip, Grid, MenuItem, Rating, Stack, Typography } from "@mui/material";
+import { Alert, Box, Chip, Grid, Rating, Stack, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
@@ -25,6 +25,7 @@ const normalizeReview = (review) => ({
   id: review.id ?? review.review_id,
   reviewId: review.review_id ?? review.id,
   restaurantId: review.restaurantId ?? review.restaurant_id,
+  restaurantName: review.restaurantName ?? review.restaurant_name ?? "",
   customerId: review.customerId ?? review.customer_id,
   rating: Number(review.rating || 0),
   comment: review.comment ?? "",
@@ -43,9 +44,18 @@ function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deletingReviewId, setDeletingReviewId] = useState(null);
+  const [selectedRestaurantDetail, setSelectedRestaurantDetail] = useState(null);
+  const [visibleMyReviews, setVisibleMyReviews] = useState([]);
+  const [loadingMoreMyReviews, setLoadingMoreMyReviews] = useState(false);
+  const [hasMoreMyReviews, setHasMoreMyReviews] = useState(false);
   const [values, setValues] = useState(initialFormValues);
 
   const isCustomer = String(user?.role || "").toLowerCase() === "customer";
+  const selectedRestaurantId = searchParams.get("restaurantId") || values.restaurantId;
+  const restaurantMap = useMemo(
+    () => Object.fromEntries(restaurants.map((restaurant) => [String(restaurant.id), restaurant])),
+    [restaurants]
+  );
 
   const handleGoBack = () => {
     if (window.history.length > 1) {
@@ -64,9 +74,14 @@ function ReviewPage() {
 
       if (isCustomer) {
         const reviewData = await reviewService.getMyReviews();
-        setMyReviews(reviewData.map(normalizeReview));
+        const normalizedReviews = reviewData.map(normalizeReview);
+        setMyReviews(normalizedReviews);
+        setVisibleMyReviews(normalizedReviews.slice(0, 4));
+        setHasMoreMyReviews(normalizedReviews.length > 4);
       } else {
         setMyReviews([]);
+        setVisibleMyReviews([]);
+        setHasMoreMyReviews(false);
       }
     } catch (err) {
       setError(err.message);
@@ -87,15 +102,40 @@ function ReviewPage() {
     }
   }, [searchParams]);
 
-  const restaurantMap = useMemo(
-    () => Object.fromEntries(restaurants.map((restaurant) => [String(restaurant.id), restaurant])),
-    [restaurants]
-  );
+  useEffect(() => {
+    const restaurantId = selectedRestaurantId;
+    if (!restaurantId) {
+      setSelectedRestaurantDetail(null);
+      return;
+    }
+
+    const matchedRestaurant = restaurantMap[String(restaurantId)];
+    if (matchedRestaurant) {
+      setSelectedRestaurantDetail(matchedRestaurant);
+      return;
+    }
+
+    let active = true;
+    restaurantService
+      .getRestaurantDetail(restaurantId)
+      .then((restaurant) => {
+        if (active) setSelectedRestaurantDetail(restaurant);
+      })
+      .catch(() => {
+        if (active) setSelectedRestaurantDetail(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [restaurantMap, selectedRestaurantId]);
 
   const myReviewMap = useMemo(
     () => Object.fromEntries(myReviews.map((review) => [String(review.restaurantId), review])),
     [myReviews]
   );
+
+  const selectedRestaurant = selectedRestaurantDetail || (selectedRestaurantId ? restaurantMap[String(selectedRestaurantId)] : null);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -154,6 +194,22 @@ function ReviewPage() {
     }
   };
 
+  const handleLoadMoreMyReviews = async () => {
+    if (loadingMoreMyReviews) return;
+
+    setLoadingMoreMyReviews(true);
+    try {
+      const nextSkip = visibleMyReviews.length;
+      const nextPage = await reviewService.getMyReviewsPage({ skip: nextSkip, limit: 8 });
+      const moreReviews = nextPage.map(normalizeReview);
+      const merged = [...visibleMyReviews, ...moreReviews];
+      setVisibleMyReviews(merged);
+      setHasMoreMyReviews(moreReviews.length === 8);
+    } finally {
+      setLoadingMoreMyReviews(false);
+    }
+  };
+
   if (loading) return <Typography>Đang tải đánh giá...</Typography>;
 
   return (
@@ -184,21 +240,30 @@ function ReviewPage() {
             <Stack component="form" spacing={2.5} onSubmit={handleSubmit}>
               <Typography variant="h4">Viết đánh giá mới</Typography>
 
-              <FormInput
-                select
-                label="Nhà hàng"
-                value={values.restaurantId}
-                onChange={(event) => setValues((prev) => ({ ...prev, restaurantId: event.target.value }))}
-              >
-                <MenuItem value="">Chọn nhà hàng</MenuItem>
-                {restaurants.map((restaurant) => (
-                  <MenuItem key={restaurant.id} value={restaurant.id}>
-                    {restaurant.name}
-                  </MenuItem>
-                ))}
-              </FormInput>
+              {selectedRestaurantId ? (
+                <Box
+                  sx={{
+                    p: 1.75,
+                    borderRadius: 2,
+                    bgcolor: "rgba(248,250,255,0.95)",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                  }}
+                >
+                  <Stack spacing={0.5}>
+                    <Typography variant="body2" color="text.secondary">
+                      Đánh giá cho nhà hàng
+                    </Typography>
+                    <Typography fontWeight={800}>{selectedRestaurant?.name || "Nhà hàng đang được chọn"}</Typography>
+                    {selectedRestaurant?.address ? <Typography color="text.secondary">{selectedRestaurant.address}</Typography> : null}
+                  </Stack>
+                </Box>
+              ) : (
+                <Alert severity="warning">
+                  Trang đánh giá này cần có nhà hàng được chọn. Hãy vào trang chi tiết nhà hàng hoặc từ mục yêu thích và bấm "Viết đánh giá".
+                </Alert>
+              )}
 
-              {values.restaurantId && myReviewMap[String(values.restaurantId)] ? (
+              {selectedRestaurantId && myReviewMap[String(selectedRestaurantId)] ? (
                 <Alert severity="info">Bạn đã đánh giá nhà hàng này rồi. Có thể xoá đánh giá cũ để tạo lại.</Alert>
               ) : null}
 
@@ -218,7 +283,11 @@ function ReviewPage() {
                 onChange={(event) => setValues((prev) => ({ ...prev, comment: event.target.value }))}
               />
 
-              <CustomButton type="submit" startIcon={<RateReviewRoundedIcon />} disabled={submitting || !isCustomer}>
+              <CustomButton
+                type="submit"
+                startIcon={<RateReviewRoundedIcon />}
+                disabled={submitting || !isCustomer || !selectedRestaurantId}
+              >
                 {submitting ? "Đang gửi..." : "Gửi đánh giá"}
               </CustomButton>
             </Stack>
@@ -229,10 +298,11 @@ function ReviewPage() {
           <CustomCard>
             <Stack spacing={2}>
               <Typography variant="h4">Đánh giá của bạn</Typography>
-              {myReviews.length ? (
+              {visibleMyReviews.length ? (
                 <Stack spacing={1.5}>
-                  {myReviews.map((review) => {
+                  {visibleMyReviews.map((review) => {
                     const restaurant = restaurantMap[String(review.restaurantId)];
+                    const restaurantName = review.restaurantName || review.restaurant_name || restaurant?.name || "Nhà hàng";
                     return (
                       <Box
                         key={review.id}
@@ -246,7 +316,7 @@ function ReviewPage() {
                         <Stack spacing={0.8}>
                           <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                             <Box>
-                              <Typography fontWeight={800}>{restaurant?.name || "Nhà hàng"}</Typography>
+                              <Typography fontWeight={800}>{restaurantName}</Typography>
                               <Typography variant="body2" color="text.secondary">
                                 {formatDate(review.createdAt)}
                               </Typography>
@@ -277,12 +347,25 @@ function ReviewPage() {
                       </Box>
                     );
                   })}
+                  {hasMoreMyReviews ? (
+                    <CustomButton
+                      variant="outlined"
+                      onClick={handleLoadMoreMyReviews}
+                      disabled={loadingMoreMyReviews}
+                      sx={{
+                        alignSelf: "flex-start",
+                        background: "transparent",
+                        color: "var(--app-primary)",
+                        borderColor: "color-mix(in srgb, var(--app-primary) 24%, white)",
+                        boxShadow: "none",
+                      }}
+                    >
+                      {loadingMoreMyReviews ? "Đang tải..." : "Xem thêm"}
+                    </CustomButton>
+                  ) : null}
                 </Stack>
               ) : (
-                <EmptyState
-                  title="Chưa có đánh giá nào"
-                  description="Bạn hãy chọn một nhà hàng và gửi nhận xét đầu tiên."
-                />
+                <EmptyState title="Chưa có đánh giá nào" description="Bạn hãy mở một nhà hàng và bấm Viết đánh giá để bắt đầu." />
               )}
             </Stack>
           </CustomCard>
@@ -293,3 +376,5 @@ function ReviewPage() {
 }
 
 export default ReviewPage;
+
+

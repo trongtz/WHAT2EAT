@@ -18,6 +18,7 @@ class ReviewResponse(ReviewBase):
     review_id: UUID
     customer_id: UUID
     restaurant_id: UUID
+    restaurant_name: Optional[str] = None
     reservation_id: Optional[UUID] = None
     status: str
     rejection_reason: Optional[str] = None

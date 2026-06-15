@@ -140,7 +140,13 @@ const getStoredChat = () => {
 };
 
 const getRatingLabel = (restaurant) => {
-  const rating = Number(restaurant.averageRating || restaurant.rating || 0);
+  const rating = Number(
+    restaurant.averageRating ||
+      restaurant.rating ||
+      restaurant.quality_signals?.rating_avg ||
+      restaurant.qualitySignals?.rating_avg ||
+      0
+  );
   return rating > 0 ? rating.toFixed(1) : "Mới";
 };
 

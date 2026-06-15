@@ -6,7 +6,7 @@ import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import CustomCard from "./CustomCard";
-import { formatCurrency, formatPriceRangeDisplay, getPriceRangeLabel, getTableAvailabilityLabel } from "../utils/helpers";
+import { formatCurrency, formatPriceRangeDisplay, getTableAvailabilityLabel } from "../utils/helpers";
 
 function RestaurantCard({
   restaurant,
@@ -19,7 +19,7 @@ function RestaurantCard({
 }) {
   const ratingValue = Number(restaurant.rating || restaurant.averageRating || 0);
   const ratingLabel = ratingValue > 0 ? ratingValue.toFixed(1) : "Mới";
-  const topLabel = restaurant.category || getPriceRangeLabel(restaurant.priceRange);
+  const topLabel = restaurant.category || "";
 
   const handleToggleFavorite = (event) => {
     event.preventDefault();

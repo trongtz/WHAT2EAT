@@ -19,6 +19,11 @@ export const reviewService = {
     return response.data;
   },
 
+  getMyReviewsPage: async ({ skip = 0, limit = 20 } = {}) => {
+    const response = await apiClient.get("/reviews/me", { params: { skip, limit } });
+    return response.data;
+  },
+
   delete: async (reviewId) => {
     await apiClient.delete(`/reviews/${reviewId}`);
     invalidateCachePrefix("restaurants:list");

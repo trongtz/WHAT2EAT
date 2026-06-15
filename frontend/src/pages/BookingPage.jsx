@@ -15,18 +15,25 @@ function BookingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const editingBookingId = params.get("bookingId") || "";
+  const isEditing = Boolean(editingBookingId);
   const [restaurants, setRestaurants] = useState([]);
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState({});
   const [values, setValues] = useState({
     restaurantId: params.get("nhaHang") || "",
-    date: "",
-    time: "",
-    guests: 2,
-    note: "",
+    date: params.get("date") || "",
+    time: params.get("time") || "",
+    guests: Number(params.get("guests") || 2),
+    note: params.get("note") || "",
   });
 
   const handleGoBack = () => {
+    if (isEditing) {
+      navigate("/lich-su-dat-ban");
+      return;
+    }
+
     const restaurantId = params.get("nhaHang");
     if (restaurantId) {
       navigate(`/nha-hang/${restaurantId}`);
@@ -49,6 +56,16 @@ function BookingPage() {
     fetchRestaurants();
   }, []);
 
+  useEffect(() => {
+    setValues({
+      restaurantId: params.get("nhaHang") || "",
+      date: params.get("date") || "",
+      time: params.get("time") || "",
+      guests: Number(params.get("guests") || 2),
+      note: params.get("note") || "",
+    });
+  }, [params]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -69,8 +86,18 @@ function BookingPage() {
       createGuestBooking(values);
       setMessage("Đặt bàn tạm thời đã được lưu trong phiên khách này.");
     } else {
-      await bookingService.create({ ...values, userId: user.id, guests: Number(values.guests) });
-      setMessage("Đặt bàn thành công. Bạn có thể xem trạng thái ở lịch sử đặt bàn.");
+      if (isEditing) {
+        await bookingService.update(editingBookingId, { ...values, userId: user.id, guests: Number(values.guests) });
+        setMessage("Đã cập nhật thông tin đặt bàn.");
+      } else {
+        await bookingService.create({ ...values, userId: user.id, guests: Number(values.guests) });
+        setMessage("Đặt bàn thành công. Bạn có thể xem trạng thái ở lịch sử đặt bàn.");
+      }
+    }
+
+    if (isEditing) {
+      navigate("/lich-su-dat-ban");
+      return;
     }
 
     setValues({ ...values, date: "", time: "", guests: 2, note: "" });
@@ -78,7 +105,10 @@ function BookingPage() {
 
   return (
     <Stack spacing={3}>
-      <SectionHeader title="Đặt bàn" description="Hoàn tất thông tin để giữ chỗ nhanh chóng tại nhà hàng bạn yêu thích." />
+      <SectionHeader
+        title={isEditing ? "Cập nhật đặt bàn" : "Đặt bàn"}
+        description={isEditing ? "Chỉnh sửa lại thông tin booking đang chờ duyệt." : "Hoàn tất thông tin để giữ chỗ nhanh chóng tại nhà hàng bạn yêu thích."}
+      />
       <Stack direction="row" justifyContent="flex-start">
         <CustomButton onClick={handleGoBack} variant="outlined">
           Quay lại
@@ -89,7 +119,16 @@ function BookingPage() {
           <CustomCard>
             <Stack component="form" spacing={2.5} onSubmit={handleSubmit}>
               {message ? <Alert severity="success">{message}</Alert> : null}
-              <FormInput select label="Nhà hàng" name="restaurantId" value={values.restaurantId} onChange={handleChange} error={!!errors.restaurantId} helperText={errors.restaurantId}>
+              <FormInput
+                select
+                label="Nhà hàng"
+                name="restaurantId"
+                value={values.restaurantId}
+                onChange={handleChange}
+                error={!!errors.restaurantId}
+                helperText={errors.restaurantId}
+                disabled={isEditing}
+              >
                 <MenuItem value="">Chọn nhà hàng</MenuItem>
                 {restaurants.map((restaurant) => (
                   <MenuItem key={restaurant.id} value={restaurant.id}>
@@ -110,7 +149,7 @@ function BookingPage() {
               </Grid>
               <FormInput multiline rows={4} label="Ghi chú" name="note" value={values.note} onChange={handleChange} />
               <CustomButton type="submit">
-                Xác nhận đặt bàn
+                {isEditing ? "Lưu thay đổi" : "Xác nhận đặt bàn"}
               </CustomButton>
             </Stack>
           </CustomCard>

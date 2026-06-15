@@ -28,6 +28,9 @@ function RestaurantDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [visibleReviews, setVisibleReviews] = useState([]);
+  const [loadingMoreReviews, setLoadingMoreReviews] = useState(false);
+  const [hasMoreReviews, setHasMoreReviews] = useState(false);
 
   useEffect(() => {
     const fetchRestaurant = async () => {
@@ -41,6 +44,7 @@ function RestaurantDetailPage() {
         const mergedRatings = sortedReviews
           .map((review) => Number(review.rating || 0))
           .filter((rating) => Number.isFinite(rating) && rating > 0);
+        const initialVisibleReviews = sortedReviews.slice(0, 4);
 
         setRestaurant({
           ...data,
@@ -51,6 +55,8 @@ function RestaurantDetailPage() {
             ? mergedRatings.reduce((sum, rating) => sum + rating, 0) / mergedRatings.length
             : Number(data.averageRating || data.rating || 0),
         });
+        setVisibleReviews(initialVisibleReviews);
+        setHasMoreReviews(sortedReviews.length > initialVisibleReviews.length);
       } finally {
         setLoading(false);
       }
@@ -105,6 +111,29 @@ function RestaurantDetailPage() {
     setMessage(result.isFavorite ? "Đã thêm vào danh sách yêu thích." : "Đã bỏ khỏi danh sách yêu thích.");
   };
 
+  const handleLoadMoreReviews = async () => {
+    if (!restaurant || loadingMoreReviews) return;
+
+    const nextSkip = visibleReviews.length;
+    const nextLimit = 8;
+    const alreadyLoaded = restaurant.reviewsList.slice(0, nextSkip + nextLimit);
+    if (alreadyLoaded.length > nextSkip) {
+      setVisibleReviews(alreadyLoaded);
+      setHasMoreReviews(alreadyLoaded.length < restaurant.reviewsList.length);
+      return;
+    }
+
+    setLoadingMoreReviews(true);
+    try {
+      const moreReviews = await restaurantService.getRestaurantReviews(id, { skip: nextSkip, limit: nextLimit });
+      const mergedReviews = [...visibleReviews, ...moreReviews].filter(Boolean);
+      setVisibleReviews(mergedReviews);
+      setHasMoreReviews(moreReviews.length === nextLimit);
+    } finally {
+      setLoadingMoreReviews(false);
+    }
+  };
+
   const ratingText = useMemo(() => {
     if (!restaurant) return "--";
     return Number(restaurant.averageRating || 0) > 0
@@ -156,11 +185,9 @@ function RestaurantDetailPage() {
           </Typography>
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} flexWrap="wrap" useFlexGap>
-            <Chip
-              icon={<LocationOnRoundedIcon />}
-              label={restaurant.address || "Chưa cập nhật địa chỉ"}
-              sx={{ bgcolor: "rgba(255,255,255,0.18)", color: "white" }}
-            />
+            {restaurant.address ? (
+              <Chip icon={<LocationOnRoundedIcon />} label={restaurant.address} sx={{ bgcolor: "rgba(255,255,255,0.18)", color: "white" }} />
+            ) : null}
             <Chip
               icon={<AccessTimeRoundedIcon />}
               label={formatOpenHours(restaurant.openHours)}
@@ -188,14 +215,18 @@ function RestaurantDetailPage() {
               </Typography>
 
               <Stack spacing={1.1}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOnRoundedIcon sx={{ color: "var(--app-secondary)" }} />
-                  <Typography color="text.secondary">{restaurant.address || "Chưa cập nhật địa chỉ"}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LocalPhoneRoundedIcon sx={{ color: "var(--app-secondary)" }} />
-                  <Typography color="text.secondary">{restaurant.phone || "Chưa cập nhật số điện thoại"}</Typography>
-                </Stack>
+                {restaurant.address ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <LocationOnRoundedIcon sx={{ color: "var(--app-secondary)" }} />
+                    <Typography color="text.secondary">{restaurant.address}</Typography>
+                  </Stack>
+                ) : null}
+                {restaurant.phone ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <LocalPhoneRoundedIcon sx={{ color: "var(--app-secondary)" }} />
+                    <Typography color="text.secondary">{restaurant.phone}</Typography>
+                  </Stack>
+                ) : null}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeRoundedIcon sx={{ color: "var(--app-secondary)" }} />
                   <Typography color="text.secondary">{formatOpenHours(restaurant.openHours)}</Typography>
@@ -335,27 +366,45 @@ function RestaurantDetailPage() {
             <CustomCard>
               <Stack spacing={2}>
                 <Typography variant="h4">Đánh giá gần đây</Typography>
-                {restaurant.reviewsList.length ? (
-                  restaurant.reviewsList.slice(0, 4).map((review) => (
-                    <Box key={review.id}>
-                      <Stack direction="row" spacing={1} alignItems="center" mb={0.35}>
-                        <Typography fontWeight={700}>{review.userName || "Khách hàng"}</Typography>
-                        <Chip
-                          size="small"
-                          icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
-                          label={Number(review.rating || 0) > 0 ? Number(review.rating || 0).toFixed(1) : "--"}
-                          sx={{
-                            bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
-                            color: "var(--app-primary)",
-                          }}
-                        />
-                      </Stack>
-                      <Typography color="text.secondary">{review.comment || "Không có nội dung đánh giá."}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDate(review.createdAt)}
-                      </Typography>
-                    </Box>
-                  ))
+                {visibleReviews.length ? (
+                  <>
+                    {visibleReviews.map((review) => (
+                      <Box key={review.id}>
+                        <Stack direction="row" spacing={1} alignItems="center" mb={0.35}>
+                          <Typography fontWeight={700}>{review.userName || "Khách hàng"}</Typography>
+                          <Chip
+                            size="small"
+                            icon={<StarRoundedIcon sx={{ color: "#F6B500 !important" }} />}
+                            label={Number(review.rating || 0) > 0 ? Number(review.rating || 0).toFixed(1) : "--"}
+                            sx={{
+                              bgcolor: "color-mix(in srgb, var(--app-primary) 10%, white)",
+                              color: "var(--app-primary)",
+                            }}
+                          />
+                        </Stack>
+                        <Typography color="text.secondary">{review.comment || "Không có nội dung đánh giá."}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatDate(review.createdAt)}
+                        </Typography>
+                      </Box>
+                    ))}
+                    {hasMoreReviews ? (
+                      <CustomButton
+                        variant="outlined"
+                        onClick={handleLoadMoreReviews}
+                        disabled={loadingMoreReviews}
+                        sx={{
+                          alignSelf: "flex-start",
+                          background: "transparent",
+                          color: "var(--app-primary)",
+                          borderColor: "color-mix(in srgb, var(--app-primary) 24%, white)",
+                          boxShadow: "none",
+                        }}
+                      >
+                        {loadingMoreReviews ? "Đang tải..." : "Xem thêm"}
+                      </CustomButton>
+                    ) : null}
+                  </>
                 ) : (
                   <Typography color="text.secondary">Nhà hàng này chưa có đánh giá nào.</Typography>
                 )}

@@ -101,4 +101,17 @@ export const bookingService = {
     invalidateCachePrefix("restaurants:list");
     return normalizeBooking(response.data);
   },
+  update: async (bookingId, payload) => {
+    const reservationTime = new Date(`${payload.date}T${payload.time}`);
+    const response = await apiClient.put(`/bookings/${bookingId}`, {
+      reservation_time: reservationTime.toISOString(),
+      guest_count: Number(payload.guests),
+      notes: payload.note || null,
+    });
+    invalidateCachePrefix("booking:history");
+    invalidateCachePrefix("owner:bookings");
+    invalidateCachePrefix("restaurants:detail:");
+    invalidateCachePrefix("restaurants:list");
+    return normalizeBooking(response.data);
+  },
 };
