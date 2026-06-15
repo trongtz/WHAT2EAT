@@ -1,6 +1,6 @@
 import { Alert, Grid, MenuItem, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import CustomButton from "../components/CustomButton";
 import CustomCard from "../components/CustomCard";
 import FormInput from "../components/FormInput";
@@ -13,6 +13,7 @@ import { validateBooking } from "../utils/validators";
 
 function BookingPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const [restaurants, setRestaurants] = useState([]);
   const [message, setMessage] = useState("");
@@ -24,6 +25,21 @@ function BookingPage() {
     guests: 2,
     note: "",
   });
+
+  const handleGoBack = () => {
+    const restaurantId = params.get("nhaHang");
+    if (restaurantId) {
+      navigate(`/nha-hang/${restaurantId}`);
+      return;
+    }
+
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/");
+  };
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -63,6 +79,11 @@ function BookingPage() {
   return (
     <Stack spacing={3}>
       <SectionHeader title="Đặt bàn" description="Hoàn tất thông tin để giữ chỗ nhanh chóng tại nhà hàng bạn yêu thích." />
+      <Stack direction="row" justifyContent="flex-start">
+        <CustomButton onClick={handleGoBack} variant="outlined">
+          Quay lại
+        </CustomButton>
+      </Stack>
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 7 }}>
           <CustomCard>

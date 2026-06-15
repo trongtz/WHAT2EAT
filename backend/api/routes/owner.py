@@ -101,6 +101,7 @@ def get_owner_reviews(
             "id": review.review_id,
             "review_id": review.review_id,
             "restaurant_id": review.restaurant_id,
+            "restaurant_name": review.restaurant.name if review.restaurant else "Nhà hàng",
             "customer_id": review.customer_id,
             "rating": review.rating,
             "comment": review.comment,

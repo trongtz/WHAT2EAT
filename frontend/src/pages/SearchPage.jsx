@@ -51,9 +51,19 @@ function SearchPage() {
     setLoading(true);
     setError("");
     try {
-      const [data] = await Promise.all([restaurantService.getRestaurants(currentFilters), loadFavorites()]);
+      const data = await restaurantService.getRestaurants(currentFilters);
       setRestaurants(data);
       setSearchParams(currentFilters);
+
+      try {
+        await loadFavorites();
+      } catch (favoriteError) {
+        // Favorites only enhance the UI; don't block search results if auth is stale.
+        setFavoriteIds([]);
+        if (!favoriteError.message?.toLowerCase?.().includes("token")) {
+          setError(favoriteError.message);
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
