@@ -227,6 +227,15 @@ def passes_hard_constraints(restaurant: Restaurant, intent: Any, *, db: Session 
         for keyword in ["pho", "bun", "hu tieu", "lau", "canh", "mi", "sup", "soup", "bo kho"]
     ):
         return False
+    if "hot_food" in preference_tags and not any(
+        _contains_alias(normalized_text, keyword)
+        for keyword in ["pho", "bun", "hu tieu", "lau", "chao", "mi", "sup", "soup", "bo kho", "banh cuon nong", "com", "am bung"]
+    ):
+        return False
+    if "hot_food" in preference_tags:
+        identity_text = restaurant_identity_text(restaurant)
+        if _is_beverage_first_venue(identity_text) and not _has_meal_identity(identity_text):
+            return False
 
     requested_districts = set(intent_value(intent, "districts", []) or [])
     restaurant_district = extract_district_slug_from_text(restaurant.address)

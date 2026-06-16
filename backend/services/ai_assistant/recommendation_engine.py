@@ -447,6 +447,7 @@ def _preference_score(intent: Any, search_text: str) -> tuple[float, str]:
         "quick_service": ["an nhanh", "phuc vu nhanh", "len mon nhanh", "can tin", "com", "banh mi"],
         "comfort_food": ["com", "pho", "bun", "lau", "mi", "am bung"],
         "cooling_food": ["tra sua", "nuoc", "kem", "salad", "cafe", "giai nhiet"],
+        "hot_food": ["pho", "bun", "hu tieu", "lau", "chao", "mi", "sup", "soup", "bo kho", "banh cuon nong"],
         "vegetarian_option": ["chay", "healthy", "salad", "rau", "vegetarian"],
         "kid_friendly": ["tre em", "gia dinh", "kids"],
         "group_work": ["wifi", "o cam", "hoc nhom", "lam viec", "meeting"],
@@ -462,6 +463,7 @@ def _preference_score(intent: Any, search_text: str) -> tuple[float, str]:
         "quick_service": "Phù hợp nhu cầu ăn nhanh",
         "comfort_food": "Hợp kiểu comfort food dễ ăn",
         "cooling_food": "Có lựa chọn mát và dễ dùng khi trời nóng",
+        "hot_food": "Ưu tiên món nóng, hợp lúc trời mưa hoặc muốn ăn ấm bụng",
         "vegetarian_option": "Có lựa chọn phù hợp người ăn chay",
         "kid_friendly": "Phù hợp nhóm có trẻ em",
         "group_work": "Phù hợp ngồi làm việc nhóm",
@@ -475,7 +477,7 @@ def _preference_score(intent: Any, search_text: str) -> tuple[float, str]:
         if tag in patterns_by_tag and any(_contains_alias(normalized, pattern) for pattern in patterns_by_tag[tag])
     ]
     if not hits:
-        if any(tag in requested_tags for tag in ["healthy", "light_meal", "vegetarian_option", "cooling_food"]):
+        if any(tag in requested_tags for tag in ["healthy", "light_meal", "vegetarian_option", "cooling_food", "hot_food"]):
             return -12.0, ""
         return 0.0, ""
     return min(18.0, 6.0 + len(hits) * 4.0), ". ".join(reason_by_tag[tag] for tag in hits[:2])

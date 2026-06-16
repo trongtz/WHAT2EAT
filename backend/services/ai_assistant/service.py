@@ -68,6 +68,7 @@ class AIAssistantService:
                 agent_response["conversation_mode"] = conversation_mode
                 agent_response["context_used"] = {
                     "previous_query": conversation_context["previous_query"],
+                    "previous_intent": conversation_context.get("previous_intent"),
                     "previous_result_ids": conversation_context["previous_result_ids"],
                     "use_previous_context": conversation_context["use_previous_context"],
                     "avoid_repeated_results": conversation_context["avoid_repeated_results"],
@@ -85,6 +86,7 @@ class AIAssistantService:
                 "conversation_mode": conversation_mode,
                 "context_used": {
                     "previous_query": conversation_context["previous_query"],
+                    "previous_intent": conversation_context.get("previous_intent"),
                     "previous_result_ids": conversation_context["previous_result_ids"],
                     "use_previous_context": False,
                     "avoid_repeated_results": False,
@@ -95,10 +97,18 @@ class AIAssistantService:
             mode_name not in {"new_search", "small_talk"} and conversation_context["use_previous_context"]
         )
         if use_previous_context:
-            intent = extract_intent(query, previous_query=conversation_context["previous_query"])
+            intent = extract_intent(
+                query,
+                previous_query=conversation_context["previous_query"],
+                previous_intent=conversation_context.get("previous_intent"),
+            )
         else:
             intent = base_intent
-        intent = apply_conversation_memory(intent, conversation_context["recent_user_queries"])
+        intent = apply_conversation_memory(
+            intent,
+            conversation_context["recent_user_queries"],
+            conversation_context.get("recent_user_intents"),
+        )
         intent = _apply_negative_overrides(intent)
         filters_applied = filters_from_intent(intent)
         radius_km = parse_radius_km_from_query(query) if latitude is not None and longitude is not None else None
@@ -113,6 +123,7 @@ class AIAssistantService:
             direct_response["intent"] = intent_to_dict(intent)
             direct_response["context_used"] = {
                 "previous_query": conversation_context["previous_query"],
+                "previous_intent": conversation_context.get("previous_intent"),
                 "previous_result_ids": conversation_context["previous_result_ids"],
                 "use_previous_context": conversation_context["use_previous_context"],
                 "avoid_repeated_results": conversation_context["avoid_repeated_results"],
@@ -193,6 +204,7 @@ class AIAssistantService:
         response["conversation_mode"] = conversation_mode
         response["context_used"] = {
             "previous_query": conversation_context["previous_query"],
+            "previous_intent": conversation_context.get("previous_intent"),
             "previous_result_ids": conversation_context["previous_result_ids"],
             "use_previous_context": use_previous_context,
             "avoid_repeated_results": conversation_context["avoid_repeated_results"],

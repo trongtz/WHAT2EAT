@@ -90,7 +90,7 @@ OCCASION_PATTERNS = {
 
 WEATHER_PATTERNS = {
     "troi_mua": ["troi mua", "mua", "tranh mua", "tranh lanh"],
-    "troi_nong": ["nong", "mat me", "giai nhiet"],
+    "troi_nong": ["troi nong", "oi buc", "nong nuc", "mat me", "giai nhiet"],
 }
 
 BUDGET_PATTERNS = {
@@ -108,6 +108,7 @@ PREFERENCE_PATTERNS = {
     "quick_service": ["an nhanh", "phuc vu nhanh", "len mon nhanh", "mang di"],
     "comfort_food": ["comfort food", "am bung", "de chiu"],
     "cooling_food": ["lam mat", "giai nhiet", "mat co the"],
+    "hot_food": ["mon nong", "do nong", "an nong", "nong hoi", "am nong"],
     "vegetarian_option": ["nguoi an chay", "co an chay", "mon chay"],
     "kid_friendly": ["tre em", "kids", "ghe tre em"],
     "group_work": ["lam viec nhom", "hoc nhom", "meeting nhom"],
@@ -400,6 +401,13 @@ def parse_query_heuristically(query: str) -> QueryIntent:
         preference_tags = unique_preserve_order([*preference_tags, "cooling_food"])
     if "troi_mua" in weather_tags:
         preference_tags = unique_preserve_order([*preference_tags, "comfort_food"])
+    hot_food_positive_phrases = ["mon nong", "do nong", "an nong", "nong hoi", "am nong"]
+    hot_food_negative_phrases = ["khong an mon nong", "khong an do nong", "khong muon an mon nong", "khong muon an do nong"]
+    if any(phrase in normalized for phrase in hot_food_positive_phrases) and not any(
+        phrase in normalized for phrase in hot_food_negative_phrases
+    ):
+        preference_tags = unique_preserve_order([*preference_tags, "hot_food", "comfort_food"])
+        weather_tags = [tag for tag in weather_tags if tag != "troi_nong"]
     walking_only = any(phrase in normalized for phrase in ["di bo", "pham vi di bo", "walking"])
     conflicts = _detect_conflicts(normalized, price_max, budget, preference_tags, walking_only)
 
@@ -481,6 +489,11 @@ def _parse_price(normalized_text: str) -> tuple[int | None, int | None, str | No
     if remaining_budget_match:
         high = _normalize_price_number(remaining_budget_match.group(2), remaining_budget_match.group(3))
         return None, high, None
+
+    approximate_budget_match = re.search(r"(tam|khoang)\s*(\d{2,3})\s*(k|000)?", normalized_text)
+    if approximate_budget_match:
+        target = _normalize_price_number(approximate_budget_match.group(2), approximate_budget_match.group(3))
+        return None, int(target * 1.2), None
 
     over_match = re.search(r"(tren|tu)\s*(\d{2,3})\s*(k|000)?", normalized_text)
     if over_match:

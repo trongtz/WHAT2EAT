@@ -128,6 +128,7 @@ def _build_intent_prefix(intent: Any) -> str:
         "quick_service": "phục vụ nhanh",
         "comfort_food": "comfort food",
         "cooling_food": "món giúp giải nhiệt",
+        "hot_food": "món nóng",
         "vegetarian_option": "lựa chọn cho người ăn chay",
         "kid_friendly": "chỗ phù hợp trẻ em",
         "group_work": "chỗ hợp làm việc nhóm",

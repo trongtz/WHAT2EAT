@@ -54,10 +54,14 @@ MODE_FOLLOW_UP_CUES = {
     "dung goi y",
     "it pho bien hon",
     "khac nua",
+    "danh sach vua roi",
+    "vua roi",
 }
 MODE_RESTAURANT_CUES = {
     "quan nay",
     "quan do",
+    "thong tin quan",
+    "xem thong tin",
     "xem review",
     "review quan",
     "luu quan",
@@ -232,10 +236,10 @@ def _heuristic_mode(
         return {"mode": "booking_flow", "reason": "Booking or availability request.", "source": "heuristic"}
     if _looks_like_restaurant_focus(normalized_query):
         return {"mode": "restaurant_focus", "reason": "Specific restaurant follow-up.", "source": "heuristic"}
-    if _looks_like_new_search(normalized_query, current_intent):
-        return {"mode": "new_search", "reason": "Fresh restaurant search request.", "source": "heuristic"}
     if has_previous_results and _looks_like_follow_up_search(normalized_query):
         return {"mode": "follow_up_search", "reason": "Refinement of previous search results.", "source": "heuristic"}
+    if _looks_like_new_search(normalized_query, current_intent):
+        return {"mode": "new_search", "reason": "Fresh restaurant search request.", "source": "heuristic"}
     if _looks_like_small_talk(normalized_query):
         return {"mode": "small_talk", "reason": "Greeting or small talk.", "source": "heuristic"}
     if has_previous_query and len((intent_value(current_intent, "keywords", []) or [])) <= 3:
@@ -255,6 +259,10 @@ def _guard_mode_selection(
         return {"mode": "new_search", "reason": "Guardrail: fresh search while pending flow.", "source": "guardrail"}
     if openai_mode["mode"] == "unknown":
         return heuristic_mode
+    if heuristic_mode["mode"] == "restaurant_focus" and openai_mode["mode"] != "restaurant_focus":
+        return heuristic_mode
+    if heuristic_mode["mode"] in {"follow_up_search", "restaurant_focus"} and openai_mode["mode"] == "new_search":
+        return heuristic_mode
     if heuristic_mode["mode"] == "new_search" and openai_mode["mode"] in {"booking_flow", "restaurant_focus"}:
         if not _looks_like_booking_followup(normalized_query) and not _looks_like_restaurant_focus(normalized_query):
             return heuristic_mode
@@ -262,6 +270,8 @@ def _guard_mode_selection(
 
 
 def _looks_like_new_search(normalized_query: str, current_intent: Any) -> bool:
+    if _looks_like_follow_up_search(normalized_query) or _looks_like_restaurant_focus(normalized_query):
+        return False
     heuristic_intent = parse_query_heuristically(normalized_query)
     if any(
         [
@@ -313,7 +323,8 @@ def _looks_like_small_talk(normalized_query: str) -> bool:
 
 def _parse_restaurant_index(normalized_query: str) -> int | None:
     patterns = [
-        r"quan\s+(?:thu|so)?\s*(\d+)",
+        r"quan\s+(?:thu|so)\s*(\d+)",
+        r"(?:xem|chon|dat|doi sang|chuyen sang)\s+quan\s+(\d+)",
         r"\bso\s*(\d+)\b",
         r"#\s*(\d+)",
     ]

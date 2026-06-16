@@ -13,6 +13,8 @@ from services.ai_assistant.recommend_imports import normalize_text, parse_query_
 CONTEXT_CUES = {
     "gan hon",
     "re hon",
+    "hon di",
+    "hon nua",
     "duoi",
     "tren",
     "quan khac",
@@ -27,6 +29,9 @@ CONTEXT_CUES = {
     "toi vua an com roi",
     "ghet an cay",
     "it pho bien hon",
+    "danh sach vua roi",
+    "vua roi",
+    "xem thong tin",
 }
 
 REPEAT_AVOIDANCE_CUES = {
@@ -49,14 +54,17 @@ def get_conversation_context(db: Session, session_id: UUID | None, query: str, c
     session = _get_session(db, session_id)
     previous_user_message = _get_previous_user_message(db, session_id)
     recent_user_queries = _get_recent_user_queries(db, session_id)
+    recent_user_intents = _get_recent_user_intents(db, session_id)
     previous_result_ids = _get_previous_result_ids(db, session_id)
     normalized_query = normalize_text(query)
 
     return {
         "session": session,
         "previous_query": previous_user_message.content if previous_user_message else None,
+        "previous_intent": _extract_message_intent(previous_user_message),
         "previous_result_ids": previous_result_ids,
         "recent_user_queries": recent_user_queries,
+        "recent_user_intents": recent_user_intents,
         "use_previous_context": _should_use_previous_context(normalized_query, current_intent, previous_user_message),
         "avoid_repeated_results": any(cue in normalized_query for cue in REPEAT_AVOIDANCE_CUES),
         "context_summary": session.context_summary if session else None,
@@ -89,8 +97,10 @@ def _empty_context() -> dict[str, Any]:
     return {
         "session": None,
         "previous_query": None,
+        "previous_intent": None,
         "previous_result_ids": [],
         "recent_user_queries": [],
+        "recent_user_intents": [],
         "use_previous_context": False,
         "avoid_repeated_results": False,
         "context_summary": None,
@@ -118,6 +128,13 @@ def _get_previous_user_message(db: Session, session_id: UUID) -> AIChatMessage |
         )
     except Exception:
         return None
+
+
+def _extract_message_intent(message: AIChatMessage | None) -> dict[str, Any] | None:
+    if not message:
+        return None
+    extracted_intent = getattr(message, "extracted_intent", None)
+    return extracted_intent if isinstance(extracted_intent, dict) else None
 
 
 def _get_previous_result_ids(db: Session, session_id: UUID) -> list[str]:
@@ -154,16 +171,63 @@ def _get_recent_user_queries(db: Session, session_id: UUID) -> list[str]:
     return [message.content for message in reversed(messages)]
 
 
-def apply_conversation_memory(intent: Any, recent_user_queries: list[str]) -> Any:
-    if not recent_user_queries:
+def _get_recent_user_intents(db: Session, session_id: UUID) -> list[dict[str, Any]]:
+    try:
+        messages = (
+            db.query(AIChatMessage)
+            .filter(AIChatMessage.session_id == session_id, AIChatMessage.role == "user")
+            .order_by(AIChatMessage.created_at.desc())
+            .limit(8)
+            .all()
+        )
+    except Exception:
+        return []
+    intents: list[dict[str, Any]] = []
+    for message in reversed(messages):
+        if isinstance(message.extracted_intent, dict):
+            intents.append(message.extracted_intent)
+    return intents
+
+
+def apply_conversation_memory(
+    intent: Any,
+    recent_user_queries: list[str],
+    recent_user_intents: list[dict[str, Any]] | None = None,
+) -> Any:
+    if not recent_user_queries and not recent_user_intents:
         return intent
 
-    for query in recent_user_queries:
-        memory_intent = parse_query_heuristically(query)
-        for key in ("excluded_cuisines", "excluded_keywords", "preference_tags"):
+    recent_user_intents = recent_user_intents or []
+    stable_preference_tags = {
+        "healthy",
+        "vegetarian_option",
+        "kid_friendly",
+        "group_work",
+        "outdoor_seating",
+        "parking",
+        "quick_service",
+        "less_popular",
+    }
+
+    for index, query in enumerate(recent_user_queries):
+        memory_intent = recent_user_intents[index] if index < len(recent_user_intents) else parse_query_heuristically(query).to_dict()
+        for key in ("excluded_cuisines", "excluded_keywords"):
             previous_values = intent_value(intent, key, []) or []
             memory_values = intent_value(memory_intent, key, []) or []
             _set_intent_value(intent, key, unique_preserve_order([*previous_values, *memory_values]))
+        if _is_profile_like_query(query, memory_intent):
+            previous_preferences = intent_value(intent, "preference_tags", []) or []
+            memory_preferences = [
+                tag
+                for tag in (intent_value(memory_intent, "preference_tags", []) or [])
+                if tag in stable_preference_tags
+            ]
+            if memory_preferences:
+                _set_intent_value(
+                    intent,
+                    "preference_tags",
+                    unique_preserve_order([*previous_preferences, *memory_preferences]),
+                )
     return intent
 
 
@@ -172,6 +236,36 @@ def _set_intent_value(intent: Any, key: str, value: Any) -> None:
         intent[key] = value
     else:
         setattr(intent, key, value)
+
+
+def _is_profile_like_query(query: str, memory_intent: dict[str, Any]) -> bool:
+    normalized = normalize_text(query)
+    profile_cues = {
+        "toi ghet",
+        "toi khong an",
+        "khong thich",
+        "toi thich",
+        "hay an",
+        "thuong an",
+        "dua tren so thich",
+        "theo so thich",
+    }
+    if any(cue in normalized for cue in profile_cues):
+        return True
+    preference_tags = set(intent_value(memory_intent, "preference_tags", []) or [])
+    return bool(
+        preference_tags
+        & {
+            "healthy",
+            "vegetarian_option",
+            "kid_friendly",
+            "group_work",
+            "outdoor_seating",
+            "parking",
+            "quick_service",
+            "less_popular",
+        }
+    )
 
 
 def _should_use_previous_context(normalized_query: str, current_intent: Any, previous_user_message: AIChatMessage | None) -> bool:

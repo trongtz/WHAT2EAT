@@ -11,25 +11,71 @@ from services.ai_assistant.openai_intent_parser import (
 from services.ai_assistant.recommend_imports import normalize_text, parse_query_heuristically, tokenize, unique_preserve_order
 
 
-def extract_intent(query: str, previous_query: str | None = None) -> Any:
+MERGEABLE_LIST_KEYS = {
+    "keywords",
+    "cuisines",
+    "districts",
+    "ambience_tags",
+    "amenity_tags",
+    "occasion_tags",
+    "weather_tags",
+    "excluded_cuisines",
+    "excluded_keywords",
+    "preference_tags",
+    "dish_terms",
+    "conflicts",
+    "notes",
+}
+TOPIC_SWITCH_CLEAR_FIELDS = {
+    "keywords",
+    "cuisines",
+    "ambience_tags",
+    "amenity_tags",
+    "occasion_tags",
+    "weather_tags",
+    "preference_tags",
+    "dish_terms",
+}
+
+
+def extract_intent(
+    query: str,
+    previous_query: str | None = None,
+    previous_intent: Any = None,
+) -> Any:
+    intent: Any
+    local_intent = parse_query_heuristically(query) if parse_query_heuristically else _fallback_intent(query)
+    previous_context_intent = previous_intent
+    if previous_context_intent is None and previous_query:
+        previous_context_intent = parse_query_heuristically(previous_query) if parse_query_heuristically else _fallback_intent(previous_query)
     if should_use_openai_intent_parser():
         try:
-            parsed_intent = parse_intent_with_openai(query, previous_query=previous_query)
-            return _apply_general_intent_safeguards(_merge_local_heuristics(parsed_intent, parse_query_heuristically(query)))
+            parsed_intent = parse_intent_with_openai(
+                query,
+                previous_query=previous_query,
+                previous_intent=intent_to_dict(previous_context_intent) if previous_context_intent else None,
+            )
+            intent = _merge_local_heuristics(parsed_intent, local_intent)
+            if previous_query and not _has_explicit_cuisine_marker(local_intent) and not (intent_value(local_intent, "dish_terms", []) or []):
+                intent["cuisines"] = []
+            if previous_context_intent:
+                intent = _merge_intent_like(previous_context_intent, intent)
+            return _apply_general_intent_safeguards(intent)
         except OpenAIIntentParserError:
             pass
 
-    intent = parse_query_heuristically(query) if parse_query_heuristically else _fallback_intent(query)
-    if not previous_query:
+    intent = local_intent
+    if isinstance(intent, dict):
+        intent["context_action"] = _infer_context_action(query, local_intent, previous_context_intent)
+        intent["clear_fields"] = _default_clear_fields_for_action(intent["context_action"], intent)
+    else:
+        intent.context_action = _infer_context_action(query, local_intent, previous_context_intent)
+        intent.clear_fields = _default_clear_fields_for_action(intent.context_action, intent)
+
+    if not previous_context_intent:
         return _apply_general_intent_safeguards(intent)
 
-    previous_intent = parse_query_heuristically(previous_query) if parse_query_heuristically else _fallback_intent(previous_query)
-    if hasattr(intent, "merged_with"):
-        return _apply_general_intent_safeguards(intent.merged_with(previous_intent))
-
-    merged = dict(previous_intent)
-    merged.update({key: value for key, value in intent.items() if value not in (None, [], "")})
-    return _apply_general_intent_safeguards(merged)
+    return _apply_general_intent_safeguards(_merge_intent_like(previous_context_intent, intent))
 
 
 def intent_value(intent: Any, key: str, default: Any = None) -> Any:
@@ -40,7 +86,11 @@ def intent_value(intent: Any, key: str, default: Any = None) -> Any:
 
 def intent_to_dict(intent: Any) -> dict[str, Any]:
     if hasattr(intent, "to_dict"):
-        return intent.to_dict()
+        payload = intent.to_dict()
+        for extra_key in ("context_action", "clear_fields"):
+            if hasattr(intent, extra_key):
+                payload[extra_key] = getattr(intent, extra_key)
+        return payload
     if isinstance(intent, dict):
         return intent
     return {}
@@ -70,6 +120,8 @@ def filters_from_intent(intent: Any) -> dict[str, Any]:
 
 def _fallback_intent(query: str) -> dict[str, Any]:
     return {
+        "context_action": "fresh_search",
+        "clear_fields": [],
         "keywords": tokenize(query),
         "cuisines": [],
         "districts": [],
@@ -93,6 +145,7 @@ def _fallback_intent(query: str) -> dict[str, Any]:
 
 def _merge_local_heuristics(openai_intent: dict[str, Any], local_intent: Any) -> dict[str, Any]:
     merged = dict(openai_intent)
+    merged["context_action"] = str(merged.get("context_action") or "fresh_search")
     broad_recommendation = _is_broad_recommendation(local_intent)
     keep_only_dish_filter = _should_keep_only_dish_filter(local_intent)
     if broad_recommendation:
@@ -139,6 +192,8 @@ def _merge_local_heuristics(openai_intent: dict[str, Any], local_intent: Any) ->
         if merged.get(key) is None:
             merged[key] = intent_value(local_intent, key)
     merged["walking_only"] = bool(merged.get("walking_only") or intent_value(local_intent, "walking_only", False))
+    if not merged.get("clear_fields"):
+        merged["clear_fields"] = _default_clear_fields_for_action(merged["context_action"], merged)
     _sanitize_merged_intent(merged, local_intent)
     return merged
 
@@ -213,6 +268,9 @@ def _should_keep_only_dish_filter(local_intent: Any) -> bool:
     local_dish_terms = intent_value(local_intent, "dish_terms", []) or []
     if not local_dish_terms:
         return False
+    normalized_dishes = {normalize_text(dish) for dish in local_dish_terms}
+    if normalized_dishes & {"ca phe", "tra sua"}:
+        return False
     return not _has_explicit_cuisine_marker(local_intent)
 
 
@@ -279,14 +337,130 @@ def _sanitize_merged_intent(merged: dict[str, Any], local_intent: Any) -> None:
         )
 
 
+def _infer_context_action(query: str, local_intent: Any, previous_intent: Any) -> str:
+    if previous_intent is None:
+        return "fresh_search"
+    normalized = normalize_text(query)
+    if _looks_like_topic_switch(normalized, local_intent, previous_intent):
+        return "switch_topic"
+    if _looks_like_refine_previous(normalized, local_intent):
+        return "refine_previous"
+    return "fresh_search"
+
+
+def _looks_like_refine_previous(normalized_query: str, local_intent: Any) -> bool:
+    refine_cues = {
+        "re hon",
+        "gan hon",
+        "xa hon",
+        "them quan",
+        "co quan nao",
+        "khac nua",
+        "vua roi",
+        "danh sach vua roi",
+        "duoi",
+        "tren",
+        "tam",
+        "gan binh thanh hon",
+    }
+    if any(cue in normalized_query for cue in refine_cues):
+        return True
+    has_core_topic = bool((intent_value(local_intent, "cuisines", []) or []) or (intent_value(local_intent, "dish_terms", []) or []))
+    changed_scalar = any(intent_value(local_intent, key) is not None for key in ("price_min", "price_max", "group_size", "open_now"))
+    changed_location = bool(intent_value(local_intent, "districts", []) or [])
+    return not has_core_topic and (changed_scalar or changed_location)
+
+
+def _looks_like_topic_switch(normalized_query: str, local_intent: Any, previous_intent: Any) -> bool:
+    switch_cues = {
+        "thoi doi y",
+        "doi y roi",
+        "khong an",
+        "khong muon an",
+        "khong an nua",
+        "khong goi y",
+        "doi mon",
+        "mon khac",
+        "thich sushi",
+        "them sushi",
+        "khac di",
+    }
+    if any(cue in normalized_query for cue in switch_cues):
+        return True
+    current_topics = {
+        *(normalize_text(item) for item in (intent_value(local_intent, "cuisines", []) or [])),
+        *(normalize_text(item) for item in (intent_value(local_intent, "dish_terms", []) or [])),
+    }
+    previous_topics = {
+        *(normalize_text(item) for item in (intent_value(previous_intent, "cuisines", []) or [])),
+        *(normalize_text(item) for item in (intent_value(previous_intent, "dish_terms", []) or [])),
+    }
+    if current_topics and previous_topics and current_topics.isdisjoint(previous_topics):
+        return True
+    return False
+
+
+def _default_clear_fields_for_action(action: str, intent: Any) -> list[str]:
+    if action != "switch_topic":
+        return []
+    clear_fields = set(TOPIC_SWITCH_CLEAR_FIELDS)
+    if intent_value(intent, "excluded_cuisines", []) or intent_value(intent, "excluded_keywords", []) or intent_value(intent, "preference_tags", []):
+        clear_fields.discard("preference_tags")
+    return sorted(clear_fields)
+
+
 def _apply_general_intent_safeguards(intent: Any) -> Any:
+    normalized = normalize_text(intent_value(intent, "original_query", ""))
     if not _should_keep_only_dish_filter(intent):
-        return intent
-    if isinstance(intent, dict):
+        pass
+    elif isinstance(intent, dict):
         intent["cuisines"] = []
-        return intent
-    intent.cuisines = []
+    else:
+        intent.cuisines = []
+    if any(phrase in normalized for phrase in ["khong an mon nong", "khong an do nong", "khong muon an mon nong", "khong muon an do nong"]):
+        current_preferences = intent_value(intent, "preference_tags", []) or []
+        filtered_preferences = [tag for tag in current_preferences if tag != "hot_food"]
+        current_excluded = intent_value(intent, "excluded_keywords", []) or []
+        if isinstance(intent, dict):
+            intent["preference_tags"] = filtered_preferences
+            intent["excluded_keywords"] = unique_preserve_order([*current_excluded, "do nong"])
+        else:
+            intent.preference_tags = filtered_preferences
+            intent.excluded_keywords = unique_preserve_order([*current_excluded, "do nong"])
     return intent
+
+
+def _merge_intent_like(previous_intent: Any, current_intent: Any) -> Any:
+    previous_dict = intent_to_dict(previous_intent)
+    current_dict = intent_to_dict(current_intent)
+    if not current_dict:
+        return current_intent
+    action = str(current_dict.get("context_action") or "refine_previous")
+    clear_fields = set(current_dict.get("clear_fields") or [])
+    if action == "fresh_search":
+        merged: dict[str, Any] = {}
+    else:
+        merged = dict(previous_dict)
+        if action == "switch_topic":
+            for field in clear_fields or TOPIC_SWITCH_CLEAR_FIELDS:
+                if field in MERGEABLE_LIST_KEYS:
+                    merged[field] = []
+                else:
+                    merged[field] = None
+    for key, value in current_dict.items():
+        if key in MERGEABLE_LIST_KEYS:
+            if value:
+                merged[key] = unique_preserve_order([*(merged.get(key) or []), *value])
+            else:
+                merged[key] = merged.get(key) or []
+            continue
+        if value not in (None, "", []):
+            merged[key] = value
+        elif key not in merged:
+            merged[key] = value
+    merged["context_action"] = action
+    merged["clear_fields"] = sorted(clear_fields)
+    return merged
 
 
 def _prefer_local_price_when_openai_drops_k_suffix(merged: dict[str, Any], local_intent: Any, key: str) -> None:
