@@ -62,7 +62,7 @@ CUISINE_PATTERNS = {
 AMBIENCE_PATTERNS = {
     "yen_tinh": ["yen tinh", "thu gian", "nhe nhang", "it on", "doc sach", "lam viec"],
     "am_cung": ["am cung", "cozy", "nho xinh", "de thuong", "ap ap"],
-    "lang_man": ["hen ho", "lang man", "romantic", "anniversary", "dating"],
+    "lang_man": ["hen ho", "lang man", "romantic", "anniversary", "dating", "date night", "gap mat lan dau"],
     "view_dep": ["view dep", "song ao", "rooftop", "skyline", "ngam canh"],
     "sang_trong": ["sang trong", "fine dining", "cao cap", "luxury"],
     "dong_vui": ["dong vui", "nhon nhip", "vui ve", "party"],
@@ -71,7 +71,7 @@ AMBIENCE_PATTERNS = {
 AMENITY_PATTERNS = {
     "do_xe": ["do xe", "giu xe", "bai xe", "parking"],
     "o_cam": ["o cam", "cam sac", "sac laptop", "work friendly"],
-    "wifi": ["wifi", "internet", "mang manh"],
+    "wifi": ["wifi", "internet", "mang manh", "work"],
     "phong_rieng": ["phong rieng", "vip", "private room"],
     "ngoai_troi": ["ngoai troi", "san vuon", "ban cong", "terrace"],
     "may_lanh": ["may lanh", "lanh", "indoor"],
@@ -79,12 +79,12 @@ AMENITY_PATTERNS = {
 }
 
 OCCASION_PATTERNS = {
-    "hen_ho": ["hen ho", "dating", "lang man", "couple"],
+    "hen_ho": ["hen ho", "dating", "lang man", "couple", "date night", "gap mat lan dau"],
     "gia_dinh": ["gia dinh", "tre em", "kids", "bo me"],
-    "ban_be": ["ban be", "tu tap", "hop mat", "gap go"],
-    "lam_viec": ["lam viec", "meeting", "hoc bai", "workspace"],
+    "ban_be": ["ban be", "tu tap", "hop mat", "gap go", "team dinner"],
+    "lam_viec": ["lam viec", "meeting", "hoc bai", "workspace", "work"],
     "an_dem": ["an dem", "khuya", "late night"],
-    "nhom_dong": ["nhom", "dong nguoi", "team", "party", "sinh nhat"],
+    "nhom_dong": ["nhom", "dong nguoi", "team", "party", "sinh nhat", "team dinner"],
     "sinh_nhat": ["sinh nhat", "birthday"],
 }
 
@@ -94,21 +94,21 @@ WEATHER_PATTERNS = {
 }
 
 BUDGET_PATTERNS = {
-    "binh_dan": ["gia re", "binh dan", "sinh vien", "hssv", "tiet kiem"],
-    "trung_binh": ["vua tui tien", "gia hop ly", "tam trung"],
+    "binh_dan": ["gia re", "binh dan", "sinh vien", "hssv", "tiet kiem", "gia ok", "budget ok"],
+    "trung_binh": ["vua tui tien", "gia hop ly", "tam trung", "khong qua dat"],
     "cao_cap": ["sang trong", "cao cap", "fine dining", "xin xo"],
 }
 
 PREFERENCE_PATTERNS = {
-    "easy_to_eat": ["de an", "ngon ngon", "on khong", "chan an", "khong biet an gi", "co gi an"],
-    "light_meal": ["an nhe", "mon nhe", "nhe bung", "vua an com", "an com roi", "chan an"],
+    "easy_to_eat": ["de an", "ngon ngon", "on khong", "chan an", "khong biet an gi", "co gi an", "an toan", "quen thuoc"],
+    "light_meal": ["an nhe", "mon nhe", "nhe bung", "khong qua nang bung", "vua an com", "an com roi", "chan an"],
     "healthy": ["healthy", "eat clean", "it calo", "low calorie", "tot cho suc khoe"],
     "filling": ["no bung", "that no", "an no"],
     "less_popular": ["it pho bien", "la la", "quan moi", "doi vi"],
     "quick_service": ["an nhanh", "phuc vu nhanh", "len mon nhanh", "mang di"],
     "comfort_food": ["comfort food", "am bung", "de chiu"],
     "cooling_food": ["lam mat", "giai nhiet", "mat co the"],
-    "hot_food": ["mon nong", "do nong", "an nong", "nong hoi", "am nong"],
+    "hot_food": ["mon nong", "do nong", "an nong", "nong hoi", "am nong", "something hot"],
     "vegetarian_option": ["nguoi an chay", "co an chay", "mon chay"],
     "kid_friendly": ["tre em", "kids", "ghe tre em"],
     "group_work": ["lam viec nhom", "hoc nhom", "meeting nhom"],
@@ -490,6 +490,11 @@ def _parse_price(normalized_text: str) -> tuple[int | None, int | None, str | No
         high = _normalize_price_number(remaining_budget_match.group(2), remaining_budget_match.group(3))
         return None, high, None
 
+    budget_match = re.search(r"(budget|ngan sach|khoang|tam)\s*(\d{2,3})\s*(k|000)?", normalized_text)
+    if budget_match:
+        high = _normalize_price_number(budget_match.group(2), budget_match.group(3))
+        return None, high, None
+
     approximate_budget_match = re.search(r"(tam|khoang)\s*(\d{2,3})\s*(k|000)?", normalized_text)
     if approximate_budget_match:
         target = _normalize_price_number(approximate_budget_match.group(2), approximate_budget_match.group(3))
@@ -558,7 +563,17 @@ def _extract_excluded_keywords(normalized_text: str) -> list[str]:
     excluded: list[str] = []
     if any(
         phrase in normalized_text
-        for phrase in ["ghet an cay", "khong an cay", "khong cay", "it cay", "khong phai mi cay", "dung goi y mi cay"]
+        for phrase in [
+            "ghet an cay",
+            "khong an cay",
+            "khong cay",
+            "it cay",
+            "khong spicy",
+            "khong spicy qua",
+            "not spicy",
+            "khong phai mi cay",
+            "dung goi y mi cay",
+        ]
     ):
         excluded.extend(["cay", "mi cay"])
     if any(phrase in normalized_text for phrase in ["vua an com", "an com roi", "khong an com"]):
@@ -606,6 +621,10 @@ def _detect_conflicts(
         conflicts.append(
             f"Phạm vi đi bộ {radius_match.group(1)}km là khá xa; hệ thống giới hạn khoảng đi bộ thực tế ở 1.5km."
         )
+    if "yen tinh" in normalized_text and any(word in normalized_text for word in ["nao nhiet", "dong vui", "party"]):
+        conflicts.append("Yêu cầu vừa yên tĩnh vừa náo nhiệt khá mâu thuẫn; hệ thống sẽ ưu tiên không gian dễ nói chuyện.")
+    if "khong cay" in normalized_text and "mi cay" in normalized_text:
+        conflicts.append("Mì cay thường khó đáp ứng tiêu chí không cay; hệ thống sẽ ưu tiên món nước hoặc mì ít cay hơn.")
     return conflicts
 
 

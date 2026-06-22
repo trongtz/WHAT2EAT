@@ -24,6 +24,14 @@ class OpenAIIntentParserError(RuntimeError):
 
 ALLOWED_BUDGET_LABELS = {"binh_dan", "trung_binh", "kha_cao", "cao_cap"}
 ALLOWED_CONTEXT_ACTIONS = {"fresh_search", "refine_previous", "switch_topic"}
+ALLOWED_INTENT_TYPES = {
+    "restaurant_search",
+    "restaurant_followup",
+    "booking_or_agent",
+    "preference_update",
+    "unclear",
+    "out_of_domain",
+}
 ALLOWED_CLEAR_FIELDS = {
     "keywords",
     "cuisines",
@@ -47,10 +55,22 @@ INTENT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
+        "intent_type": {
+            "type": "string",
+            "enum": [
+                "restaurant_search",
+                "restaurant_followup",
+                "booking_or_agent",
+                "preference_update",
+                "unclear",
+                "out_of_domain",
+            ],
+        },
         "context_action": {
             "type": "string",
             "enum": ["fresh_search", "refine_previous", "switch_topic"],
         },
+        "clarification_message": {"type": ["string", "null"]},
         "clear_fields": {"type": "array", "items": {"type": "string"}},
         "keywords": {"type": "array", "items": {"type": "string"}},
         "cuisines": {"type": "array", "items": {"type": "string"}},
@@ -73,7 +93,9 @@ INTENT_SCHEMA = {
         "notes": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
+        "intent_type",
         "context_action",
+        "clarification_message",
         "clear_fields",
         "keywords",
         "cuisines",
@@ -124,12 +146,19 @@ def parse_intent_with_openai(
             "Choose context_action=switch_topic when the user changes craving/topic such as doi y, khong ... nua, them sushi, or wants a different cuisine/dish.",
             "When switching topic, use clear_fields to remove outdated fields from previous context such as cuisines, dish_terms, ambience_tags, amenity_tags, occasion_tags, weather_tags, and temporary preference_tags.",
             "When refining previous results, only set the fields the user is changing or adding; leave unrelated fields empty and do not clear them.",
+            "Choose intent_type=out_of_domain when the message is mainly not about food, restaurants, booking, favorites, reviews, or eating context.",
+            "Choose intent_type=unclear when the message is too short, meaningless, or lacks enough eating/restaurant context.",
+            "For unclear or out_of_domain, set clarification_message to a concise Vietnamese user-facing reply that gently redirects to restaurant/food needs.",
+            "For valid food/restaurant prompts, set clarification_message=null.",
+            "For contradictory constraints, keep intent_type as restaurant_search and add concise Vietnamese conflict notes instead of rejecting the prompt.",
         ],
         "query": query,
         "previous_query": previous_query,
         "previous_intent": previous_intent,
         "schema": {
+            "intent_type": "restaurant_search|restaurant_followup|booking_or_agent|preference_update|unclear|out_of_domain",
             "context_action": "fresh_search|refine_previous|switch_topic",
+            "clarification_message": "string|null",
             "clear_fields": ["string"],
             "keywords": ["string"],
             "cuisines": ["string"],
@@ -168,7 +197,9 @@ def _normalize_payload(payload: dict[str, Any], query: str) -> dict[str, Any]:
     return {
         "original_query": query,
         "normalized_query": normalize_text(query),
+        "intent_type": payload.get("intent_type") if payload.get("intent_type") in ALLOWED_INTENT_TYPES else "restaurant_search",
         "context_action": payload.get("context_action") if payload.get("context_action") in ALLOWED_CONTEXT_ACTIONS else "fresh_search",
+        "clarification_message": _optional_string(payload.get("clarification_message")),
         "clear_fields": _clear_fields(payload.get("clear_fields")),
         "keywords": _string_list(payload.get("keywords")) or tokenize(query),
         "cuisines": _canonical_string_list(payload.get("cuisines"), _canonical_map(CUISINE_PATTERNS)),
@@ -197,6 +228,11 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item or "").strip()]
+
+
+def _optional_string(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
 def _canonical_map(patterns_map: dict[str, list[str]]) -> dict[str, str]:

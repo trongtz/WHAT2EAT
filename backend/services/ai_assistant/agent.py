@@ -40,17 +40,20 @@ AVAILABILITY_CUES = {
     "con cho",
     "con ban",
     "con slot",
+    "slot",
     "du cho",
     "het cho",
     "kiem tra cho",
     "co cho",
+    "phu hop",
+    "di duoc",
 }
 CONFIRM_CUES = {"ok", "oke", "okay", "dong y", "xac nhan", "chot", "dat di", "dat luon"}
 DETAIL_CUES = {"quan thu", "quan so", "so ", "xem quan", "chon quan", "duoc do", "lay quan"}
 CANCEL_CUES = {"huy", "thoi", "khong dat nua", "bo qua", "cancel"}
 CHANGE_RESTAURANT_CUES = {"quan khac", "doi quan", "chon quan khac", "khac di", "doi sang", "chuyen sang"}
 MODIFY_CUES = {"doi", "sua", "thay", "thanh", "luc", "gio", "nguoi", "khach", "cho"}
-FAVORITE_ADD_CUES = {"yeu thich", "luu quan", "them vao yeu thich", "tha tim", "bam tim", "like quan"}
+FAVORITE_ADD_CUES = {"yeu thich", "luu quan", "luu vao yeu thich", "them vao yeu thich", "tha tim", "bam tim", "like quan"}
 FAVORITE_REMOVE_CUES = {"bo yeu thich", "xoa yeu thich", "bo tim", "unlike", "khong thich nua"}
 CHECKIN_CUES = {"checkin", "check-in", "toi da den", "toi dang o day", "check in"}
 SHOW_REVIEW_CUES = {"xem review", "xem danh gia", "co gi danh gia", "co review nao", "review gan day"}
@@ -139,7 +142,7 @@ def handle_agent_turn(
             conversation_context=conversation_context,
         )
 
-    is_booking = action["action"] in {"check_availability", "ask_clarification", "modify_pending_booking"}
+    is_booking = action["action"] in {"check_availability", "ask_clarification", "modify_pending_booking", "create_booking"}
     selected_restaurant = _resolve_restaurant_reference(
         db=db,
         query=query,
@@ -1162,6 +1165,8 @@ def _latest_recommended_restaurants(db: Session, session_id: UUID | None) -> lis
 def _validate_booking(db: Session, restaurant: Restaurant, reservation_time: datetime, guest_count: int) -> str | None:
     if restaurant.status != "APPROVED" or not restaurant.is_active:
         return f"{restaurant.name} hiện chưa nhận đặt bàn qua hệ thống."
+    if guest_count <= 0:
+        return "Số khách cần lớn hơn 0. Bạn nhập lại số người giúp mình nhé."
     minimum_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=30)
     if reservation_time <= minimum_time:
         return "Thời gian đặt bàn cần cách hiện tại ít nhất 30 phút. Bạn chọn giờ khác giúp mình nhé."
@@ -1219,7 +1224,8 @@ def _is_switch_restaurant_request(normalized_query: str) -> bool:
 
 def _parse_restaurant_index(normalized_query: str) -> int | None:
     patterns = [
-        r"quan\s+(?:thu|so)?\s*(\d+)",
+        r"quan\s+(?:thu|so)\s*(\d+)",
+        r"(?:xem|chon|dat|doi sang|chuyen sang|luu|danh gia|review)\s+quan\s+(\d+)",
         r"\bso\s*(\d+)\b",
         r"#\s*(\d+)",
     ]
@@ -1244,12 +1250,29 @@ def _parse_restaurant_index(normalized_query: str) -> int | None:
 
 
 def _parse_guest_count(normalized_query: str) -> int | None:
-    direct_match = re.search(r"(\d{1,2})\s*(?:nguoi|ng|khach)\b", normalized_query)
+    direct_match = re.search(r"(\d{1,3})\s*(?:nguoi|ng|khach)\b", normalized_query)
     if direct_match:
         return int(direct_match.group(1))
     seat_match = re.search(r"(?<!thu\s)(\d{1,2})\s*cho\b", normalized_query)
     if seat_match:
         return int(seat_match.group(1))
+    number_words = {
+        "mot": 1,
+        "hai": 2,
+        "ba": 3,
+        "bon": 4,
+        "tu": 4,
+        "nam": 5,
+        "sau": 6,
+        "bay": 7,
+        "tam": 8,
+        "chin": 9,
+        "muoi": 10,
+        "hai muoi": 20,
+    }
+    for word, value in sorted(number_words.items(), key=lambda item: len(item[0]), reverse=True):
+        if re.search(rf"\b{re.escape(word)}\s*(?:nguoi|ng|khach)\b", normalized_query):
+            return value
     return None
 
 
@@ -1305,7 +1328,8 @@ def _extract_checkin_note(query: str) -> str | None:
 
 
 def _parse_reservation_time(query: str) -> datetime | None:
-    normalized_query = normalize_text(query).replace(",", " ")
+    raw_query = str(query or "")
+    normalized_query = normalize_text(raw_query).replace(",", " ")
     time_match = re.search(r"\b(?:luc|vao)?\s*(\d{1,2})(?::|h)(\d{2})?\b", normalized_query)
     if not time_match:
         return None
@@ -1317,7 +1341,9 @@ def _parse_reservation_time(query: str) -> datetime | None:
         return None
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    date_match = re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b", normalized_query)
+    date_match = re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b", raw_query)
+    if not date_match:
+        date_match = re.search(r"\bngay\s+(\d{1,2})\s+thang\s+(\d{1,2})(?:\s+nam\s+(\d{2,4}))?\b", normalized_query)
     if date_match:
         day = int(date_match.group(1))
         month = int(date_match.group(2))

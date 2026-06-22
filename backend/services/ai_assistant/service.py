@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -43,6 +44,10 @@ class AIAssistantService:
         session_id=None,
         limit: int = 5,
     ) -> dict[str, Any]:
+        early_response = _build_prompt_guard_response(query)
+        if early_response:
+            return early_response
+
         latitude, longitude, location_anchor = _resolve_location_anchor(query, latitude, longitude)
         base_intent = extract_intent(query)
         conversation_context = get_conversation_context(db, session_id, query, base_intent)
@@ -74,6 +79,18 @@ class AIAssistantService:
                     "avoid_repeated_results": conversation_context["avoid_repeated_results"],
                 }
                 return agent_response
+
+        intent_guard_response = _build_intent_guard_response(base_intent)
+        if intent_guard_response:
+            intent_guard_response["conversation_mode"] = conversation_mode
+            intent_guard_response["context_used"] = {
+                "previous_query": conversation_context["previous_query"],
+                "previous_intent": conversation_context.get("previous_intent"),
+                "previous_result_ids": conversation_context["previous_result_ids"],
+                "use_previous_context": conversation_context["use_previous_context"],
+                "avoid_repeated_results": conversation_context["avoid_repeated_results"],
+            }
+            return intent_guard_response
 
         if mode_name == "small_talk":
             return {
@@ -165,6 +182,27 @@ class AIAssistantService:
             user_profile=user_profile,
             limit=shortlist_limit,
         )
+        expanded_radius_note = None
+        if not matches:
+            expanded_matches, expanded_total_found, expanded_radius_km = _expanded_dish_radius_fallback(
+                db=db,
+                recommendation_engine=self.recommendation_engine,
+                intent=intent,
+                query=query,
+                latitude=latitude,
+                longitude=longitude,
+                radius_km=radius_km,
+                user_profile=user_profile,
+                limit=shortlist_limit,
+                previous_result_ids=previous_result_ids,
+                avoid_repeated_results=conversation_context["avoid_repeated_results"],
+                search_terms=search_terms,
+            )
+            if expanded_matches:
+                matches = expanded_matches
+                total_found = expanded_total_found
+                filters_applied["expanded_radius_km"] = expanded_radius_km
+                expanded_radius_note = _build_expanded_radius_note(intent, radius_km, expanded_radius_km)
         agentic_metadata = {
             "enabled": use_agentic_reranker,
             "used": False,
@@ -199,6 +237,8 @@ class AIAssistantService:
             message_override=message_override,
             source=source,
         )
+        if expanded_radius_note:
+            response["message"] = f"{expanded_radius_note} {response['message']}"
         response["agentic"] = agentic_metadata
         response["intent"] = intent_to_dict(intent)
         response["conversation_mode"] = conversation_mode
@@ -246,6 +286,48 @@ def _resolve_location_anchor(
             "source": "demo_keyword",
         },
     )
+
+
+def _build_prompt_guard_response(query: str) -> dict[str, Any] | None:
+    normalized_query = normalize_text(query)
+    meaningful_tokens = [token for token in normalized_query.split() if token.isalpha()]
+    if not normalized_query or len(meaningful_tokens) <= 1 or not re.search(r"[a-z0-9]", normalized_query):
+        return {
+            "message": "Bạn mô tả thêm nhu cầu ăn uống giúp mình nhé, ví dụ: quán cà phê yên tĩnh gần trường, hoặc món nóng dưới 100k.",
+            "total_found": 0,
+            "filters_applied": {},
+            "result_restaurant_ids": [],
+            "recommended_restaurants": [],
+            "source": "HYBRID",
+            "intent": {},
+            "conversation_mode": {"mode": "small_talk", "reason": "Prompt is too short or unclear.", "source": "guardrail"},
+            "context_used": {},
+        }
+    return None
+
+
+def _build_intent_guard_response(intent: Any) -> dict[str, Any] | None:
+    intent_type = intent_value(intent, "intent_type")
+    if intent_type not in {"unclear", "out_of_domain"}:
+        return None
+
+    default_message = (
+        "Mình chỉ hỗ trợ gợi ý nhà hàng, món ăn và đặt bàn trong WHAT2EAT. "
+        "Bạn có thể nói món muốn ăn, khu vực, ngân sách hoặc bối cảnh đi cùng nhé."
+        if intent_type == "out_of_domain"
+        else "Bạn mô tả thêm nhu cầu ăn uống giúp mình nhé, ví dụ: quán cà phê yên tĩnh gần trường, hoặc món nóng dưới 100k."
+    )
+    return {
+        "message": intent_value(intent, "clarification_message") or default_message,
+        "total_found": 0,
+        "filters_applied": filters_from_intent(intent),
+        "result_restaurant_ids": [],
+        "recommended_restaurants": [],
+        "source": "HYBRID",
+        "intent": intent_to_dict(intent),
+        "conversation_mode": {"mode": "small_talk", "reason": f"Intent parser returned {intent_type}.", "source": "intent_parser"},
+        "context_used": {},
+    }
 
 
 def _build_distance_lookup_response(
@@ -311,6 +393,20 @@ def _build_distance_lookup_response(
 def _candidate_search_terms(intent: Any, query: str) -> list[str]:
     dish_terms = intent_value(intent, "dish_terms", []) or []
     cuisines = intent_value(intent, "cuisines", []) or []
+    has_hard_filters = any(
+        [
+            dish_terms,
+            cuisines,
+            intent_value(intent, "districts", []) or [],
+            intent_value(intent, "ambience_tags", []) or [],
+            intent_value(intent, "amenity_tags", []) or [],
+            intent_value(intent, "occasion_tags", []) or [],
+            intent_value(intent, "weather_tags", []) or [],
+        ]
+    )
+    if not has_hard_filters:
+        # Vague prompts should rank the full pool instead of filtering by filler words.
+        return []
     raw_tokens = [
         token.strip()
         for token in str(query or "").replace(",", " ").split()
@@ -377,3 +473,74 @@ def _apply_negative_overrides(intent: Any) -> Any:
         intent.cuisines = cuisines
         intent.dish_terms = dish_terms
     return intent
+
+
+def _expanded_dish_radius_fallback(
+    *,
+    db: Session,
+    recommendation_engine: RecommendationEngine,
+    intent: Any,
+    query: str,
+    latitude: float | None,
+    longitude: float | None,
+    radius_km: float | None,
+    user_profile: dict[str, Any],
+    limit: int,
+    previous_result_ids: set[str],
+    avoid_repeated_results: bool,
+    search_terms: list[str],
+) -> tuple[list[Any], int, float | None]:
+    dish_terms = intent_value(intent, "dish_terms", []) or []
+    if not dish_terms or latitude is None or longitude is None or radius_km is None:
+        return [], 0, None
+
+    expanded_radius_km = min(max(radius_km * 3, 6.0), 12.0)
+    if expanded_radius_km <= radius_km:
+        return [], 0, None
+
+    expanded_candidates = [
+        restaurant
+        for restaurant in search_restaurants_tool(
+            db,
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=expanded_radius_km,
+            search_terms=search_terms,
+        )
+        if passes_hard_constraints(restaurant, intent, db=db)
+        and passes_location_constraint(
+            restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=expanded_radius_km,
+        )
+        and (
+            not avoid_repeated_results
+            or str(restaurant.restaurant_id) not in previous_result_ids
+        )
+    ]
+    if not expanded_candidates:
+        return [], 0, None
+
+    matches, total_found = recommendation_engine.rank_restaurants_tool(
+        db,
+        candidate_restaurants=expanded_candidates,
+        intent=intent,
+        query=query,
+        latitude=latitude,
+        longitude=longitude,
+        user_profile=user_profile,
+        limit=limit,
+    )
+    return matches, total_found, expanded_radius_km
+
+
+def _build_expanded_radius_note(intent: Any, original_radius_km: float | None, expanded_radius_km: float | None) -> str | None:
+    dish_terms = intent_value(intent, "dish_terms", []) or []
+    if not dish_terms or original_radius_km is None or expanded_radius_km is None:
+        return None
+    dish_text = ", ".join(dish_terms[:2])
+    return (
+        f"Trong bán kính {original_radius_km:.1f} km chưa có quán khớp rõ với {dish_text}, "
+        f"nên mình mở rộng tìm kiếm ra {expanded_radius_km:.1f} km."
+    )

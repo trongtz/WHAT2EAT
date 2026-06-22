@@ -28,6 +28,48 @@ from services.ai_assistant.tools import (
 from services.ai_assistant.restaurant_signals import availability_score, get_restaurant_signals
 from services.ai_assistant.user_preferences import user_behavior_score
 
+MEAL_FORWARD_PATTERNS = [
+    "quan com",
+    "com tam",
+    "com ga",
+    "com chay",
+    "pho",
+    "bun",
+    "hu tieu",
+    "chao",
+    "lau",
+    "nuong",
+    "bbq",
+    "banh mi",
+    "quan an",
+    "nha hang",
+    "restaurant",
+    "canteen",
+]
+BEVERAGE_FORWARD_PATTERNS = [
+    "cafe",
+    "ca phe",
+    "coffee",
+    "tra sua",
+    "tea",
+    "milktea",
+    "juice",
+    "smoothie",
+]
+SPICY_HEAVY_PATTERNS = [
+    "mi cay",
+    "tokbokki",
+    "tteokbokki",
+    "nuong",
+    "bbq",
+    "lau thai",
+]
+GENERIC_CANTEEN_PATTERNS = [
+    "canteen",
+    "can tin",
+    "nha an",
+]
+
 
 @dataclass
 class ScoredRestaurant:
@@ -316,8 +358,7 @@ def _keyword_reason(query_tokens: set[str], restaurant_tokens: set[str]) -> str:
 def _cuisine_score(intent: Any, restaurant: Restaurant, search_text: str) -> float:
     requested_cuisines = intent_value(intent, "cuisines", []) or []
     if not requested_cuisines:
-        requested_cuisines = _safe_infer_cuisines(search_text)
-        return 0.0 if not requested_cuisines else 4.0
+        return 0.0
 
     explicit_text = normalize_text(f"{restaurant.name} {getattr(restaurant, 'cuisine_type', '')}")
     normalized = normalize_text(search_text)
@@ -439,6 +480,12 @@ def _semantic_reason(tags: set[str]) -> str:
 def _preference_score(intent: Any, search_text: str) -> tuple[float, str]:
     normalized = normalize_text(search_text)
     requested_tags = intent_value(intent, "preference_tags", []) or []
+    meal_focused_tags = {"easy_to_eat", "light_meal", "filling", "comfort_food", "quick_service", "soupy_food"}
+    meal_focus_requested = bool(set(requested_tags) & meal_focused_tags)
+    meal_identity = any(_contains_alias(normalized, pattern) for pattern in MEAL_FORWARD_PATTERNS)
+    beverage_identity = any(_contains_alias(normalized, pattern) for pattern in BEVERAGE_FORWARD_PATTERNS)
+    spicy_heavy_identity = any(_contains_alias(normalized, pattern) for pattern in SPICY_HEAVY_PATTERNS)
+    generic_canteen_identity = any(_contains_alias(normalized, pattern) for pattern in GENERIC_CANTEEN_PATTERNS)
     patterns_by_tag = {
         "easy_to_eat": ["com", "bun", "pho", "banh", "chay", "can tin"],
         "light_meal": ["an nhe", "nhe bung", "chay", "salad", "banh", "tra sua", "cafe", "an vat"],
@@ -477,10 +524,27 @@ def _preference_score(intent: Any, search_text: str) -> tuple[float, str]:
         if tag in patterns_by_tag and any(_contains_alias(normalized, pattern) for pattern in patterns_by_tag[tag])
     ]
     if not hits:
+        if meal_focus_requested and beverage_identity and not meal_identity:
+            return -10.0, ""
+        if "easy_to_eat" in requested_tags and spicy_heavy_identity:
+            return -8.0, ""
+        if "comfort_food" in requested_tags and beverage_identity and not meal_identity:
+            return -6.0, ""
         if any(tag in requested_tags for tag in ["healthy", "light_meal", "vegetarian_option", "cooling_food", "hot_food"]):
             return -12.0, ""
         return 0.0, ""
-    return min(18.0, 6.0 + len(hits) * 4.0), ". ".join(reason_by_tag[tag] for tag in hits[:2])
+    score = min(18.0, 6.0 + len(hits) * 4.0)
+    if meal_focus_requested and meal_identity:
+        score += 4.0
+    if meal_focus_requested and beverage_identity:
+        score -= 8.0
+    if meal_focus_requested and generic_canteen_identity and "quick_service" not in requested_tags:
+        score -= 4.0
+    if "easy_to_eat" in requested_tags and spicy_heavy_identity:
+        score -= 5.0
+    if "light_meal" in requested_tags and spicy_heavy_identity:
+        score -= 7.0
+    return score, ". ".join(reason_by_tag[tag] for tag in hits[:2])
 
 
 def _district_score(intent: Any, address: str) -> float:

@@ -36,6 +36,7 @@ TOPIC_SWITCH_CLEAR_FIELDS = {
     "preference_tags",
     "dish_terms",
 }
+EXTRA_INTENT_META_KEYS = ("context_action", "clear_fields", "intent_type", "clarification_message")
 
 
 def extract_intent(
@@ -68,9 +69,13 @@ def extract_intent(
     if isinstance(intent, dict):
         intent["context_action"] = _infer_context_action(query, local_intent, previous_context_intent)
         intent["clear_fields"] = _default_clear_fields_for_action(intent["context_action"], intent)
+        intent["intent_type"] = "restaurant_search"
+        intent["clarification_message"] = None
     else:
         intent.context_action = _infer_context_action(query, local_intent, previous_context_intent)
         intent.clear_fields = _default_clear_fields_for_action(intent.context_action, intent)
+        intent.intent_type = "restaurant_search"
+        intent.clarification_message = None
 
     if not previous_context_intent:
         return _apply_general_intent_safeguards(intent)
@@ -87,7 +92,7 @@ def intent_value(intent: Any, key: str, default: Any = None) -> Any:
 def intent_to_dict(intent: Any) -> dict[str, Any]:
     if hasattr(intent, "to_dict"):
         payload = intent.to_dict()
-        for extra_key in ("context_action", "clear_fields"):
+        for extra_key in EXTRA_INTENT_META_KEYS:
             if hasattr(intent, extra_key):
                 payload[extra_key] = getattr(intent, extra_key)
         return payload
@@ -120,6 +125,8 @@ def filters_from_intent(intent: Any) -> dict[str, Any]:
 
 def _fallback_intent(query: str) -> dict[str, Any]:
     return {
+        "intent_type": "restaurant_search",
+        "clarification_message": None,
         "context_action": "fresh_search",
         "clear_fields": [],
         "keywords": tokenize(query),
@@ -148,6 +155,9 @@ def _merge_local_heuristics(openai_intent: dict[str, Any], local_intent: Any) ->
     merged["context_action"] = str(merged.get("context_action") or "fresh_search")
     broad_recommendation = _is_broad_recommendation(local_intent)
     keep_only_dish_filter = _should_keep_only_dish_filter(local_intent)
+    if broad_recommendation and merged.get("intent_type") in {"unclear", "out_of_domain"}:
+        merged["intent_type"] = "restaurant_search"
+        merged["clarification_message"] = None
     if broad_recommendation:
         # For vague prompts, GPT should help understand mood, not invent hard filters.
         merged["cuisines"] = []
@@ -448,6 +458,9 @@ def _merge_intent_like(previous_intent: Any, current_intent: Any) -> Any:
                 else:
                     merged[field] = None
     for key, value in current_dict.items():
+        if key in EXTRA_INTENT_META_KEYS:
+            merged[key] = value
+            continue
         if key in MERGEABLE_LIST_KEYS:
             if value:
                 merged[key] = unique_preserve_order([*(merged.get(key) or []), *value])

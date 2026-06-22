@@ -263,6 +263,8 @@ def _guard_mode_selection(
         return heuristic_mode
     if heuristic_mode["mode"] in {"follow_up_search", "restaurant_focus"} and openai_mode["mode"] == "new_search":
         return heuristic_mode
+    if heuristic_mode["mode"] == "new_search" and openai_mode["mode"] == "follow_up_search":
+        return heuristic_mode
     if heuristic_mode["mode"] == "new_search" and openai_mode["mode"] in {"booking_flow", "restaurant_focus"}:
         if not _looks_like_booking_followup(normalized_query) and not _looks_like_restaurant_focus(normalized_query):
             return heuristic_mode

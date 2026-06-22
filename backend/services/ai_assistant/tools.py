@@ -423,7 +423,14 @@ def _is_obvious_non_restaurant(restaurant: Restaurant) -> bool:
         "restaurant",
         "food",
     ]
-    return not any(signal in normalized_name for signal in food_signals)
+    food_like = any(
+        _contains_alias(normalized_name, signal)
+        for signal in food_signals
+        if signal != "pho"
+    )
+    if not food_like and _contains_alias(normalized_name, "pho") and "thanh pho" not in normalized_name:
+        food_like = True
+    return not food_like
 
 
 def _is_open_now(restaurant: Restaurant) -> bool:
