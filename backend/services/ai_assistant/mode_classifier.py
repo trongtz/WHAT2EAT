@@ -128,6 +128,14 @@ def classify_conversation_mode(
         conversation_context=conversation_context,
         agent_state=agent_state,
     )
+    if _should_skip_openai_mode_classifier(
+        normalized_query=normalized_query,
+        current_intent=current_intent,
+        conversation_context=conversation_context,
+        agent_state=agent_state,
+        heuristic_mode=heuristic_mode,
+    ):
+        return heuristic_mode
     if should_use_openai_mode_classifier():
         try:
             parsed = _classify_mode_with_openai(
@@ -232,6 +240,14 @@ def _heuristic_mode(
         return {"mode": "booking_flow", "reason": "Pending booking flow with booking follow-up.", "source": "heuristic"}
     if _looks_like_profile_preference(normalized_query):
         return {"mode": "profile_preference", "reason": "Stable preference statement.", "source": "heuristic"}
+    if _looks_like_rich_fresh_search(
+        normalized_query=normalized_query,
+        current_intent=current_intent,
+        has_previous_query=has_previous_query,
+        has_previous_results=has_previous_results,
+        agent_state=agent_state,
+    ):
+        return {"mode": "new_search", "reason": "Rich standalone search request.", "source": "heuristic"}
     if _looks_like_booking_followup(normalized_query):
         return {"mode": "booking_flow", "reason": "Booking or availability request.", "source": "heuristic"}
     if _looks_like_restaurant_focus(normalized_query):
@@ -245,6 +261,61 @@ def _heuristic_mode(
     if has_previous_query and len((intent_value(current_intent, "keywords", []) or [])) <= 3:
         return {"mode": "follow_up_search", "reason": "Short contextual follow-up.", "source": "heuristic"}
     return {"mode": "new_search", "reason": "Default to fresh search.", "source": "heuristic"}
+
+
+def _should_skip_openai_mode_classifier(
+    *,
+    normalized_query: str,
+    current_intent: Any,
+    conversation_context: dict[str, Any],
+    agent_state: dict[str, Any],
+    heuristic_mode: dict[str, Any],
+) -> bool:
+    mode = heuristic_mode.get("mode")
+    if mode == "small_talk":
+        return True
+    if mode == "new_search" and _looks_like_rich_fresh_search(
+        normalized_query=normalized_query,
+        current_intent=current_intent,
+        has_previous_query=bool(conversation_context.get("previous_query")),
+        has_previous_results=bool(conversation_context.get("previous_result_ids")),
+        agent_state=agent_state,
+    ):
+        return True
+    return False
+
+
+def _looks_like_rich_fresh_search(
+    *,
+    normalized_query: str,
+    current_intent: Any,
+    has_previous_query: bool,
+    has_previous_results: bool,
+    agent_state: dict[str, Any],
+) -> bool:
+    if has_previous_query or has_previous_results or agent_state.get("pending_action"):
+        return False
+    if _looks_like_follow_up_search(normalized_query) or _looks_like_restaurant_focus(normalized_query):
+        return False
+
+    strong_signal_count = 0
+    for key in (
+        "cuisines",
+        "dish_terms",
+        "districts",
+        "ambience_tags",
+        "amenity_tags",
+        "occasion_tags",
+        "weather_tags",
+    ):
+        if intent_value(current_intent, key, []) or []:
+            strong_signal_count += 1
+    for key in ("price_min", "price_max", "budget_label", "group_size", "open_now"):
+        if intent_value(current_intent, key) is not None:
+            strong_signal_count += 1
+    if _looks_like_new_search(normalized_query, current_intent):
+        strong_signal_count += 1
+    return strong_signal_count >= 3
 
 
 def _guard_mode_selection(

@@ -57,6 +57,70 @@ def get_restaurant_signals(db: Session, restaurant: Restaurant) -> RestaurantSig
     )
 
 
+def get_restaurant_signals_map(db: Session, restaurants: list[Restaurant]) -> dict[Any, RestaurantSignals]:
+    if not restaurants:
+        return {}
+
+    restaurant_ids = [restaurant.restaurant_id for restaurant in restaurants]
+    since = datetime.utcnow() - timedelta(days=30)
+
+    review_rows = db.query(
+        Review.restaurant_id,
+        func.count().label("rating_count"),
+        func.avg(Review.rating).label("rating_avg"),
+    ).filter(
+        Review.restaurant_id.in_(restaurant_ids),
+        Review.status == "APPROVED",
+    ).group_by(Review.restaurant_id).all()
+    review_map = {
+        restaurant_id: {
+            "rating_count": int(rating_count or 0),
+            "rating_avg": float(rating_avg or 0),
+        }
+        for restaurant_id, rating_count, rating_avg in review_rows
+    }
+
+    checkin_map = dict(
+        db.query(CheckIn.restaurant_id, func.count())
+        .filter(CheckIn.restaurant_id.in_(restaurant_ids), CheckIn.checkin_at >= since)
+        .group_by(CheckIn.restaurant_id)
+        .all()
+    )
+    favorite_map = dict(
+        db.query(Favorite.restaurant_id, func.count())
+        .filter(Favorite.restaurant_id.in_(restaurant_ids))
+        .group_by(Favorite.restaurant_id)
+        .all()
+    )
+    booking_map = dict(
+        db.query(Reservation.restaurant_id, func.count())
+        .filter(Reservation.restaurant_id.in_(restaurant_ids), Reservation.created_at >= since)
+        .group_by(Reservation.restaurant_id)
+        .all()
+    )
+
+    signals_by_restaurant: dict[Any, RestaurantSignals] = {}
+    for restaurant in restaurants:
+        restaurant_id = restaurant.restaurant_id
+        review_info = review_map.get(restaurant_id, {})
+        rating_avg = float(getattr(restaurant, "rating_avg", None) or getattr(restaurant, "average_rating", None) or review_info.get("rating_avg") or 0)
+        rating_count = int(review_info.get("rating_count") or 0)
+        checkin_count = int(checkin_map.get(restaurant_id) or 0)
+        favorite_count = int(favorite_map.get(restaurant_id) or 0)
+        booking_count = int(booking_map.get(restaurant_id) or 0)
+        quality_score = _quality_score(rating_avg, rating_count, checkin_count, favorite_count, booking_count)
+        signals_by_restaurant[restaurant_id] = RestaurantSignals(
+            rating_avg=round(rating_avg, 2),
+            rating_count=rating_count,
+            checkin_count_30d=checkin_count,
+            favorite_count=favorite_count,
+            booking_count_30d=booking_count,
+            quality_score=round(quality_score, 4),
+            quality_reasons=_quality_reasons(rating_avg, rating_count, checkin_count, favorite_count, booking_count),
+        )
+    return signals_by_restaurant
+
+
 def availability_score(available_capacity: int | None, group_size: int | None) -> tuple[float, list[str]]:
     if available_capacity is None:
         return 0.0, []

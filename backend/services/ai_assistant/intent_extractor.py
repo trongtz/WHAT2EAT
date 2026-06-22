@@ -49,7 +49,12 @@ def extract_intent(
     previous_context_intent = previous_intent
     if previous_context_intent is None and previous_query:
         previous_context_intent = parse_query_heuristically(previous_query) if parse_query_heuristically else _fallback_intent(previous_query)
-    if should_use_openai_intent_parser():
+    if should_use_openai_intent_parser() and not _should_skip_openai_for_direct_search(
+        query=query,
+        local_intent=local_intent,
+        previous_query=previous_query,
+        previous_context_intent=previous_context_intent,
+    ):
         try:
             parsed_intent = parse_intent_with_openai(
                 query,
@@ -81,6 +86,63 @@ def extract_intent(
         return _apply_general_intent_safeguards(intent)
 
     return _apply_general_intent_safeguards(_merge_intent_like(previous_context_intent, intent))
+
+
+def _should_skip_openai_for_direct_search(
+    *,
+    query: str,
+    local_intent: Any,
+    previous_query: str | None,
+    previous_context_intent: Any,
+) -> bool:
+    if previous_query or previous_context_intent is not None:
+        return False
+
+    normalized = normalize_text(query)
+    complex_cues = [
+        "nhung khong",
+        "nhung chi",
+        "ngoai tru",
+        "tru ",
+        "khong an",
+        "dung goi y",
+        "doi mon",
+        "mon khac",
+        "toi ghet",
+        "toi vua an",
+        "it pho bien hon",
+        "co 1 nguoi an chay",
+        "nhom co tre em",
+    ]
+    if any(cue in normalized for cue in complex_cues):
+        return False
+
+    strong_signal_count = 0
+    for key in (
+        "cuisines",
+        "dish_terms",
+        "districts",
+        "ambience_tags",
+        "amenity_tags",
+        "occasion_tags",
+        "weather_tags",
+    ):
+        if intent_value(local_intent, key, []) or []:
+            strong_signal_count += 1
+
+    for key in ("price_min", "price_max", "budget_label", "group_size", "open_now"):
+        if intent_value(local_intent, key) is not None:
+            strong_signal_count += 1
+
+    if intent_value(local_intent, "walking_only", False):
+        strong_signal_count += 1
+
+    has_explicit_food_target = bool(
+        (intent_value(local_intent, "cuisines", []) or [])
+        or (intent_value(local_intent, "dish_terms", []) or [])
+        or (intent_value(local_intent, "occasion_tags", []) or [])
+    )
+    return strong_signal_count >= 2 and has_explicit_food_target
 
 
 def intent_value(intent: Any, key: str, default: Any = None) -> Any:

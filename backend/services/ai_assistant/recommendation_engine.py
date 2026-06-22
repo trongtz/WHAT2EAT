@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from models.restaurant import Restaurant
+from services.capacity_service import attach_capacity_summaries
 from services.ai_assistant.intent_extractor import intent_value
 from services.ai_assistant.recommend_imports import (
     extract_district_slug_from_text,
@@ -25,7 +26,7 @@ from services.ai_assistant.tools import (
     price_budget_label,
     restaurant_matches_dish,
 )
-from services.ai_assistant.restaurant_signals import availability_score, get_restaurant_signals
+from services.ai_assistant.restaurant_signals import availability_score, get_restaurant_signals, get_restaurant_signals_map
 from services.ai_assistant.user_preferences import user_behavior_score
 
 MEAL_FORWARD_PATTERNS = [
@@ -116,6 +117,10 @@ class RecommendationEngine:
         initial_scored.sort(key=lambda item: item.score, reverse=True)
         shortlist_size = min(len(initial_scored), max(limit * 12, 60))
         shortlist = initial_scored[:shortlist_size]
+        shortlist_restaurants = [item.restaurant for item in shortlist]
+        precomputed_signals = get_restaurant_signals_map(db, shortlist_restaurants) if shortlist_restaurants else {}
+        if shortlist_restaurants:
+            attach_capacity_summaries(db, shortlist_restaurants)
         scored = [
             self._score_restaurant(
                 db,
@@ -126,6 +131,8 @@ class RecommendationEngine:
                 longitude,
                 user_profile,
                 include_db_signals=True,
+                precomputed_signals=precomputed_signals.get(item.restaurant.restaurant_id),
+                precomputed_capacity=getattr(item.restaurant, "available_capacity", None),
             )
             for item in shortlist
         ]
@@ -143,6 +150,8 @@ class RecommendationEngine:
         longitude: float | None,
         user_profile: dict[str, Any],
         include_db_signals: bool,
+        precomputed_signals: Any = None,
+        precomputed_capacity: int | None = None,
     ) -> ScoredRestaurant:
         search_text = restaurant_search_text(restaurant)
         restaurant_tokens = set(tokenize(search_text))
@@ -189,7 +198,7 @@ class RecommendationEngine:
         budget_score = _budget_score(intent, restaurant.price_range)
         if budget_score:
             score += budget_score
-            explanations.append(_budget_reason(restaurant.price_range))
+            explanations.append(_budget_reason(intent, restaurant.price_range))
 
         distance_km = _distance_from_user(latitude, longitude, restaurant)
         if distance_km is not None:
@@ -204,7 +213,7 @@ class RecommendationEngine:
 
         quality_signals = None
         if include_db_signals:
-            quality_signals = get_restaurant_signals(db, restaurant)
+            quality_signals = precomputed_signals or get_restaurant_signals(db, restaurant)
             if quality_signals.quality_score:
                 score += quality_signals.quality_score * 8
                 explanations.extend(quality_signals.quality_reasons)
@@ -222,7 +231,10 @@ class RecommendationEngine:
         available_capacity = None
         availability_value = 0.0
         if include_db_signals and normalized_group_size is not None:
-            available_capacity = check_available_slots_tool(db, restaurant)
+            if precomputed_capacity is not None:
+                available_capacity = int(precomputed_capacity)
+            else:
+                available_capacity = check_available_slots_tool(db, restaurant)
             availability_value, availability_reasons = availability_score(available_capacity, normalized_group_size)
             if availability_value:
                 score += availability_value * 7
@@ -573,7 +585,20 @@ def _budget_score(intent: Any, price_range: str | None) -> float:
     return 0.0
 
 
-def _budget_reason(price_range: str | None) -> str:
+def _budget_reason(intent: Any, price_range: str | None) -> str:
+    requested_min = intent_value(intent, "price_min")
+    requested_max = intent_value(intent, "price_max")
+    budget_label = intent_value(intent, "budget_label")
+
+    if requested_min is not None and requested_max is not None:
+        return f"Nằm trong ngân sách khoảng {requested_min // 1000}k-{requested_max // 1000}k"
+    if requested_max is not None:
+        return f"Nằm trong ngân sách khoảng {requested_max // 1000}k"
+    if requested_min is not None:
+        return f"Phù hợp mức chi từ khoảng {requested_min // 1000}k trở lên"
+    if budget_label:
+        return "Mức giá hợp với ngân sách bạn chọn"
+
     price_min, price_max = parse_price_range(price_range)
     if price_min is not None and price_max is not None:
         return f"Khoảng giá khoảng {price_min // 1000}k-{price_max // 1000}k"
