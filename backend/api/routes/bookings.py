@@ -2,18 +2,15 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import crud.reservation as crud_reservation
 import crud.restaurant as crud_restaurant
 from api.deps import get_current_user
 from core.database import get_db
-from models.booking import Reservation
 from models.user import User
 from schemas.booking import ReservationCreate, ReservationResponse
 from schemas.booking import ReservationUpdate
-from services.capacity_service import get_restaurant_capacity_for_date
 
 router = APIRouter()
 MIN_BOOKING_NOTICE = timedelta(minutes=30)
@@ -60,29 +57,6 @@ def create_booking(
     restaurant = crud_restaurant.get_restaurant_by_id(db, booking_in.restaurant_id)
     if not restaurant or restaurant.status != "APPROVED":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant not found")
-
-    max_capacity = get_restaurant_capacity_for_date(db, booking_in.restaurant_id, reservation_time.date())
-    if max_capacity <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Restaurant capacity is not available for this date",
-        )
-    if booking_in.guest_count > max_capacity:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Guest count exceeds restaurant capacity",
-        )
-    if not crud_reservation.check_overbooking(
-        db,
-        booking_in.restaurant_id,
-        reservation_time,
-        booking_in.guest_count,
-        max_capacity,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Not enough capacity for this time slot",
-        )
 
     booking_to_create = booking_in.model_copy(update={"reservation_time": reservation_time})
     created_booking = crud_reservation.create_reservation(db, booking_to_create, current_user.user_id)
@@ -137,27 +111,6 @@ def update_my_booking(
     guest_count = booking_in.guest_count if booking_in.guest_count is not None else booking.guest_count
     if guest_count <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guest count must be greater than 0")
-
-    max_capacity = get_restaurant_capacity_for_date(db, booking.restaurant_id, reservation_time.date())
-    if max_capacity <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Restaurant capacity is not available for this date",
-        )
-
-    booked_seats = (
-        db.query(func.sum(Reservation.guest_count))
-        .filter(
-            Reservation.restaurant_id == booking.restaurant_id,
-            Reservation.reservation_time == reservation_time,
-            Reservation.status.in_(["CONFIRMED", "PENDING"]),
-            Reservation.reservation_id != booking_id,
-        )
-        .scalar()
-        or 0
-    )
-    if guest_count > max_capacity - int(booked_seats):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not enough capacity for this time slot")
 
     updated_booking = crud_reservation.update_reservation(
         db,

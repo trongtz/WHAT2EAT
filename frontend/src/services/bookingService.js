@@ -24,6 +24,14 @@ const toTimeInputValue = (value) => {
   return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
 };
 
+const buildReservationTime = (dateValue, timeValue) => {
+  const reservationTime = new Date(`${dateValue}T${timeValue}`);
+  if (Number.isNaN(reservationTime.getTime())) {
+    throw new Error("Ngày hoặc giờ đặt bàn không hợp lệ");
+  }
+  return reservationTime.toISOString();
+};
+
 const normalizeBooking = (booking) => {
   const reservationTime = booking.reservation_time ?? booking.reservationTime;
   const guestCount = Number(booking.guest_count ?? booking.guestCount ?? booking.guests ?? 0);
@@ -80,10 +88,10 @@ export const bookingService = {
     return response.data.map(normalizeBooking);
   },
   create: async (payload) => {
-    const reservationTime = new Date(`${payload.date}T${payload.time}`);
+    const reservationTime = buildReservationTime(payload.date, payload.time);
     const response = await apiClient.post("/bookings", {
       restaurant_id: payload.restaurantId,
-      reservation_time: reservationTime.toISOString(),
+      reservation_time: reservationTime,
       guest_count: Number(payload.guests),
       notes: payload.note || null,
     });
@@ -102,9 +110,9 @@ export const bookingService = {
     return normalizeBooking(response.data);
   },
   update: async (bookingId, payload) => {
-    const reservationTime = new Date(`${payload.date}T${payload.time}`);
+    const reservationTime = buildReservationTime(payload.date, payload.time);
     const response = await apiClient.put(`/bookings/${bookingId}`, {
-      reservation_time: reservationTime.toISOString(),
+      reservation_time: reservationTime,
       guest_count: Number(payload.guests),
       notes: payload.note || null,
     });

@@ -19,6 +19,7 @@ function BookingPage() {
   const isEditing = Boolean(editingBookingId);
   const [restaurants, setRestaurants] = useState([]);
   const [message, setMessage] = useState("");
+  const [messageSeverity, setMessageSeverity] = useState("success");
   const [errors, setErrors] = useState({});
   const [values, setValues] = useState({
     restaurantId: params.get("nhaHang") || "",
@@ -53,6 +54,7 @@ function BookingPage() {
       const data = await restaurantService.getRestaurants();
       setRestaurants(data);
     };
+
     fetchRestaurants();
   }, []);
 
@@ -68,6 +70,10 @@ function BookingPage() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+    if (message) {
+      setMessage("");
+      setMessageSeverity("success");
+    }
     setValues((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -78,21 +84,29 @@ function BookingPage() {
     if (Object.keys(nextErrors).length) return;
 
     if (!user) {
+      setMessageSeverity("error");
       setMessage("Vui lòng đăng nhập trước khi đặt bàn.");
       return;
     }
 
-    if (user.isGuest) {
-      createGuestBooking(values);
-      setMessage("Đặt bàn tạm thời đã được lưu trong phiên khách này.");
-    } else {
-      if (isEditing) {
+    try {
+      if (user.isGuest) {
+        createGuestBooking(values);
+        setMessageSeverity("success");
+        setMessage("Đặt bàn tạm thời đã được lưu trong phiên khách này.");
+      } else if (isEditing) {
         await bookingService.update(editingBookingId, { ...values, userId: user.id, guests: Number(values.guests) });
+        setMessageSeverity("success");
         setMessage("Đã cập nhật thông tin đặt bàn.");
       } else {
         await bookingService.create({ ...values, userId: user.id, guests: Number(values.guests) });
+        setMessageSeverity("success");
         setMessage("Đặt bàn thành công. Bạn có thể xem trạng thái ở lịch sử đặt bàn.");
       }
+    } catch (error) {
+      setMessageSeverity("error");
+      setMessage(error.message || "Không thể đặt bàn vào lúc này.");
+      return;
     }
 
     if (isEditing) {
@@ -107,7 +121,11 @@ function BookingPage() {
     <Stack spacing={3}>
       <SectionHeader
         title={isEditing ? "Cập nhật đặt bàn" : "Đặt bàn"}
-        description={isEditing ? "Chỉnh sửa lại thông tin booking đang chờ duyệt." : "Hoàn tất thông tin để giữ chỗ nhanh chóng tại nhà hàng bạn yêu thích."}
+        description={
+          isEditing
+            ? "Chỉnh sửa lại thông tin booking đang chờ duyệt."
+            : "Hoàn tất thông tin để giữ chỗ nhanh chóng tại nhà hàng bạn yêu thích."
+        }
       />
       <Stack direction="row" justifyContent="flex-start">
         <CustomButton onClick={handleGoBack} variant="outlined">
@@ -118,7 +136,7 @@ function BookingPage() {
         <Grid size={{ xs: 12, md: 7 }}>
           <CustomCard>
             <Stack component="form" spacing={2.5} onSubmit={handleSubmit}>
-              {message ? <Alert severity="success">{message}</Alert> : null}
+              {message ? <Alert severity={messageSeverity}>{message}</Alert> : null}
               <FormInput
                 select
                 label="Nhà hàng"
@@ -138,19 +156,43 @@ function BookingPage() {
               </FormInput>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, md: 4 }}>
-                  <FormInput type="date" label="Ngày" name="date" value={values.date} onChange={handleChange} InputLabelProps={{ shrink: true }} error={!!errors.date} helperText={errors.date} />
+                  <FormInput
+                    type="date"
+                    label="Ngày"
+                    name="date"
+                    value={values.date}
+                    onChange={handleChange}
+                    InputLabelProps={{ shrink: true }}
+                    error={!!errors.date}
+                    helperText={errors.date}
+                  />
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
-                  <FormInput type="time" label="Giờ" name="time" value={values.time} onChange={handleChange} InputLabelProps={{ shrink: true }} error={!!errors.time} helperText={errors.time} />
+                  <FormInput
+                    type="time"
+                    label="Giờ"
+                    name="time"
+                    value={values.time}
+                    onChange={handleChange}
+                    InputLabelProps={{ shrink: true }}
+                    error={!!errors.time}
+                    helperText={errors.time}
+                  />
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
-                  <FormInput type="number" label="Số khách" name="guests" value={values.guests} onChange={handleChange} error={!!errors.guests} helperText={errors.guests} />
+                  <FormInput
+                    type="number"
+                    label="Số khách"
+                    name="guests"
+                    value={values.guests}
+                    onChange={handleChange}
+                    error={!!errors.guests}
+                    helperText={errors.guests}
+                  />
                 </Grid>
               </Grid>
               <FormInput multiline rows={4} label="Ghi chú" name="note" value={values.note} onChange={handleChange} />
-              <CustomButton type="submit">
-                {isEditing ? "Lưu thay đổi" : "Xác nhận đặt bàn"}
-              </CustomButton>
+              <CustomButton type="submit">{isEditing ? "Lưu thay đổi" : "Xác nhận đặt bàn"}</CustomButton>
             </Stack>
           </CustomCard>
         </Grid>
@@ -158,9 +200,15 @@ function BookingPage() {
           <CustomCard>
             <Stack spacing={1.5}>
               <Typography variant="h4">Lưu ý khi đặt bàn</Typography>
-              <Typography color="text.secondary">Bạn nên đặt trước ít nhất 30 phút để hệ thống dễ gợi ý bàn phù hợp.</Typography>
-              <Typography color="text.secondary">Với nhóm đông, hãy ghi chú yêu cầu vị trí ngồi hoặc khu vực riêng nếu cần.</Typography>
-              <Typography color="text.secondary">Chế độ Khách sẽ chỉ lưu đặt bàn trong phiên hiện tại và không ghi vào database.</Typography>
+              <Typography color="text.secondary">
+                Bạn nên đặt trước ít nhất 30 phút để hệ thống dễ gợi ý bàn phù hợp.
+              </Typography>
+              <Typography color="text.secondary">
+                Với nhóm đông, hãy ghi chú yêu cầu vị trí ngồi hoặc khu vực riêng nếu cần.
+              </Typography>
+              <Typography color="text.secondary">
+                Chế độ Khách sẽ chỉ lưu đặt bàn trong phiên hiện tại và không ghi vào database.
+              </Typography>
             </Stack>
           </CustomCard>
         </Grid>

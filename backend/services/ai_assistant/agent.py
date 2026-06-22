@@ -1165,13 +1165,6 @@ def _validate_booking(db: Session, restaurant: Restaurant, reservation_time: dat
     minimum_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=30)
     if reservation_time <= minimum_time:
         return "Thời gian đặt bàn cần cách hiện tại ít nhất 30 phút. Bạn chọn giờ khác giúp mình nhé."
-    max_capacity = get_restaurant_capacity_for_date(db, restaurant.restaurant_id, reservation_time.date())
-    if max_capacity <= 0:
-        return f"{restaurant.name} chưa có thông tin sức chứa cho ngày này."
-    if guest_count > max_capacity:
-        return f"{restaurant.name} chỉ có tối đa {max_capacity} chỗ cho khung ngày này."
-    if not crud_reservation.check_overbooking(db, restaurant.restaurant_id, reservation_time, guest_count, max_capacity):
-        return f"{restaurant.name} không còn đủ {guest_count} chỗ vào {_format_datetime(reservation_time)}."
     return None
 
 

@@ -9,6 +9,23 @@ const apiClient = axios.create({
   // adapter: mockAdapter,
 });
 
+const extractApiErrorMessage = (error) => {
+  const data = error?.response?.data;
+  if (!data) return error?.message || "Đã xảy ra lỗi";
+
+  if (typeof data === "string") return data;
+  if (typeof data.message === "string" && data.message.trim()) return data.message;
+  if (typeof data.detail === "string" && data.detail.trim()) return data.detail;
+  if (Array.isArray(data.detail) && data.detail.length) {
+    const firstDetail = data.detail[0];
+    if (typeof firstDetail === "string") return firstDetail;
+    if (firstDetail?.msg) return firstDetail.msg;
+    if (firstDetail?.message) return firstDetail.message;
+  }
+
+  return error?.message || "Đã xảy ra lỗi";
+};
+
 apiClient.interceptors.request.use((config) => {
   const token = getStoredToken();
   if (token && !isGuestToken(token)) {
@@ -19,7 +36,7 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(new Error(error.response?.data?.message || error.message || "Đã xảy ra lỗi"))
+  (error) => Promise.reject(new Error(extractApiErrorMessage(error)))
 );
 
 export default apiClient;
