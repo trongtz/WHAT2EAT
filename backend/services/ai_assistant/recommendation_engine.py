@@ -421,6 +421,8 @@ def _safe_infer_cuisines(search_text: str) -> list[str]:
             continue
         if cuisine == "món trung hoa" and not _has_real_chinese_signal(normalized):
             continue
+        if cuisine == "món thái" and not _has_real_thai_signal(normalized):
+            continue
         filtered.append(cuisine)
     return filtered
 
@@ -437,6 +439,35 @@ def _has_real_chinese_signal(normalized_text: str) -> bool:
     return any(_contains_alias(normalized_text, pattern) for pattern in strong_patterns)
 
 
+def _has_real_thai_signal(normalized_text: str) -> bool:
+    strong_patterns = [
+        "mon thai",
+        "do thai",
+        "quan thai",
+        "an thai",
+        "thai lan",
+        "thailan",
+        "thai cuisine",
+        "pad thai",
+        "tom yum",
+        "tomyum",
+        "som tam",
+        "som tum",
+        "som tum thai",
+        "mala thai",
+        "thai market",
+        "thai express",
+        "thaiexpress",
+        "thai street",
+        "thai bistro",
+        "thai cafe",
+        "chang thai",
+        "chaba thai",
+        "tuktuk thai",
+    ]
+    return any(_contains_alias(normalized_text, pattern) for pattern in strong_patterns)
+
+
 def _cuisine_aliases(normalized_cuisine: str) -> list[str]:
     aliases = {
         "ca phe brunch": ["cafe", "coffee", "ca phe", "tra sua", "brunch"],
@@ -444,6 +475,31 @@ def _cuisine_aliases(normalized_cuisine: str) -> list[str]:
         "bbq nuong": ["bbq", "nuong", "grill"],
         "mon nhat": ["nhat", "sushi", "ramen", "udon"],
         "mon han": ["han quoc", "korean", "kimchi", "tokbokki", "tteokbokki", "mi cay", "seoul", "daegu"],
+        "mon thai": [
+            "mon thai",
+            "do thai",
+            "quan thai",
+            "an thai",
+            "thai lan",
+            "thailan",
+            "thai cuisine",
+            "pad thai",
+            "tom yum",
+            "tomyum",
+            "som tam",
+            "som tum",
+            "som tum thai",
+            "mala thai",
+            "thai market",
+            "thai express",
+            "thaiexpress",
+            "thai street",
+            "thai bistro",
+            "thai cafe",
+            "chang thai",
+            "chaba thai",
+            "tuktuk thai",
+        ],
         "hai san": ["hai san", "seafood", "oc"],
         "chay healthy": ["chay", "healthy", "salad"],
     }

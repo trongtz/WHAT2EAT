@@ -33,6 +33,19 @@ def get_reservations_by_customer(db: Session, customer_id: UUID, skip: int = 0, 
     ).offset(skip).limit(limit).all()
 
 
+def get_latest_pending_reservation_by_customer(db: Session, customer_id: UUID) -> Reservation | None:
+    """Lấy booking PENDING mới nhất của khách hàng"""
+    return (
+        db.query(Reservation)
+        .filter(
+            Reservation.customer_id == customer_id,
+            Reservation.status == "PENDING",
+        )
+        .order_by(Reservation.created_at.desc())
+        .first()
+    )
+
+
 def get_reservations_by_restaurant(db: Session, restaurant_id: UUID, skip: int = 0, limit: int = 100) -> list:
     """Lấy danh sách reservations của nhà hàng"""
     return db.query(Reservation).filter(
@@ -139,4 +152,3 @@ def check_overbooking(
     """
     available = count_available_seats(db, restaurant_id, reservation_time, max_capacity)
     return guest_count <= available
-

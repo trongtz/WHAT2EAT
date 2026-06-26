@@ -15,6 +15,7 @@ import AppLogoImage from "../components/AppLogoImage";
 import { useAuth } from "../hooks/useAuth";
 import { aiService } from "../services/aiService";
 import { rememberRecentAiBooking } from "../services/bookingService";
+import { invalidateCachePrefix } from "../services/requestCache";
 import { normalizeRestaurant, restaurantService } from "../services/restaurantService";
 import { formatPriceRangeDisplay } from "../utils/helpers";
 import { validatePrompt } from "../utils/validators";
@@ -217,6 +218,11 @@ const getAgentStatusLabel = (status) => {
     awaiting_booking_confirmation: "Chờ xác nhận đặt bàn",
     booking_created: "Đã tạo booking",
     booking_cancelled: "Đã hủy bước đặt",
+    booking_updated: "Đã cập nhật booking",
+    booking_cancelled_existing: "Đã hủy booking",
+    booking_not_found: "Không thấy booking",
+    booking_not_editable: "Booking không thể sửa",
+    needs_booking_update_info: "Cần thông tin cập nhật",
     booking_rejected: "Không thể đặt",
     needs_login: "Cần đăng nhập",
     preference_saved: "Đã ghi nhớ sở thích",
@@ -226,15 +232,57 @@ const getAgentStatusLabel = (status) => {
     checkin_owner_required: "Nhà hàng sẽ xác nhận check-in",
     showing_reviews: "Đang xem review",
     review_created: "Đã gửi review",
+    review_updated: "Đã sửa review",
+    review_deleted: "Đã xoá review",
+    review_not_found: "Không thấy review",
   };
   return labels[status] || "Agent đang xử lý";
 };
 
 const getAgentStatusColor = (status) => {
-  if (status === "booking_created") return "success";
+  if (["booking_created", "booking_updated", "booking_cancelled_existing"].includes(status)) return "success";
   if (["booking_rejected", "needs_login"].includes(status)) return "error";
-  if (["awaiting_booking_confirmation", "needs_booking_info", "needs_restaurant", "needs_review_info"].includes(status)) return "warning";
+  if (["awaiting_booking_confirmation", "needs_booking_info", "needs_restaurant", "needs_review_info", "needs_booking_update_info"].includes(status)) return "warning";
   return "info";
+};
+
+const syncAgentSideEffects = (data) => {
+  const agentStatus = data?.agent?.status;
+  const booking = data?.booking;
+  const restaurantId = booking?.restaurant_id ?? data?.agent?.pending_state?.restaurant_id ?? null;
+
+  if (booking) {
+    rememberRecentAiBooking(booking);
+  }
+
+  if (["booking_created", "booking_updated", "booking_cancelled_existing"].includes(agentStatus)) {
+    invalidateCachePrefix("booking:history");
+    invalidateCachePrefix("owner:bookings");
+    invalidateCachePrefix("restaurants:list");
+    invalidateCachePrefix("restaurants:detail:");
+    invalidateCachePrefix("restaurants:owner:");
+    invalidateCachePrefix("restaurants:manage:");
+    if (restaurantId) {
+      invalidateCachePrefix(`restaurants:detail:${restaurantId}`);
+      invalidateCachePrefix(`restaurants:manage:${restaurantId}`);
+    }
+  }
+
+  if (["review_created", "review_updated", "review_deleted"].includes(agentStatus)) {
+    invalidateCachePrefix("restaurants:list");
+    invalidateCachePrefix("restaurants:detail:");
+    invalidateCachePrefix("owner:reviews");
+    if (restaurantId) {
+      invalidateCachePrefix(`restaurants:detail:${restaurantId}`);
+      invalidateCachePrefix(`restaurants:manage:${restaurantId}`);
+    }
+  }
+
+  if (["favorite_added", "favorite_removed"].includes(agentStatus)) {
+    invalidateCachePrefix("favorites:");
+    invalidateCachePrefix("restaurants:list");
+    invalidateCachePrefix("restaurants:detail:");
+  }
 };
 
 function RecommendationListCard({ restaurant, index }) {
@@ -403,12 +451,38 @@ function AgentActionButtons({ message, onQuickAction }) {
       { label: "Hủy", prompt: "thôi không đặt nữa" },
     ],
     booking_created: [
+      { label: "Dời sang 20h", prompt: "đổi booking này sang 20h" },
+      { label: "Đổi thành 5 người", prompt: "đổi booking này thành 5 người" },
+      { label: "Hủy booking", prompt: "hủy booking này" },
+      { label: "Xem lịch sử đặt bàn", to: "/lich-su-dat-ban" },
+      { label: "Gợi ý tiếp", prompt: "gợi ý quán khác gần đây" },
+    ],
+    booking_updated: [
+      { label: "Xem lịch sử đặt bàn", to: "/lich-su-dat-ban" },
+      { label: "Đổi sang 20h", prompt: "đổi booking này sang 20h" },
+      { label: "Đổi thành 5 người", prompt: "đổi booking này thành 5 người" },
+      { label: "Hủy booking", prompt: "hủy booking này" },
+    ],
+    booking_cancelled_existing: [
       { label: "Xem lịch sử đặt bàn", to: "/lich-su-dat-ban" },
       { label: "Gợi ý tiếp", prompt: "gợi ý quán khác gần đây" },
     ],
     booking_rejected: [
       { label: "Đổi giờ 20h", prompt: "đổi sang 20h" },
       ...(candidateRestaurants.length > 1 ? [{ label: "Đổi sang quán 2", prompt: "đổi sang quán 2" }] : [{ label: "Chọn quán khác", prompt: "quán khác đi" }]),
+    ],
+    needs_booking_update_info: [
+      { label: "Đổi sang 20h", prompt: "đổi booking này sang 20h" },
+      { label: "Đổi thành 5 người", prompt: "đổi booking này thành 5 người" },
+      { label: "Hủy booking", prompt: "hủy booking này" },
+    ],
+    review_created: [
+      { label: "Sửa thành 4 sao", prompt: "sửa đánh giá này thành 4 sao" },
+      { label: "Xóa review", prompt: "xóa review này" },
+    ],
+    review_updated: [
+      { label: "Sửa thành 5 sao", prompt: "sửa đánh giá này thành 5 sao" },
+      { label: "Xóa review", prompt: "xóa review này" },
     ],
     needs_login: [
       { label: "Đăng nhập", to: "/dang-nhap" },
@@ -599,9 +673,7 @@ function AiRecommendationPage() {
           })
         : [];
 
-      if (data.booking) {
-        rememberRecentAiBooking(data.booking);
-      }
+      syncAgentSideEffects(data);
 
       setMessages((current) => {
         const nextAssistantMessage = createAssistantMessage({

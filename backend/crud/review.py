@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.review import Review
-from schemas.review import ReviewCreate
+from schemas.review import ReviewCreate, ReviewUpdate
 
 
 def serialize_review(review: Review) -> dict:
@@ -87,6 +87,15 @@ def get_reviews_by_customer(db: Session, customer_id: UUID, skip: int = 0, limit
     )
 
 
+def get_latest_review_by_customer(db: Session, customer_id: UUID) -> Review | None:
+    return (
+        db.query(Review)
+        .filter(Review.customer_id == customer_id)
+        .order_by(Review.created_at.desc())
+        .first()
+    )
+
+
 def get_review_by_reservation(db: Session, reservation_id: UUID) -> Review | None:
     """Lấy review theo reservation_id"""
     return db.query(Review).filter(Review.reservation_id == reservation_id).first()
@@ -117,6 +126,16 @@ def reject_review(db: Session, review_id: UUID, rejection_reason: str) -> Review
     db.commit()
     db.refresh(db_review)
     return db_review
+
+
+def update_review(db: Session, review: Review, review_in: ReviewUpdate) -> Review:
+    update_data = review_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(review, field, value)
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return review
 
 
 def delete_review(db: Session, review: Review) -> None:

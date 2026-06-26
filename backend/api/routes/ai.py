@@ -72,10 +72,12 @@ async def get_ai_recommendation(
                 agent_state=ai_data.get("agent_state"),
             )
         except Exception:
+            db.rollback()
             logger.exception("Failed to save AI trace for session %s", request.session_id)
         return response
 
     except Exception as error:
+        db.rollback()
         response = fallback_keyword_search_tool(db, request, error)
         try:
             trace_payload = fallback_trace_payload(response, error, request.query)
@@ -89,5 +91,6 @@ async def get_ai_recommendation(
                 result_restaurant_ids=trace_payload["result_restaurant_ids"],
             )
         except Exception:
+            db.rollback()
             logger.exception("Failed to save fallback AI trace for session %s", request.session_id)
         return response

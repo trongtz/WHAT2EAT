@@ -46,9 +46,33 @@ STOPWORDS = {
 
 CUISINE_PATTERNS = {
     "món việt": ["viet", "com nha", "quan com", "com tam", "bun", "pho", "hu tieu", "banh cuon", "banh xeo"],
-    "món nhật": ["nhat", "sushi", "sashimi", "ramen", "udon", "izakaya", "omakase"],
+    "món nhật": ["mon nhat", "nhat ban", "japanese", "sushi", "sashimi", "ramen", "udon", "izakaya", "omakase"],
     "món hàn": ["han", "han quoc", "tokbokki", "tteok", "tteokbokki", "kimchi", "korean", "soju", "bbq han"],
-    "món thái": ["thai", "tom yum", "pad thai", "thai lan"],
+    "món thái": [
+        "mon thai",
+        "do thai",
+        "quan thai",
+        "an thai",
+        "thai lan",
+        "thailan",
+        "thai cuisine",
+        "tom yum",
+        "tomyum",
+        "pad thai",
+        "som tam",
+        "som tum",
+        "som tum thai",
+        "mala thai",
+        "thai market",
+        "thai express",
+        "thaiexpress",
+        "thai street",
+        "thai bistro",
+        "thai cafe",
+        "chang thai",
+        "chaba thai",
+        "tuktuk thai",
+    ],
     "món trung hoa": ["trung hoa", "dim sum", "sieu cay trung", "lau trung", "chinese"],
     "bbq / nướng": ["nuong", "bbq", "grill", "thit nuong", "yakitori"],
     "lẩu": ["lau", "hotpot", "hot pot"],
@@ -490,7 +514,10 @@ def _parse_price(normalized_text: str) -> tuple[int | None, int | None, str | No
         high = _normalize_price_number(remaining_budget_match.group(2), remaining_budget_match.group(3))
         return None, high, None
 
-    budget_match = re.search(r"(budget|ngan sach|khoang|tam)\s*(\d{2,3})\s*(k|000)?", normalized_text)
+    budget_match = re.search(
+        r"(budget|ngan sach|khoang(?:\s+gia)?|tam(?:\s+gia)?)\s*(\d{2,3})\s*(k|000)?",
+        normalized_text,
+    )
     if budget_match:
         high = _normalize_price_number(budget_match.group(2), budget_match.group(3))
         return None, high, None

@@ -48,6 +48,13 @@ MODE_FOLLOW_UP_CUES = {
     "re hon",
     "duoi",
     "tren",
+    "khu vuc",
+    "o quan",
+    "o q",
+    "quan ",
+    "phuong ",
+    "binh thanh",
+    "thu duc",
     "them quan",
     "co quan nao",
     "xa hon",
@@ -64,6 +71,12 @@ MODE_RESTAURANT_CUES = {
     "xem thong tin",
     "xem review",
     "review quan",
+    "sua review",
+    "sua danh gia",
+    "xoa review",
+    "xoa danh gia",
+    "viet review",
+    "danh gia",
     "luu quan",
     "yeu thich",
     "bo yeu thich",
@@ -240,6 +253,8 @@ def _heuristic_mode(
         return {"mode": "booking_flow", "reason": "Pending booking flow with booking follow-up.", "source": "heuristic"}
     if _looks_like_profile_preference(normalized_query):
         return {"mode": "profile_preference", "reason": "Stable preference statement.", "source": "heuristic"}
+    if has_previous_results and _looks_like_contextual_refinement(normalized_query, current_intent):
+        return {"mode": "follow_up_search", "reason": "Contextual refinement of previous results.", "source": "heuristic"}
     if _looks_like_rich_fresh_search(
         normalized_query=normalized_query,
         current_intent=current_intent,
@@ -367,7 +382,82 @@ def _looks_like_new_search(normalized_query: str, current_intent: Any) -> bool:
 
 
 def _looks_like_follow_up_search(normalized_query: str) -> bool:
+    heuristic_intent = parse_query_heuristically(normalized_query)
+    has_new_topic = any(
+        [
+            heuristic_intent.cuisines,
+            heuristic_intent.dish_terms,
+            heuristic_intent.occasion_tags,
+            heuristic_intent.ambience_tags,
+            heuristic_intent.amenity_tags,
+        ]
+    )
+    if has_new_topic and any(
+        cue in normalized_query
+        for cue in ["goi y", "tim", "toi muon an", "muon an", "cho toi", "an gi"]
+    ):
+        return False
+    if any(
+        [
+            heuristic_intent.cuisines,
+            heuristic_intent.dish_terms,
+            heuristic_intent.occasion_tags,
+            heuristic_intent.ambience_tags,
+            heuristic_intent.amenity_tags,
+        ]
+    ) and any(cue in normalized_query for cue in MODE_FRESH_SEARCH_CUES):
+        return False
     return any(cue in normalized_query for cue in MODE_FOLLOW_UP_CUES)
+
+
+def _looks_like_contextual_refinement(normalized_query: str, current_intent: Any) -> bool:
+    if _looks_like_booking_followup(normalized_query) or _looks_like_restaurant_focus(normalized_query):
+        return False
+
+    has_new_topic = bool(
+        (intent_value(current_intent, "cuisines", []) or [])
+        or (intent_value(current_intent, "dish_terms", []) or [])
+    )
+    if has_new_topic:
+        return False
+
+    has_refinement_fields = any(
+        [
+            intent_value(current_intent, "districts", []) or [],
+            intent_value(current_intent, "ambience_tags", []) or [],
+            intent_value(current_intent, "amenity_tags", []) or [],
+            intent_value(current_intent, "occasion_tags", []) or [],
+            intent_value(current_intent, "weather_tags", []) or [],
+            intent_value(current_intent, "price_min") is not None,
+            intent_value(current_intent, "price_max") is not None,
+            intent_value(current_intent, "budget_label"),
+            intent_value(current_intent, "group_size") is not None,
+            intent_value(current_intent, "open_now") is not None,
+            intent_value(current_intent, "walking_only", False),
+        ]
+    )
+    if has_refinement_fields:
+        return True
+
+    refinement_phrases = [
+        "khu vuc",
+        "quan 1",
+        "quan 2",
+        "quan 3",
+        "quan 7",
+        "binh thanh",
+        "thu duc",
+        "phu nhuan",
+        "q1",
+        "q3",
+        "q7",
+        "re hon",
+        "gan hon",
+        "xa hon",
+        "o do",
+        "o khu do",
+    ]
+    return any(phrase in normalized_query for phrase in refinement_phrases)
 
 
 def _looks_like_restaurant_focus(normalized_query: str) -> bool:

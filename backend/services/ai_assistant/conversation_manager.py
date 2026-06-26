@@ -63,25 +63,26 @@ def save_ai_trace(
         current_user.user_id if current_user else None,
     )
 
-    for index, restaurant in enumerate(response.recommended_restaurants, start=1):
-        try:
-            restaurant_id = UUID(str(restaurant.id))
-        except ValueError:
-            continue
+    if response.source != "AGENT":
+        for index, restaurant in enumerate(response.recommended_restaurants, start=1):
+            try:
+                restaurant_id = UUID(str(restaurant.id))
+            except ValueError:
+                continue
 
-        crud_ai_chat.create_recommendation_log(
-            db,
-            RecommendationLogCreate(
-                session_id=session.session_id if session else None,
-                customer_id=current_user.user_id if current_user else None,
-                restaurant_id=restaurant_id,
-                score=restaurant.match_score,
-                reason=restaurant.reason,
-                source=response.source,
-                rank_position=index,
-                prompt_summary=request.query,
-            ),
-        )
+            crud_ai_chat.create_recommendation_log(
+                db,
+                RecommendationLogCreate(
+                    session_id=session.session_id if session else None,
+                    customer_id=current_user.user_id if current_user else None,
+                    restaurant_id=restaurant_id,
+                    score=restaurant.match_score,
+                    reason=restaurant.reason,
+                    source=response.source,
+                    rank_position=index,
+                    prompt_summary=request.query,
+                ),
+            )
 
     if session:
         crud_ai_chat.update_session(

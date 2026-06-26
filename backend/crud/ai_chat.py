@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -70,7 +70,11 @@ def update_session(db: Session, session: AIChatSession, payload: AIChatSessionUp
 
 
 def create_message(db: Session, session_id: UUID, payload: AIChatMessageCreate) -> AIChatMessage:
-    message = AIChatMessage(session_id=session_id, **payload.model_dump())
+    message = AIChatMessage(
+        session_id=session_id,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        **payload.model_dump(),
+    )
     db.add(message)
     db.commit()
     db.refresh(message)

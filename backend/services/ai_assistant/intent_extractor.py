@@ -62,6 +62,16 @@ def extract_intent(
                 previous_intent=intent_to_dict(previous_context_intent) if previous_context_intent else None,
             )
             intent = _merge_local_heuristics(parsed_intent, local_intent)
+            if not previous_context_intent:
+                _sanitize_fresh_search_without_history(intent)
+            if previous_context_intent:
+                inferred_action = _infer_context_action(query, local_intent, previous_context_intent)
+                intent["context_action"] = inferred_action
+                intent["clear_fields"] = _default_clear_fields_for_action(inferred_action, intent)
+                if inferred_action in {"fresh_search", "switch_topic"}:
+                    intent["conflicts"] = _sanitize_conflicts_for_new_topic(intent.get("conflicts") or [])
+                if inferred_action == "refine_previous" and not _has_explicit_cuisine_marker(local_intent):
+                    intent["conflicts"] = _sanitize_conflicts_for_context_refinement(intent.get("conflicts") or [])
             if previous_query and not _has_explicit_cuisine_marker(local_intent) and not (intent_value(local_intent, "dish_terms", []) or []):
                 intent["cuisines"] = []
             if previous_context_intent:
@@ -413,6 +423,8 @@ def _infer_context_action(query: str, local_intent: Any, previous_intent: Any) -
     if previous_intent is None:
         return "fresh_search"
     normalized = normalize_text(query)
+    if _looks_like_explicit_fresh_search(normalized, local_intent):
+        return "fresh_search"
     if _looks_like_topic_switch(normalized, local_intent, previous_intent):
         return "switch_topic"
     if _looks_like_refine_previous(normalized, local_intent):
@@ -443,15 +455,55 @@ def _looks_like_refine_previous(normalized_query: str, local_intent: Any) -> boo
     return not has_core_topic and (changed_scalar or changed_location)
 
 
+def _looks_like_explicit_fresh_search(normalized_query: str, local_intent: Any) -> bool:
+    current_topics = {
+        *(normalize_text(item) for item in (intent_value(local_intent, "cuisines", []) or [])),
+        *(normalize_text(item) for item in (intent_value(local_intent, "dish_terms", []) or [])),
+    }
+    search_signals = [
+        "goi y",
+        "tim",
+        "toi muon an",
+        "muon an",
+        "cho toi",
+        "gio goi y",
+        "bay gio",
+        "gio toi muon",
+        "gio tim",
+        "hom nay an gi",
+        "an gi",
+    ]
+    if not current_topics:
+        return False
+    if any(signal in normalized_query for signal in search_signals):
+        return True
+
+    rich_fields = sum(
+        1
+        for key in ("districts", "ambience_tags", "amenity_tags", "occasion_tags", "weather_tags")
+        if intent_value(local_intent, key, []) or []
+    )
+    rich_fields += sum(
+        1
+        for key in ("price_min", "price_max", "budget_label", "group_size", "open_now")
+        if intent_value(local_intent, key) is not None
+    )
+    return rich_fields >= 2
+
+
 def _looks_like_topic_switch(normalized_query: str, local_intent: Any, previous_intent: Any) -> bool:
     switch_cues = {
         "thoi doi y",
         "doi y roi",
+        "gio doi y",
+        "bay gio doi y",
         "khong an",
         "khong muon an",
         "khong an nua",
         "khong goi y",
         "doi mon",
+        "doi sang",
+        "chuyen sang",
         "mon khac",
         "thich sushi",
         "them sushi",
@@ -565,3 +617,70 @@ def _uses_demo_location_anchor(local_intent: Any) -> bool:
             "dh khtn",
         ]
     )
+
+
+def _sanitize_fresh_search_without_history(intent: dict[str, Any]) -> None:
+    action = str(intent.get("context_action") or "fresh_search")
+    if action != "fresh_search":
+        intent["context_action"] = "fresh_search"
+        intent["clear_fields"] = []
+
+    conflicts = intent.get("conflicts") or []
+    cleaned_conflicts = [
+        conflict
+        for conflict in conflicts
+        if not any(
+            phrase in normalize_text(str(conflict))
+            for phrase in [
+                "dang chuyen",
+                "sau khi da",
+                "truoc do",
+                "da them",
+            ]
+        )
+    ]
+    intent["conflicts"] = cleaned_conflicts
+
+
+def _sanitize_conflicts_for_new_topic(conflicts: list[str]) -> list[str]:
+    return [
+        conflict
+        for conflict in conflicts
+        if not _is_stale_topic_conflict(str(conflict))
+    ]
+
+
+def _sanitize_conflicts_for_context_refinement(conflicts: list[str]) -> list[str]:
+    return [
+        conflict
+        for conflict in conflicts
+        if not _is_stale_topic_conflict(str(conflict))
+    ]
+
+
+def _is_stale_topic_conflict(conflict: str) -> bool:
+    normalized = normalize_text(conflict)
+    topic_markers = [
+        "mon viet",
+        "mon han",
+        "mon nhat",
+        "quan mon viet",
+        "quan mon han",
+        "quan mon nhat",
+    ]
+    stale_cues = [
+        "khong the tim",
+        "cung luc",
+        "mau thuan giua",
+        "vua mon",
+        "chuyen tu",
+        "thay vi mon",
+        "thay vi quan",
+        "dang tim",
+        "dang hoi",
+        "hoi ve",
+        "nghe co ve",
+        "muon tim",
+        "yeu cau",
+    ]
+    return any(marker in normalized for marker in topic_markers) and any(cue in normalized for cue in stale_cues)

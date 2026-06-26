@@ -18,8 +18,16 @@ from services.ai_assistant.tools import (
 
 def fallback_keyword_search_tool(db: Session, request: AIRecommendationRequest, error: Exception) -> AIRecommendationResponse:
     try:
+        db.rollback()
+    except Exception:
+        pass
+    try:
         return _offline_recommendation_fallback(db, request, error)
     except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return _basic_keyword_fallback(db, request, error)
 
 

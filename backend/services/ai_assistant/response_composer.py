@@ -44,7 +44,7 @@ def compose_recommendation_response(
 
 
 def build_message(query: str, matches: list[ScoredRestaurant], intent: Any) -> str:
-    prefix = _build_intent_prefix(intent)
+    prefix = _build_intent_prefix(intent, has_matches=bool(matches))
     if not matches:
         return prefix + _build_empty_result_message(intent)
 
@@ -106,9 +106,9 @@ def _display_cuisine_text(cuisines: list[str]) -> str:
     return ", ".join(labels.get(cuisine, cuisine) for cuisine in cuisines)
 
 
-def _build_intent_prefix(intent: Any) -> str:
+def _build_intent_prefix(intent: Any, *, has_matches: bool) -> str:
     parts: list[str] = []
-    conflicts = intent_value(intent, "conflicts", []) or []
+    conflicts = _displayable_conflicts(intent_value(intent, "conflicts", []) or [], has_matches=has_matches)
     if conflicts:
         parts.append("Lưu ý: " + " ".join(conflicts[:2]))
 
@@ -141,3 +141,52 @@ def _build_intent_prefix(intent: Any) -> str:
         parts.append("Mình đang ưu tiên " + ", ".join(readable_preferences[:3]) + ".")
 
     return (" ".join(parts) + " ") if parts else ""
+
+
+def _displayable_conflicts(conflicts: list[str], *, has_matches: bool) -> list[str]:
+    cleaned: list[str] = []
+    for conflict in conflicts:
+        normalized = str(conflict or "").strip()
+        lower = normalized.lower()
+        if not normalized:
+            continue
+        if has_matches and any(
+            phrase in lower
+            for phrase in [
+                "không có thông tin",
+                "khong co thong tin",
+                "không tìm thấy",
+                "khong tim thay",
+                "chưa tìm thấy",
+                "chua tim thay",
+            ]
+        ):
+            continue
+        if any(
+            phrase in lower
+            for phrase in [
+                "món việt",
+                "mon viet",
+                "món hàn",
+                "mon han",
+                "món nhật",
+                "mon nhat",
+                "đã chọn",
+                "da chon",
+                "thay đổi chủ đề",
+                "thay doi chu de",
+                "thay vì",
+                "thay vi",
+                "chuyển từ",
+                "chuyen tu",
+                "đang muốn chuyển sang",
+                "dang muon chuyen sang",
+                "nghe có vẻ",
+                "nghe co ve",
+                "hỏi về",
+                "hoi ve",
+            ]
+        ):
+            continue
+        cleaned.append(normalized)
+    return cleaned

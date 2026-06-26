@@ -15,9 +15,9 @@ import crud.review as crud_review
 from models.ai_chat import RecommendationLog
 from models.restaurant import Restaurant
 from models.user import User
-from schemas.booking import ReservationCreate
+from schemas.booking import ReservationCreate, ReservationUpdate
 from schemas.favorite import FavoriteCreate
-from schemas.review import ReviewCreate
+from schemas.review import ReviewCreate, ReviewUpdate
 from services.ai_assistant.openai_agent_planner import (
     OpenAIAgentPlannerError,
     plan_agent_action,
@@ -58,6 +58,9 @@ FAVORITE_REMOVE_CUES = {"bo yeu thich", "xoa yeu thich", "bo tim", "unlike", "kh
 CHECKIN_CUES = {"checkin", "check-in", "toi da den", "toi dang o day", "check in"}
 SHOW_REVIEW_CUES = {"xem review", "xem danh gia", "co gi danh gia", "co review nao", "review gan day"}
 CREATE_REVIEW_CUES = {"viet review", "them review", "danh gia", "review cho", "cho 5 sao", "cho 4 sao", "cho 3 sao", "cho 2 sao", "cho 1 sao"}
+UPDATE_REVIEW_CUES = {"sua review", "sua danh gia", "cap nhat review", "cap nhat danh gia", "doi review", "doi danh gia"}
+DELETE_REVIEW_CUES = {"xoa review", "xoa danh gia", "huy review", "bo review", "xoa nhan xet"}
+BOOKING_REFERENCE_CUES = {"booking", "lich dat", "lich su dat", "don dat", "booking do", "booking nay", "dat ban nay"}
 AGENT_STATE_PREFIX = "agent_state="
 
 
@@ -87,6 +90,27 @@ def handle_agent_turn(
     if action["action"] == "cancel_pending_booking":
         return _cancel_pending_booking(action)
 
+    if action["action"] == "cancel_existing_booking":
+        return _cancel_existing_booking(
+            db=db,
+            state=state,
+            current_user=current_user,
+            latitude=latitude,
+            longitude=longitude,
+            action=action,
+        )
+
+    if action["action"] == "modify_existing_booking":
+        return _modify_existing_booking(
+            db=db,
+            query=query,
+            state=state,
+            current_user=current_user,
+            latitude=latitude,
+            longitude=longitude,
+            action=action,
+        )
+
     if action["action"] == "change_restaurant":
         return _change_pending_restaurant(
             action=action,
@@ -108,7 +132,7 @@ def handle_agent_turn(
     if action["action"] == "save_preference":
         return _save_preference_note(state, action)
 
-    if action["action"] == "create_review" and state.get("pending_action") == "collect_review_info":
+    if action["action"] in {"create_review", "update_review"} and state.get("pending_action") == "collect_review_info":
         return _handle_review_flow(
             db=db,
             state=state,
@@ -127,6 +151,8 @@ def handle_agent_turn(
         "checkin_restaurant",
         "show_reviews",
         "create_review",
+        "update_review",
+        "delete_review",
         "ask_review_info",
     }:
         return _handle_restaurant_side_action(
@@ -285,6 +311,158 @@ def _cancel_pending_booking(action: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _cancel_existing_booking(
+    *,
+    db: Session,
+    state: dict[str, Any],
+    current_user: User | None,
+    latitude: float | None,
+    longitude: float | None,
+    action: dict[str, Any],
+) -> dict[str, Any]:
+    if current_user is None or current_user.role != "CUSTOMER":
+        return _build_agent_message(
+            message="Bạn cần đăng nhập tài khoản Customer trước khi mình hủy booking cho bạn.",
+            status="needs_login",
+            pending_state=state,
+            action=action,
+        )
+
+    reservation = _resolve_booking_reference(db, current_user, state, action)
+    if reservation is None:
+        return _build_agent_message(
+            message="Mình chưa thấy booking PENDING nào để hủy. Bạn có thể vào lịch sử đặt bàn để kiểm tra lại.",
+            status="booking_not_found",
+            pending_state=state,
+            action=action,
+        )
+
+    restaurant = crud_restaurant.get_restaurant_by_id(db, reservation.restaurant_id)
+    if reservation.status != "PENDING":
+        return _build_agent_message(
+            message=f"Booking này đang ở trạng thái {reservation.status}, nên hiện không thể hủy qua agent nữa.",
+            status="booking_not_editable",
+            restaurant=restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            booking=_booking_payload(reservation),
+            pending_state=_booking_state(reservation, restaurant),
+            action=action,
+        )
+
+    reservation = crud_reservation.cancel_reservation(db, reservation.reservation_id)
+    assert reservation is not None
+    return _build_agent_message(
+        message=(
+            f"Mình đã hủy booking tại {restaurant.name if restaurant else 'nhà hàng này'} "
+            f"lúc {_format_datetime(reservation.reservation_time)} cho bạn."
+        ),
+        status="booking_cancelled_existing",
+        restaurant=restaurant,
+        latitude=latitude,
+        longitude=longitude,
+        booking=_booking_payload(reservation),
+        pending_state=_booking_state(reservation, restaurant),
+        action=action,
+    )
+
+
+def _modify_existing_booking(
+    *,
+    db: Session,
+    query: str,
+    state: dict[str, Any],
+    current_user: User | None,
+    latitude: float | None,
+    longitude: float | None,
+    action: dict[str, Any],
+) -> dict[str, Any]:
+    if current_user is None or current_user.role != "CUSTOMER":
+        return _build_agent_message(
+            message="Bạn cần đăng nhập tài khoản Customer trước khi mình sửa booking cho bạn.",
+            status="needs_login",
+            pending_state=state,
+            action=action,
+        )
+
+    reservation = _resolve_booking_reference(db, current_user, state, action)
+    if reservation is None:
+        return _build_agent_message(
+            message="Mình chưa thấy booking PENDING nào để chỉnh sửa. Bạn có thể vào lịch sử đặt bàn để kiểm tra lại.",
+            status="booking_not_found",
+            pending_state=state,
+            action=action,
+        )
+
+    restaurant = crud_restaurant.get_restaurant_by_id(db, reservation.restaurant_id)
+    if reservation.status != "PENDING":
+        return _build_agent_message(
+            message=f"Booking này đang ở trạng thái {reservation.status}, nên hiện không thể chỉnh sửa qua agent nữa.",
+            status="booking_not_editable",
+            restaurant=restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            booking=_booking_payload(reservation),
+            pending_state=_booking_state(reservation, restaurant),
+            action=action,
+        )
+
+    guest_count = action.get("guest_count") or reservation.guest_count
+    reservation_time = _parse_reservation_time_with_reference(
+        action.get("reservation_time_text") or query,
+        reservation.reservation_time,
+    ) or reservation.reservation_time
+
+    if guest_count == reservation.guest_count and reservation_time == reservation.reservation_time:
+        return _build_agent_message(
+            message="Bạn muốn mình đổi lại số người hay thời gian nào cho booking này?",
+            status="needs_booking_update_info",
+            restaurant=restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            booking=_booking_payload(reservation),
+            pending_state=_booking_state(reservation, restaurant),
+            action=action,
+        )
+
+    validation_error = _validate_booking_update(db, reservation, restaurant, reservation_time, guest_count)
+    if validation_error:
+        return _build_agent_message(
+            message=validation_error,
+            status="booking_rejected",
+            restaurant=restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            booking=_booking_payload(reservation),
+            pending_state=_booking_state(reservation, restaurant),
+            action=action,
+        )
+
+    updated = crud_reservation.update_reservation(
+        db,
+        reservation.reservation_id,
+        ReservationUpdate(
+            reservation_time=reservation_time,
+            guest_count=guest_count,
+            notes=reservation.notes,
+        ),
+    )
+    assert updated is not None
+    return _build_agent_message(
+        message=(
+            f"Mình đã cập nhật booking tại {restaurant.name if restaurant else 'nhà hàng này'} "
+            f"thành {updated.guest_count} người lúc {_format_datetime(updated.reservation_time)}."
+        ),
+        status="booking_updated",
+        restaurant=restaurant,
+        latitude=latitude,
+        longitude=longitude,
+        booking=_booking_payload(updated),
+        pending_state=_booking_state(updated, restaurant),
+        action=action,
+    )
+
+
 def _change_pending_restaurant(
     *,
     action: dict[str, Any],
@@ -358,13 +536,25 @@ def _should_prefer_rule_action(
             "create_booking",
             "modify_pending_booking",
             "cancel_pending_booking",
+            "modify_existing_booking",
+            "cancel_existing_booking",
             "change_restaurant",
         } and planned_name not in {
             "create_booking",
             "modify_pending_booking",
             "cancel_pending_booking",
+            "modify_existing_booking",
+            "cancel_existing_booking",
             "change_restaurant",
         }:
+            return True
+
+    if state.get("booking_id"):
+        if rule_name in {"modify_existing_booking", "cancel_existing_booking"} and planned_name != rule_name:
+            return True
+
+    if state.get("review_id"):
+        if rule_name in {"update_review", "delete_review"} and planned_name != rule_name:
             return True
 
     if rule_action.get("confirmation") and not planned_action.get("confirmation"):
@@ -373,6 +563,10 @@ def _should_prefer_rule_action(
         return True
     if rule_action.get("guest_count") is not None and planned_action.get("guest_count") is None:
         return True
+    if rule_action.get("booking_id") and not planned_action.get("booking_id"):
+        return True
+    if rule_action.get("review_id") and not planned_action.get("review_id"):
+        return True
     if rule_action.get("reservation_time_text") and not planned_action.get("reservation_time_text"):
         return True
     return False
@@ -380,8 +574,23 @@ def _should_prefer_rule_action(
 
 def _rule_based_action(query: str, normalized_query: str, state: dict[str, Any] | None = None) -> dict[str, Any]:
     state = state or {}
+    has_existing_booking = bool(state.get("booking_id"))
     has_pending_booking = state.get("pending_action") in {"collect_booking_info", "confirm_booking"}
     awaiting_confirmation = state.get("pending_action") == "confirm_booking"
+    if has_existing_booking and _is_existing_booking_cancel_request(normalized_query, state):
+        return _base_action(
+            action="cancel_existing_booking",
+            booking_id=str(state.get("booking_id") or ""),
+            planner_mode="rule",
+        )
+    if has_existing_booking and _is_existing_booking_modify_request(query, normalized_query, state):
+        return _base_action(
+            action="modify_existing_booking",
+            booking_id=str(state.get("booking_id") or ""),
+            guest_count=_parse_guest_count(normalized_query),
+            reservation_time_text=query,
+            planner_mode="rule",
+        )
     if has_pending_booking and any(cue in normalized_query for cue in CANCEL_CUES):
         return _base_action(action="cancel_pending_booking", planner_mode="rule")
     if has_pending_booking and _is_switch_restaurant_request(normalized_query) and _parse_restaurant_index(normalized_query):
@@ -462,6 +671,23 @@ def _rule_based_action(query: str, normalized_query: str, state: dict[str, Any] 
             planner_mode="rule",
         )
     review_rating = _parse_review_rating(normalized_query)
+    if _is_delete_review_request(normalized_query):
+        return _base_action(
+            action="delete_review",
+            restaurant_rank=_parse_restaurant_index(normalized_query),
+            restaurant_ref=query,
+            review_comment=_extract_review_comment(query, normalized_query),
+            planner_mode="rule",
+        )
+    if _is_update_review_request(normalized_query):
+        return _base_action(
+            action="update_review" if review_rating is not None or _extract_review_comment(query, normalized_query) else "ask_review_info",
+            restaurant_rank=_parse_restaurant_index(normalized_query),
+            restaurant_ref=query,
+            rating=review_rating,
+            review_comment=_extract_review_comment(query, normalized_query),
+            planner_mode="rule",
+        )
     if _is_create_review_request(normalized_query):
         return _base_action(
             action="create_review" if review_rating is not None else "ask_review_info",
@@ -489,6 +715,8 @@ def _base_action(**updates: Any) -> dict[str, Any]:
         "restaurant_ref": None,
         "restaurant_rank": None,
         "restaurant_id": None,
+        "booking_id": None,
+        "review_id": None,
         "guest_count": None,
         "reservation_time_text": None,
         "confirmation": False,
@@ -511,6 +739,8 @@ def _should_bypass_agent(action: dict[str, Any], normalized_query: str, state: d
     action_name = action.get("action") or "none"
     if action_name in {"none", "recommend", "save_preference"}:
         return False
+    if action_name in {"modify_existing_booking", "cancel_existing_booking"}:
+        return False
     if _has_explicit_agent_followup_cue(normalized_query):
         return False
     return True
@@ -523,6 +753,8 @@ def _has_explicit_agent_followup_cue(normalized_query: str) -> bool:
         return True
     if _is_booking_request(normalized_query):
         return True
+    if any(cue in normalized_query for cue in BOOKING_REFERENCE_CUES):
+        return True
     if _has_selection_cue(normalized_query):
         return True
     if _is_confirmation(normalized_query):
@@ -531,7 +763,12 @@ def _has_explicit_agent_followup_cue(normalized_query: str) -> bool:
         return True
     if _is_checkin_request(normalized_query):
         return True
-    if _is_show_reviews_request(normalized_query) or _is_create_review_request(normalized_query):
+    if (
+        _is_show_reviews_request(normalized_query)
+        or _is_create_review_request(normalized_query)
+        or _is_update_review_request(normalized_query)
+        or _is_delete_review_request(normalized_query)
+    ):
         return True
     return False
 
@@ -686,14 +923,8 @@ def _confirm_pending_booking(
         restaurant=restaurant,
         latitude=latitude,
         longitude=longitude,
-        booking={
-            "reservation_id": str(reservation.reservation_id),
-            "restaurant_id": str(reservation.restaurant_id),
-            "reservation_time": reservation.reservation_time.isoformat(),
-            "guest_count": reservation.guest_count,
-            "status": reservation.status,
-        },
-        pending_state={},
+        booking=_booking_payload(reservation),
+        pending_state=_booking_state(reservation, restaurant),
     )
 
 
@@ -803,7 +1034,7 @@ def _handle_restaurant_side_action(
         return _unfavorite_restaurant(db, current_user, restaurant, latitude, longitude, action)
     if action["action"] == "checkin_restaurant":
         return _checkin_restaurant(restaurant, latitude, longitude, action)
-    if action["action"] in {"show_reviews", "create_review", "ask_review_info"}:
+    if action["action"] in {"show_reviews", "create_review", "update_review", "delete_review", "ask_review_info"}:
         return _handle_review_flow(
             db=db,
             state={
@@ -918,21 +1149,21 @@ def _handle_review_flow(
     action: dict[str, Any],
     conversation_context: dict[str, Any],
 ) -> dict[str, Any]:
+    latest_restaurants = _latest_recommended_restaurants(db, session_id)
     restaurant_id = _parse_uuid(action.get("restaurant_id")) or _parse_uuid(state.get("restaurant_id"))
     restaurant = crud_restaurant.get_restaurant_by_id(db, restaurant_id) if restaurant_id else None
     if restaurant is None:
-        latest_restaurants = _latest_recommended_restaurants(db, session_id)
         restaurant = latest_restaurants[0] if latest_restaurants else None
-    if restaurant is None:
-        return _build_agent_message(
-            message="Mình chưa rõ bạn muốn xem hay viết review cho quán nào. Bạn chọn quán trước nhé.",
-            status="needs_restaurant",
-            restaurants=latest_restaurants[:5],
-            pending_state=state,
-            action=action,
-        )
 
     if action["action"] == "show_reviews":
+        if restaurant is None:
+            return _build_agent_message(
+                message="Mình chưa rõ bạn muốn xem review quán nào. Bạn chọn quán trước nhé.",
+                status="needs_restaurant",
+                restaurants=latest_restaurants[:5],
+                pending_state=state,
+                action=action,
+            )
         reviews = crud_review.get_reviews_by_restaurant(db, restaurant.restaurant_id, limit=3)
         if not reviews:
             message = f"{restaurant.name} hiện chưa có review đã duyệt nào để mình tóm tắt."
@@ -952,7 +1183,27 @@ def _handle_review_flow(
             action=action,
         )
 
-    requirement = _require_customer_for_action(current_user, restaurant, latitude, longitude, "viết review", action)
+    review = _resolve_review_reference(db, current_user, state, action, restaurant)
+    if restaurant is None and review is not None:
+        restaurant = crud_restaurant.get_restaurant_by_id(db, review.restaurant_id)
+
+    if restaurant is None and action["action"] in {"create_review", "ask_review_info", "update_review", "delete_review"}:
+        return _build_agent_message(
+            message="Mình chưa rõ bạn muốn thao tác review cho quán nào. Bạn chọn quán trước nhé.",
+            status="needs_restaurant",
+            restaurants=latest_restaurants[:5],
+            pending_state=state,
+            action=action,
+        )
+
+    requirement = _require_customer_for_action(
+        current_user,
+        restaurant,
+        latitude,
+        longitude,
+        "viết review" if action["action"] in {"create_review", "ask_review_info"} else "chỉnh sửa review",
+        action,
+    )
     if requirement:
         return requirement
     assert current_user is not None
@@ -961,6 +1212,77 @@ def _handle_review_flow(
     if rating is None:
         rating = _parse_review_rating(normalize_text(query))
     comment = (action.get("review_comment") or _extract_review_comment(query, normalize_text(query)) or "").strip() or None
+
+    if action["action"] == "delete_review":
+        if review is None:
+            return _build_agent_message(
+                message="Mình chưa tìm thấy review nào của bạn để xoá.",
+                status="review_not_found",
+                restaurant=restaurant,
+                latitude=latitude,
+                longitude=longitude,
+                pending_state={"restaurant_id": str(restaurant.restaurant_id), "restaurant_name": restaurant.name},
+                action=action,
+            )
+        crud_review.delete_review(db, review)
+        return _build_agent_message(
+            message=f"Mình đã xoá review của bạn cho {restaurant.name}.",
+            status="review_deleted",
+            restaurant=restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            pending_state={"restaurant_id": str(restaurant.restaurant_id), "restaurant_name": restaurant.name},
+            action=action,
+        )
+
+    if action["action"] == "update_review":
+        if review is None:
+            return _build_agent_message(
+                message="Mình chưa tìm thấy review nào của bạn để sửa. Bạn có thể viết review mới cho quán này.",
+                status="review_not_found",
+                restaurant=restaurant,
+                latitude=latitude,
+                longitude=longitude,
+                pending_state={"restaurant_id": str(restaurant.restaurant_id), "restaurant_name": restaurant.name},
+                action=action,
+            )
+        if rating is None and comment is None:
+            return _build_agent_message(
+                message=f"Bạn muốn sửa review của {restaurant.name} thành mấy sao hoặc thêm nhận xét gì?",
+                status="needs_review_info",
+                restaurant=restaurant,
+                latitude=latitude,
+                longitude=longitude,
+                pending_state={
+                    "pending_action": "collect_review_info",
+                    "restaurant_id": str(restaurant.restaurant_id),
+                    "restaurant_name": restaurant.name,
+                    "review_id": str(review.review_id),
+                },
+                action=action,
+            )
+        updated_review = crud_review.update_review(
+            db,
+            review,
+            ReviewUpdate(
+                rating=rating if rating is not None else review.rating,
+                comment=comment if comment is not None else review.comment,
+            ),
+        )
+        return _build_agent_message(
+            message=f"Mình đã cập nhật review của bạn cho {restaurant.name} thành {updated_review.rating}/5 sao.",
+            status="review_updated",
+            restaurant=restaurant,
+            latitude=latitude,
+            longitude=longitude,
+            pending_state={
+                "restaurant_id": str(restaurant.restaurant_id),
+                "restaurant_name": restaurant.name,
+                "review_id": str(updated_review.review_id),
+            },
+            action=action,
+        )
+
     if rating is None:
         return _build_agent_message(
             message=f"Bạn muốn review {restaurant.name} mấy sao? Ví dụ: 'đánh giá quán này 5 sao, nước ngon'.",
@@ -972,6 +1294,7 @@ def _handle_review_flow(
                 "pending_action": "collect_review_info",
                 "restaurant_id": str(restaurant.restaurant_id),
                 "restaurant_name": restaurant.name,
+                "review_id": str(review.review_id) if review is not None else state.get("review_id"),
             },
             action=action,
         )
@@ -991,7 +1314,11 @@ def _handle_review_flow(
         restaurant=restaurant,
         latitude=latitude,
         longitude=longitude,
-        pending_state={"restaurant_id": str(restaurant.restaurant_id), "restaurant_name": restaurant.name},
+        pending_state={
+            "restaurant_id": str(restaurant.restaurant_id),
+            "restaurant_name": restaurant.name,
+            "review_id": str(review.review_id),
+        },
         action=action,
     )
 
@@ -1050,6 +1377,60 @@ def _restaurant_payload(restaurant: Restaurant, latitude: float | None, longitud
     }
 
 
+def _booking_payload(reservation: Any) -> dict[str, Any]:
+    return {
+        "reservation_id": str(reservation.reservation_id),
+        "restaurant_id": str(reservation.restaurant_id),
+        "reservation_time": reservation.reservation_time.isoformat(),
+        "guest_count": reservation.guest_count,
+        "notes": reservation.notes,
+        "status": reservation.status,
+    }
+
+
+def _booking_state(reservation: Any, restaurant: Restaurant | None) -> dict[str, Any]:
+    return {
+        "booking_id": str(reservation.reservation_id),
+        "booking_status": reservation.status,
+        "restaurant_id": str(reservation.restaurant_id),
+        "restaurant_name": restaurant.name if restaurant else None,
+        "guest_count": reservation.guest_count,
+        "reservation_time": reservation.reservation_time.isoformat(),
+    }
+
+
+def _resolve_booking_reference(
+    db: Session,
+    current_user: User,
+    state: dict[str, Any],
+    action: dict[str, Any],
+):
+    booking_id = _parse_uuid(action.get("booking_id")) or _parse_uuid(state.get("booking_id"))
+    reservation = crud_reservation.get_reservation_by_id(db, booking_id) if booking_id else None
+    if reservation and reservation.customer_id == current_user.user_id:
+        return reservation
+    return crud_reservation.get_latest_pending_reservation_by_customer(db, current_user.user_id)
+
+
+def _resolve_review_reference(
+    db: Session,
+    current_user: User | None,
+    state: dict[str, Any],
+    action: dict[str, Any],
+    restaurant: Restaurant | None,
+):
+    review_id = _parse_uuid(action.get("review_id")) or _parse_uuid(state.get("review_id"))
+    review = crud_review.get_review_by_id(db, review_id) if review_id else None
+    if review and current_user is not None and review.customer_id == current_user.user_id:
+        return review
+    if current_user is None:
+        return None
+    if restaurant is not None:
+        review = crud_review.get_review_by_customer_and_restaurant(db, current_user.user_id, restaurant.restaurant_id)
+        return review
+    return crud_review.get_latest_review_by_customer(db, current_user.user_id)
+
+
 def _resolve_restaurant_reference(
     *,
     db: Session,
@@ -1098,6 +1479,8 @@ def _resolve_restaurant_reference(
         "checkin_restaurant",
         "show_reviews",
         "create_review",
+        "update_review",
+        "delete_review",
         "ask_review_info",
         "get_restaurant_detail",
         "select_restaurant",
@@ -1113,6 +1496,8 @@ def _resolve_restaurant_reference(
         "checkin_restaurant",
         "show_reviews",
         "create_review",
+        "update_review",
+        "delete_review",
         "ask_review_info",
         "get_restaurant_detail",
         "select_restaurant",
@@ -1144,7 +1529,10 @@ def _latest_recommended_restaurants(db: Session, session_id: UUID | None) -> lis
         return []
     logs = (
         db.query(RecommendationLog)
-        .filter(RecommendationLog.session_id == session_id)
+        .filter(
+            RecommendationLog.session_id == session_id,
+            RecommendationLog.source != "AGENT",
+        )
         .order_by(RecommendationLog.created_at.desc())
         .limit(30)
         .all()
@@ -1180,8 +1568,62 @@ def _validate_booking(db: Session, restaurant: Restaurant, reservation_time: dat
     return None
 
 
+def _validate_booking_update(
+    db: Session,
+    reservation: Any,
+    restaurant: Restaurant | None,
+    reservation_time: datetime,
+    guest_count: int,
+) -> str | None:
+    if restaurant is None:
+        return "Mình không tìm thấy nhà hàng của booking này để kiểm tra lại."
+    if restaurant.status != "APPROVED" or not restaurant.is_active:
+        return f"{restaurant.name} hiện chưa nhận chỉnh sửa đặt bàn qua hệ thống."
+    if guest_count <= 0:
+        return "Số khách cần lớn hơn 0. Bạn nhập lại số người giúp mình nhé."
+    minimum_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=30)
+    if reservation_time <= minimum_time:
+        return "Thời gian đặt bàn cần cách hiện tại ít nhất 30 phút. Bạn chọn giờ khác giúp mình nhé."
+    max_capacity = get_restaurant_capacity_for_date(db, restaurant.restaurant_id, reservation_time.date())
+    if max_capacity <= 0:
+        return f"{restaurant.name} chưa có thông tin sức chứa cho ngày này."
+    if guest_count > max_capacity:
+        return f"{restaurant.name} chỉ có tối đa {max_capacity} chỗ cho khung ngày này."
+
+    booked_other_seats = max_capacity - crud_reservation.count_available_seats(
+        db,
+        restaurant.restaurant_id,
+        reservation_time,
+        max_capacity,
+    )
+    current_reserved = (
+        reservation.guest_count
+        if reservation.reservation_time == reservation_time and reservation.status in {"PENDING", "CONFIRMED"}
+        else 0
+    )
+    available_for_update = max_capacity - max(0, booked_other_seats - current_reserved)
+    if guest_count > available_for_update:
+        return f"{restaurant.name} không còn đủ {guest_count} chỗ vào {_format_datetime(reservation_time)}."
+    return None
+
+
 def _is_booking_request(normalized_query: str) -> bool:
     return any(cue in normalized_query for cue in BOOKING_CUES | AVAILABILITY_CUES)
+
+
+def _is_existing_booking_cancel_request(normalized_query: str, state: dict[str, Any]) -> bool:
+    if not any(cue in normalized_query for cue in CANCEL_CUES):
+        return False
+    return any(cue in normalized_query for cue in BOOKING_REFERENCE_CUES) or bool(state.get("booking_id"))
+
+
+def _is_existing_booking_modify_request(query: str, normalized_query: str, state: dict[str, Any]) -> bool:
+    if not state.get("booking_id") and not any(cue in normalized_query for cue in BOOKING_REFERENCE_CUES):
+        return False
+    return bool(
+        _parse_guest_count(normalized_query)
+        or _parse_reservation_time_with_reference(query, _parse_iso_datetime(state.get("reservation_time")))
+    )
 
 
 def _is_favorite_request(normalized_query: str) -> bool:
@@ -1206,6 +1648,14 @@ def _is_show_reviews_request(normalized_query: str) -> bool:
 
 def _is_create_review_request(normalized_query: str) -> bool:
     return any(cue in normalized_query for cue in CREATE_REVIEW_CUES) or _parse_review_rating(normalized_query) is not None
+
+
+def _is_update_review_request(normalized_query: str) -> bool:
+    return any(cue in normalized_query for cue in UPDATE_REVIEW_CUES)
+
+
+def _is_delete_review_request(normalized_query: str) -> bool:
+    return any(cue in normalized_query for cue in DELETE_REVIEW_CUES)
 
 
 def _is_confirmation(normalized_query: str) -> bool:
@@ -1291,6 +1741,16 @@ def _extract_review_comment(query: str, normalized_query: str) -> str | None:
     removable_phrases = [
         "viet review",
         "them review",
+        "sua review",
+        "sua danh gia",
+        "cap nhat review",
+        "cap nhat danh gia",
+        "doi review",
+        "doi danh gia",
+        "xoa review",
+        "xoa danh gia",
+        "huy review",
+        "bo review",
         "danh gia",
         "review cho",
         "review quan nay",
@@ -1309,6 +1769,8 @@ def _extract_review_comment(query: str, normalized_query: str) -> str | None:
     for phrase in removable_phrases:
         comment = re.sub(rf"\b{re.escape(phrase)}\b", " ", comment)
     comment = re.sub(r"\s+", " ", comment).strip(" ,.-")
+    if comment in {"nay", "do", "nay thanh", "do thanh", "thanh"}:
+        return None
     return comment or None
 
 
@@ -1361,6 +1823,23 @@ def _parse_reservation_time(query: str) -> datetime | None:
     if candidate <= now + timedelta(minutes=30):
         candidate += timedelta(days=1)
     return candidate
+
+
+def _parse_reservation_time_with_reference(query: str, reference: datetime | None) -> datetime | None:
+    parsed = _parse_reservation_time(query)
+    if parsed is None:
+        return None
+    raw_query = str(query or "")
+    normalized_query = normalize_text(raw_query).replace(",", " ")
+    has_explicit_date = bool(
+        re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b", raw_query)
+        or re.search(r"\bngay\s+(\d{1,2})\s+thang\s+(\d{1,2})(?:\s+nam\s+(\d{2,4}))?\b", normalized_query)
+        or "mai" in normalized_query
+        or "hom nay" in normalized_query
+    )
+    if has_explicit_date or reference is None:
+        return parsed
+    return datetime.combine(reference.date(), parsed.time())
 
 
 def _parse_iso_datetime(value: Any) -> datetime | None:

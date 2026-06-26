@@ -53,6 +53,7 @@ def get_conversation_context(db: Session, session_id: UUID | None, query: str, c
 
     session = _get_session(db, session_id)
     previous_user_message = _get_previous_user_message(db, session_id)
+    summary_intent = _intent_from_context_summary(session.context_summary if session else None)
     recent_user_queries = _get_recent_user_queries(db, session_id)
     recent_user_intents = _get_recent_user_intents(db, session_id)
     previous_result_ids = _get_previous_result_ids(db, session_id)
@@ -61,7 +62,8 @@ def get_conversation_context(db: Session, session_id: UUID | None, query: str, c
     return {
         "session": session,
         "previous_query": previous_user_message.content if previous_user_message else None,
-        "previous_intent": _extract_message_intent(previous_user_message),
+        "previous_intent": _merge_summary_into_intent(_extract_message_intent(previous_user_message), summary_intent),
+        "summary_intent": summary_intent,
         "previous_result_ids": previous_result_ids,
         "recent_user_queries": recent_user_queries,
         "recent_user_intents": recent_user_intents,
@@ -98,6 +100,7 @@ def _empty_context() -> dict[str, Any]:
         "session": None,
         "previous_query": None,
         "previous_intent": None,
+        "summary_intent": None,
         "previous_result_ids": [],
         "recent_user_queries": [],
         "recent_user_intents": [],
@@ -115,6 +118,7 @@ def _get_session(db: Session, session_id: UUID) -> AIChatSession | None:
             .first()
         )
     except Exception:
+        db.rollback()
         return None
 
 
@@ -127,6 +131,7 @@ def _get_previous_user_message(db: Session, session_id: UUID) -> AIChatMessage |
             .first()
         )
     except Exception:
+        db.rollback()
         return None
 
 
@@ -137,16 +142,86 @@ def _extract_message_intent(message: AIChatMessage | None) -> dict[str, Any] | N
     return extracted_intent if isinstance(extracted_intent, dict) else None
 
 
+def _intent_from_context_summary(context_summary: str | None) -> dict[str, Any] | None:
+    if not context_summary:
+        return None
+
+    fields: dict[str, str] = {}
+    for part in context_summary.split(" | "):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        fields[key.strip()] = value.strip()
+
+    cuisines = [item for item in (fields.get("cuisines") or "").split(",") if item]
+    districts = [item for item in (fields.get("districts") or "").split(",") if item]
+    price_min = _parse_summary_int(fields.get("price_min"))
+    price_max = _parse_summary_int(fields.get("price_max"))
+    group_size = _parse_summary_int(fields.get("group_size"))
+
+    if not any([cuisines, districts, price_min is not None, price_max is not None, group_size is not None]):
+        return None
+
+    return {
+        "original_query": fields.get("latest_query") or "",
+        "cuisines": cuisines,
+        "districts": districts,
+        "price_min": price_min,
+        "price_max": price_max,
+        "group_size": group_size,
+        "keywords": [],
+        "ambience_tags": [],
+        "amenity_tags": [],
+        "occasion_tags": [],
+        "weather_tags": [],
+        "excluded_cuisines": [],
+        "excluded_keywords": [],
+        "preference_tags": [],
+        "dish_terms": [],
+        "conflicts": [],
+        "walking_only": False,
+    }
+
+
+def _merge_summary_into_intent(message_intent: dict[str, Any] | None, summary_intent: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not message_intent:
+        return summary_intent
+    if not summary_intent:
+        return message_intent
+
+    merged = dict(message_intent)
+    for key in ("cuisines", "districts", "ambience_tags", "amenity_tags", "occasion_tags", "weather_tags", "dish_terms"):
+        if not merged.get(key) and summary_intent.get(key):
+            merged[key] = list(summary_intent[key])
+    for key in ("price_min", "price_max", "group_size"):
+        if merged.get(key) is None and summary_intent.get(key) is not None:
+            merged[key] = summary_intent[key]
+    return merged
+
+
+def _parse_summary_int(value: str | None) -> int | None:
+    if value in {None, "", "None"}:
+        return None
+    try:
+        return int(str(value).strip())
+    except ValueError:
+        return None
+
+
 def _get_previous_result_ids(db: Session, session_id: UUID) -> list[str]:
     try:
         logs = (
             db.query(RecommendationLog)
-            .filter(RecommendationLog.session_id == session_id)
+            .filter(
+                RecommendationLog.session_id == session_id,
+                RecommendationLog.source != "AGENT",
+            )
             .order_by(RecommendationLog.created_at.desc())
             .limit(20)
             .all()
         )
     except Exception:
+        db.rollback()
         return []
 
     ids: list[str] = []
@@ -167,6 +242,7 @@ def _get_recent_user_queries(db: Session, session_id: UUID) -> list[str]:
             .all()
         )
     except Exception:
+        db.rollback()
         return []
     return [message.content for message in reversed(messages)]
 
@@ -181,6 +257,7 @@ def _get_recent_user_intents(db: Session, session_id: UUID) -> list[dict[str, An
             .all()
         )
     except Exception:
+        db.rollback()
         return []
     intents: list[dict[str, Any]] = []
     for message in reversed(messages):
@@ -231,6 +308,63 @@ def apply_conversation_memory(
     return intent
 
 
+def reinforce_follow_up_context(
+    intent: Any,
+    conversation_context: dict[str, Any],
+    *,
+    mode_name: str,
+) -> Any:
+    if mode_name != "follow_up_search":
+        return intent
+
+    context_action = str(intent_value(intent, "context_action") or "")
+    if context_action in {"fresh_search", "switch_topic"}:
+        return intent
+
+    memory_sources: list[dict[str, Any]] = []
+    summary_intent = conversation_context.get("summary_intent")
+    if isinstance(summary_intent, dict):
+        memory_sources.append(summary_intent)
+
+    recent_user_intents = conversation_context.get("recent_user_intents") or []
+    for memory_intent in reversed(recent_user_intents[-4:]):
+        if isinstance(memory_intent, dict):
+            memory_sources.append(memory_intent)
+
+    list_keys = (
+        "cuisines",
+        "districts",
+        "ambience_tags",
+        "amenity_tags",
+        "occasion_tags",
+        "weather_tags",
+        "dish_terms",
+    )
+    scalar_keys = ("price_min", "price_max", "budget_label", "group_size", "open_now")
+
+    for key in list_keys:
+        current_values = intent_value(intent, key, []) or []
+        if current_values:
+            continue
+        for memory_intent in memory_sources:
+            memory_values = intent_value(memory_intent, key, []) or []
+            if memory_values:
+                _set_intent_value(intent, key, list(memory_values))
+                break
+
+    for key in scalar_keys:
+        current_value = intent_value(intent, key)
+        if current_value is not None:
+            continue
+        for memory_intent in memory_sources:
+            memory_value = intent_value(memory_intent, key)
+            if memory_value is not None:
+                _set_intent_value(intent, key, memory_value)
+                break
+
+    return intent
+
+
 def _set_intent_value(intent: Any, key: str, value: Any) -> None:
     if isinstance(intent, dict):
         intent[key] = value
@@ -272,6 +406,26 @@ def _should_use_previous_context(normalized_query: str, current_intent: Any, pre
     if not previous_user_message:
         return False
     if any(cue in normalized_query for cue in CONTEXT_CUES):
+        return True
+
+    local_intent = parse_query_heuristically(normalized_query)
+    has_new_topic = bool(local_intent.cuisines or local_intent.dish_terms)
+    has_refinement_fields = any(
+        [
+            local_intent.districts,
+            local_intent.ambience_tags,
+            local_intent.amenity_tags,
+            local_intent.occasion_tags,
+            local_intent.weather_tags,
+            local_intent.price_min is not None,
+            local_intent.price_max is not None,
+            local_intent.budget_label,
+            local_intent.group_size is not None,
+            local_intent.open_now is not None,
+            local_intent.walking_only,
+        ]
+    )
+    if not has_new_topic and has_refinement_fields:
         return True
 
     strong_fields = [

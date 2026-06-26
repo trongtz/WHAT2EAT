@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from models.user import User
 from services.ai_assistant.agent import handle_agent_turn
-from services.ai_assistant.conversation_context import apply_conversation_memory, get_conversation_context
+from services.ai_assistant.conversation_context import (
+    apply_conversation_memory,
+    get_conversation_context,
+    reinforce_follow_up_context,
+)
 from services.ai_assistant.intent_extractor import extract_intent, filters_from_intent, intent_to_dict, intent_value
 from services.ai_assistant.mode_classifier import classify_conversation_mode
 from services.ai_assistant.openai_reranker import (
@@ -16,7 +20,7 @@ from services.ai_assistant.openai_reranker import (
     rerank_shortlist,
     should_use_agentic_reranker,
 )
-from services.ai_assistant.recommend_imports import haversine_km, normalize_text
+from services.ai_assistant.recommend_imports import haversine_km, normalize_text, parse_query_heuristically
 from services.ai_assistant.recommendation_engine import RecommendationEngine
 from services.ai_assistant.response_composer import compose_recommendation_response
 from services.ai_assistant.tools import (
@@ -110,9 +114,22 @@ class AIAssistantService:
                 },
             }
 
-        use_previous_context = mode_name == "follow_up_search" or (
-            mode_name not in {"new_search", "small_talk"} and conversation_context["use_previous_context"]
+        use_previous_context = (
+            mode_name == "follow_up_search"
+            or (
+                conversation_context["use_previous_context"]
+                and not _should_force_fresh_turn(base_intent, query)
+            )
+            or (
+                _is_refinement_only_query(query)
+                and conversation_context.get("previous_query") is not None
+            )
         )
+        base_context_action = str(intent_value(base_intent, "context_action") or "")
+        if base_context_action == "switch_topic":
+            use_previous_context = False
+        elif base_context_action == "fresh_search" and _should_force_fresh_turn(base_intent, query):
+            use_previous_context = False
         if use_previous_context:
             intent = extract_intent(
                 query,
@@ -121,6 +138,11 @@ class AIAssistantService:
             )
         else:
             intent = base_intent
+        intent = reinforce_follow_up_context(
+            intent,
+            conversation_context,
+            mode_name=mode_name,
+        )
         intent = apply_conversation_memory(
             intent,
             conversation_context["recent_user_queries"],
@@ -128,7 +150,12 @@ class AIAssistantService:
         )
         intent = _apply_negative_overrides(intent)
         filters_applied = filters_from_intent(intent)
-        radius_km = parse_radius_km_from_query(query) if latitude is not None and longitude is not None else None
+        radius_km = _resolve_radius_km(
+            query=query,
+            intent=intent,
+            latitude=latitude,
+            longitude=longitude,
+        )
         if radius_km is not None and intent_value(intent, "walking_only", False):
             radius_km = min(radius_km, 1.5)
         filters_applied["radius_km"] = radius_km
@@ -250,6 +277,64 @@ class AIAssistantService:
             "avoid_repeated_results": conversation_context["avoid_repeated_results"],
         }
         return response
+
+
+def _resolve_radius_km(
+    *,
+    query: str,
+    intent: Any,
+    latitude: float | None,
+    longitude: float | None,
+) -> float | None:
+    if latitude is None or longitude is None:
+        return None
+
+    normalized_query = normalize_text(query)
+    explicit_radius = _parse_explicit_radius_only(query)
+    mentioned_districts = intent_value(intent, "districts", []) or []
+    has_nearby_cue = _query_uses_current_location(normalized_query)
+
+    # If the user already names a district/area, do not also force a default
+    # radius around the current GPS position. District filtering is enough.
+    # This avoids "Quận 1" or "Bình Thạnh" being intersected with an unrelated
+    # 2 km circle around the user's current location.
+    if mentioned_districts and not has_nearby_cue:
+        return None
+
+    if explicit_radius is not None:
+        return explicit_radius
+
+    if has_nearby_cue:
+        return parse_radius_km_from_query(query)
+
+    return None
+
+
+def _parse_explicit_radius_only(query: str) -> float | None:
+    normalized = str(query or "").lower().replace(",", ".")
+    match = re.search(r"(\d+(?:\.\d+)?)\s*(km|m)\b", normalized)
+    if not match:
+        return None
+
+    value = float(match.group(1))
+    if match.group(2) == "m":
+        value /= 1000.0
+    return min(max(value, 0.1), 20.0)
+
+
+def _query_uses_current_location(normalized_query: str) -> bool:
+    nearby_cues = [
+        "gan day",
+        "gan toi",
+        "quanh day",
+        "quanh toi",
+        "gan toi nhat",
+        "gan nha",
+        "gan truong",
+        "xung quanh day",
+        "o gan day",
+    ]
+    return any(cue in normalized_query for cue in nearby_cues)
 
 
 def _resolve_location_anchor(
@@ -391,6 +476,14 @@ def _build_distance_lookup_response(
 
 
 def _candidate_search_terms(intent: Any, query: str) -> list[str]:
+    local_query_intent = parse_query_heuristically(query)
+    raw_query_has_topic = bool(local_query_intent.cuisines or local_query_intent.dish_terms)
+    if not raw_query_has_topic:
+        # For short refinement turns like "quận 1 á", "200k thôi", "rẻ hơn",
+        # keep the full candidate pool and let hard constraints + ranking apply
+        # the merged context from previous turns.
+        return []
+
     dish_terms = intent_value(intent, "dish_terms", []) or []
     cuisines = intent_value(intent, "cuisines", []) or []
     has_hard_filters = any(
@@ -451,6 +544,51 @@ def _candidate_search_terms(intent: Any, query: str) -> list[str]:
         seen.add(key)
         unique_terms.append(str(term).strip())
     return unique_terms[:6]
+
+
+def _should_force_fresh_turn(intent: Any, query: str) -> bool:
+    local_intent = parse_query_heuristically(query)
+    if local_intent.cuisines or local_intent.dish_terms:
+        return True
+    if _is_refinement_only_query(query):
+        return False
+    normalized = normalize_text(query)
+    return any(
+        phrase in normalized
+        for phrase in [
+            "goi y",
+            "tim",
+            "toi muon an",
+            "muon an",
+            "doi mon",
+            "doi sang",
+            "chuyen sang",
+            "mon khac",
+            "gio toi muon",
+            "gio goi y",
+        ]
+    )
+
+
+def _is_refinement_only_query(query: str) -> bool:
+    local_intent = parse_query_heuristically(query)
+    if local_intent.cuisines or local_intent.dish_terms:
+        return False
+    return any(
+        [
+            local_intent.districts,
+            local_intent.ambience_tags,
+            local_intent.amenity_tags,
+            local_intent.occasion_tags,
+            local_intent.weather_tags,
+            local_intent.price_min is not None,
+            local_intent.price_max is not None,
+            local_intent.budget_label,
+            local_intent.group_size is not None,
+            local_intent.open_now is not None,
+            local_intent.walking_only,
+        ]
+    )
 
 
 def _apply_negative_overrides(intent: Any) -> Any:
